@@ -1,0 +1,150 @@
+/* CONTENEDOR PRINCIPAL */
+.ListAjustes {
+  padding: 20px 0 40px 0;
+  font-family: 'Inter', sans-serif;
+  animation: fadeIn 0.25s ease;
+}
+
+/* HEADER SUPERIOR */
+.ajustes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.ajustes-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #000;
+}
+
+.ajustes-subtitle {
+  opacity: 0.7;
+  color: #000;
+  font-size: 15px;
+}
+
+/* FORMULARIO */
+.settings-form {
+  background: #ffffff;
+  padding: 28px 32px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 3px 10px rgba(26, 145, 144, 0.08);
+  width: 460px; /* 🔹 ancho fijo del card */
+}
+
+/* GRUPOS DE FORMULARIO */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+/* LABELS */
+.settings-form label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #000;
+  text-align: left;
+  padding-left: 0; /* elimina cualquier desplazamiento */
+  margin-left: 2px; /* ligera separación del borde interno del card */
+}
+
+
+/* INPUTS Y SELECTS */
+.settings-form input,
+.settings-form select {
+  width: 100%; /* ocupa todo el ancho útil del card */
+  padding: 11px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: 0.25s ease;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.settings-form input:focus,
+.settings-form select:focus {
+  outline: none;
+  border-color: #1A9190;
+  box-shadow: 0 0 0 3px rgba(26, 145, 144, 0.25);
+}
+
+/* BOTÓN GUARDAR */
+.save-btn {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  transition: 0.25s ease;
+  box-shadow: 0 2px 6px rgba(26, 145, 144, 0.25);
+}
+
+.save-btn:hover {
+  background: #157a78;
+}
+
+.save-btn:disabled {
+  background: #9ccfce;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ERRORES */
+.error-text {
+  color: #e63946;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* Corrección específica para el input "Remitente por defecto" */
+.settings-form input[name="defaultSender"] {
+  width: 100%; /* igual que los demás */
+  padding: 11px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 15px;
+  box-sizing: border-box;
+  margin: 0; /* elimina cualquier desplazamiento lateral */
+}
+
+
+
+/* ANIMACIÓN */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .settings-form {
+    width: 100%;
+    padding: 20px;
+  }
+
+  .ajustes-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .save-btn {
+    align-self: flex-start;
+  }
+}

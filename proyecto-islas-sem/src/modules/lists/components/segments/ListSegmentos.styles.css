@@ -1,0 +1,91 @@
+.ListSegmentos {
+  padding: 20px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* HEADER */
+.ListSegmentos__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ListSegmentos__header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #000;
+}
+
+.ListSegmentos__new {
+  background: #1A9190;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.ListSegmentos__new:hover {
+  background: #157a7a;
+}
+
+/* DESCRIPCIÓN */
+.ListSegmentos__desc {
+  margin-top: 10px;
+  color: #555;
+  font-size: 15px;
+}
+
+/* VACÍO */
+.ListSegmentos__empty {
+  margin-top: 30px;
+  text-align: center;
+  padding: 40px;
+  background: #f8f8f8;
+  border-radius: 10px;
+}
+
+.ListSegmentos__empty p {
+  color: #555;
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+/* 🔹 PAGINACIÓN ISLAS SEM */
+.ListSegmentos__pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+.ListSegmentos__pageBtn {
+  background: white;
+  color: #136B68;
+  border: 1px solid #d5dede;
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.25s ease;
+}
+
+.ListSegmentos__pageBtn:hover:not(:disabled) {
+  background: #EEF1F1;
+}
+
+.ListSegmentos__pageBtn:disabled {
+  color: #bbb;
+  border-color: #eee;
+  cursor: not-allowed;
+}
+
+.ListSegmentos__pageInfo {
+  font-size: 15px;
+  color: #333;
+  font-weight: 500;
+}

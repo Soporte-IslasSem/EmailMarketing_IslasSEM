@@ -1,0 +1,72 @@
+# ============================
+# ARCHIVOS SENSIBLES
+# ============================
+
+# Firebase Admin SDK (MUY SENSIBLE)
+*.json
+!package.json
+!package-lock.json
+
+# Configuración privada
+src/config/firebaseConfig.js
+email-server.js
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# ============================
+# DEPENDENCIAS Y BUILD
+# ============================
+
+node_modules/
+dist/
+dist-ssr/
+.vite/
+.cache/
+firebase-debug.log
+firebase-debug.*.log
+
+# ============================
+# ARCHIVOS QUE NO DEBEN SUBIRSE
+# ============================
+
+# Imágenes internas o temporales
+pixel.png
+
+# Carpeta pública generada por Vite
+public/assets/
+
+# ============================
+#  EDITOR / SISTEMA
+# ============================
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ============================
+#  FIREBASE
+# ============================
+
+.firebase/
+functions/node_modules/
+functions/.env
+functions/.runtimeconfig.json
+
+# ============================
+#  LOGS
+# ============================
+
+logs/
+*.log
+
+# ============================
+# OTROS ARCHIVOS LOCALES
+# ============================
+
+# Archivos de pruebas o scripts locales
+*.local.js
+*.test.js

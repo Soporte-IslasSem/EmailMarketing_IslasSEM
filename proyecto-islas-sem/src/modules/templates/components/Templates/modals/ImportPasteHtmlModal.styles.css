@@ -1,0 +1,74 @@
+.ImportPasteHtmlModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.ImportPasteHtmlModal__content {
+  background: #fff;
+  width: 520px;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+.ImportPasteHtmlModal__content h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1A9190;
+  margin-bottom: 16px;
+}
+
+.ImportPasteHtmlModal__content label {
+  display: block;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.ImportPasteHtmlModal__content input,
+.ImportPasteHtmlModal__content textarea {
+  width: 92%;              /* ⬅ Reduce el ancho para dejar espacio lateral */
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;      /* ⬅ Centra los campos dentro del card */
+}
+
+.ImportPasteHtmlModal__content textarea {
+  height: 180px;
+  resize: vertical;
+}
+
+
+.error {
+  color: #ff0077;
+  margin-top: 10px;
+}
+
+.ImportPasteHtmlModal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.ImportPasteHtmlModal__actions button {
+  background: #1A9190;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.ImportPasteHtmlModal__actions .cancel {
+  background: #ccc;
+  color: #000;
+}

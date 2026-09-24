@@ -1,0 +1,66 @@
+.ImportTemplateModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.ImportTemplateModal__content {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  width: 500px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.ImportTemplateModal__content h2 {
+  margin-bottom: 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1A9190;
+}
+
+.ImportTemplateModal__content label {
+  display: block;
+  margin-top: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.ImportTemplateModal__content input,
+.ImportTemplateModal__content textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.ImportTemplateModal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.ImportTemplateModal__actions button {
+  background: #1A9190;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ImportTemplateModal__actions .cancel {
+  background: #ccc;
+  color: #000;
+}

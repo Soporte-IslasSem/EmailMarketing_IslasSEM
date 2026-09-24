@@ -1,0 +1,231 @@
+/* 🔹 Fondo del modal */
+.ModalBase {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  font-family: 'Inter', sans-serif;
+}
+
+/* 🔹 Contenedor principal */
+.ModalBase__content {
+  background: #fff;
+  padding: 28px;
+  border-radius: 12px;
+  width: 420px;
+  max-width: 92%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  animation: fadeIn 0.25s ease;
+}
+
+/* 🔹 Header */
+.ModalBase__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.ModalBase__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #136B68;
+}
+
+/* 🔹 Botón cerrar */
+.ModalBase__close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: #444;
+  transition: 0.25s ease;
+}
+
+.ModalBase__close:hover {
+  color: #1A9190;
+}
+
+/* 🔹 Descripción */
+.ModalBase__description {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+/* 🔹 Input */
+.ModalBase__input {
+  width: 94%;              /* 🔹 antes 100% */
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-top: 6px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;      /* 🔹 centrado horizontal */
+  transition: border-color 0.25s ease;
+}
+
+
+.ModalBase__input:focus {
+  outline: none;
+  border-color: #1A9190;
+}
+
+/* 🔹 Acciones */
+.ModalBase__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+/* Botón cancelar */
+.ModalBase__button--cancel {
+  background: #e5e7eb;
+  color: #333;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.ModalBase__button--cancel:hover {
+  background: #d1d5db;
+}
+
+/* Botón principal */
+.ModalBase__button--primary {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.ModalBase__button--primary:hover:not(:disabled) {
+  background: #157a78;
+}
+
+.ModalBase__button--primary:disabled {
+  background: #9cc9c8;
+  cursor: not-allowed;
+}
+
+/* Animación */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* 🔹 Ajuste específico para modales de confirmación */
+.ModalBase__content.confirmation {
+  width: 340px;
+  padding: 22px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.ModalBase__content.confirmation h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #136B68;
+  margin-bottom: 10px;
+}
+
+.ModalBase__content.confirmation p {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 18px;
+}
+
+/* 🔹 Botones del modal de confirmación */
+.ModalBase__content.confirmation .ModalBase__actions {
+  justify-content: center;
+  gap: 14px;
+}
+
+.ModalBase__content.confirmation .ModalBase__button--cancel {
+  background: #e5e7eb;
+  color: #333;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.ModalBase__content.confirmation .ModalBase__button--cancel:hover {
+  background: #d1d5db;
+}
+
+.ModalBase__content.confirmation .ModalBase__button--primary {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.ModalBase__content.confirmation .ModalBase__button--primary:hover {
+  background: #c0392b;
+}
+
+
+/* 🔹 Ajuste específico para modal de renombrar plantilla */
+.ModalBase__content.rename {
+  width: 380px;
+  padding: 26px;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.ModalBase__content.rename h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #136B68;
+}
+
+.ModalBase__content.rename .ModalBase__input {
+  width: 94%;
+  margin: 12px auto 0;
+  display: block;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  transition: border-color 0.25s ease;
+}
+
+.ModalBase__content.rename .ModalBase__input:focus {
+  outline: none;
+  border-color: #1A9190;
+}
+
+.ModalBase__content.rename .ModalBase__actions {
+  justify-content: center;
+  gap: 14px;
+  margin-top: 22px;
+}

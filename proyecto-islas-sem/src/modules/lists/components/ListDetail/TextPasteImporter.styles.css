@@ -1,0 +1,56 @@
+.TextPasteImporter {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: 'Inter', sans-serif;
+}
+
+.TextPasteImporter textarea {
+  width: 100%;
+  height: 180px;
+  padding: 12px;
+  border: 1px solid #cfcfcf;
+  border-radius: 6px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.line-counter {
+  font-size: 13px;
+  color: #555;
+}
+
+/* Error general */
+.textpaste-error {
+  color: #d93636;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Caja de emails inválidos */
+.invalid-box {
+  background: #fff4f4;
+  border: 1px solid #ffb3b3;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.invalid-title {
+  color: #d93636;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.invalid-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #b30000;
+  font-size: 14px;
+}
+
+.invalid-more {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #a00000;
+}

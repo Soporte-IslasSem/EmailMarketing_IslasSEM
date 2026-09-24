@@ -1,0 +1,177 @@
+.Header {
+  width: 100%;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 15px 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.Header__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 25px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.Header__logoWrapper {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  z-index: 20; /* evita que algo lo tape */
+}
+
+.Header__logo {
+  height: 60px;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.Header__logoWrapper:hover .Header__logo {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+.Header__nav {
+  display: flex;
+  gap: 25px;
+}
+
+.Header__link {
+  color: #000;
+  text-decoration: none;
+  font-weight: 500;
+  transition: 0.25s ease;
+}
+
+.Header__link:hover {
+  color: #1A9190;
+}
+
+.Header__actions {
+  display: flex;
+  gap: 15px;
+}
+
+/* ============================
+   BOTONES PREMIUM (ACTUALIZADOS)
+   ============================ */
+
+/* BOTÓN ENTRAR */
+.Header__login {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 2px solid #1A9190;
+  color: #1A9190 !important;
+  background: white;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.Header__login:hover {
+  background: #D4A017;
+  color: white !important;
+  border-color: #D4A017;
+  box-shadow: 0 4px 12px rgba(212,160,23,0.35);
+  transform: translateY(-2px);
+}
+
+/* BOTÓN REGÍSTRATE */
+.Header__register {
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: #1A9190;
+  color: white !important;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.25s ease;
+  box-shadow: 0 3px 10px rgba(26,145,144,0.35);
+}
+
+.Header__register:hover {
+  background: #157a78;
+  color: white !important;
+  box-shadow: 0 6px 18px rgba(26,145,144,0.45);
+  transform: translateY(-2px);
+}
+
+/* ============================
+   RECURSOS WRAPPER
+   ============================ */
+
+.Header__recursosWrapper {
+  position: relative;
+  cursor: pointer;
+}
+
+/* ============================
+   MEGA MENÚ PREMIUM RECURSOS
+   ============================ */
+
+.RecursosDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+
+  width: 650px;
+  padding: 25px;
+
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: 0.25s ease;
+
+  z-index: 999;
+}
+
+.Header__recursosWrapper:hover .RecursosDropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.RecursosDropdown__card {
+  display: block;
+  padding: 18px;
+  border-radius: 12px;
+  text-decoration: none;
+
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+
+  transition: 0.25s ease;
+}
+
+.RecursosDropdown__card:hover {
+  background: white;
+  border-color: rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.RecursosDropdown__card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+}
+
+.RecursosDropdown__card p {
+  font-size: 14px;
+  color: #444;
+  line-height: 1.4;
+}

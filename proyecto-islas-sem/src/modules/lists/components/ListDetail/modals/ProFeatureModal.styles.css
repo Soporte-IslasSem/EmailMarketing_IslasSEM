@@ -1,0 +1,28 @@
+/* Ajustes específicos del modal PRO */
+.ProModal {
+  text-align: center;
+  padding-top: 30px;
+  padding-bottom: 30px;
+}
+
+/* Icono destacado del modal PRO */
+.ProModal__icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+/* Título */
+.ProModal__title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  margin-bottom: 10px;
+}
+
+/* Texto */
+.ProModal__text {
+  font-size: 15px;
+  color: #555;
+  margin-bottom: 20px;
+  padding: 0 10px;
+}

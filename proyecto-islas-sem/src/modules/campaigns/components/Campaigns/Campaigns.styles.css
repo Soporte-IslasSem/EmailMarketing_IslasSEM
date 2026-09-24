@@ -1,0 +1,146 @@
+.Campaigns {
+  padding: 30px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* HEADER */
+.Campaigns__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.Campaigns__subtitle {
+  opacity: 0.7;
+  margin-top: 5px;
+  color: #000;
+}
+
+/* BOTÓN ISLAS SEM */
+.Campaigns__newButton {
+  background: #1A9190;
+  color: white !important;
+  padding: 10px 22px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.25s ease;
+  box-shadow: 0 2px 6px rgba(26, 145, 144, 0.25);
+}
+
+.Campaigns__newButton:hover {
+  background: #157a78;
+}
+
+/* BOTÓN EN ESTADO VACÍO */
+.Campaigns__newButton--empty {
+  margin-top: 20px;
+  box-shadow: none;
+}
+
+/* TABS — pastilla segmentada */
+.Campaigns__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: #EEF1F1;
+  padding: 5px;
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.Campaigns__tabs button {
+  background: transparent;
+  border: none;
+  padding: 9px 16px;
+  cursor: pointer;
+  border-radius: 9px;
+  font-weight: 500;
+  font-size: 14px;
+  color: #5b6666;
+  transition: 0.2s ease;
+}
+
+.Campaigns__tabs button:hover {
+  color: #0F0F0F;
+}
+
+.Campaigns__tabs .active {
+  background: #ffffff;
+  color: #136B68;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+}
+
+/* FILTERS */
+.Campaigns__filters {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 40px;
+}
+
+.Campaigns__search,
+.Campaigns__select {
+  padding: 10px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.Campaigns__search:focus,
+.Campaigns__select:focus {
+  outline: none;
+  border-color: #1A9190;
+}
+
+/* EMPTY STATE */
+.Campaigns__empty {
+  text-align: center;
+  margin-top: 60px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  animation: fadeIn 0.25s ease;
+}
+
+.Campaigns__empty img {
+  width: 260px;
+  margin-bottom: 25px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  transition: opacity 0.3s ease;
+}
+
+.Campaigns__empty h3,
+.Campaigns__empty p {
+  transition: opacity 0.3s ease;
+}
+
+.Campaigns__empty h3 {
+  margin-bottom: 10px;
+  color: #000;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.Campaigns__empty p {
+  opacity: 0.7;
+  margin-bottom: 25px;
+  color: #000;
+  font-size: 15px;
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

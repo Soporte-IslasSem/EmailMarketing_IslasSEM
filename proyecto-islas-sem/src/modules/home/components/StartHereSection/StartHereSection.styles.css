@@ -1,0 +1,90 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-text-dark: #1A1A1A;
+
+  /* AMARILLO REAL DEL HERO */
+  --islas-text-highlight: #D4A017;
+}
+
+/* Fondo suave para diferenciar la sección */
+.StartHereSection {
+  padding: 40px 0;
+  text-align: center;
+  background-color: #E8F4F3;
+}
+
+.StartHereSection__title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--islas-primary);
+}
+
+/* SUBTÍTULO CON ESTILO PREMIUM (OPCIÓN 1) */
+.StartHereSection__subtitle {
+  margin-top: 10px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--islas-text-highlight); /* ← AMARILLO DEL HERO */
+  display: inline-block;
+
+  /* Estilo elegante */
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+
+  /* Sin fondo, sin bordes, sin nada raro */
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.StartHereSection__grid {
+  margin-top: 50px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 35px;
+  padding: 0 20px;
+}
+
+/* Tarjetas más redondeadas y con borde animado */
+.StartHereSection__card {
+  background: #fff;
+  padding: 30px;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  transition: border-color 0.25s ease, background 0.25s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Hover elegante, sin levantar la tarjeta */
+.StartHereSection__card:hover {
+  border-color: var(--islas-primary);
+  background: #F4FBFA;
+}
+
+/* Iconos dentro de un círculo blanco */
+.StartHereSection__icon {
+  width: 70px;
+  height: 70px;
+  padding: 15px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  margin-bottom: 20px;
+}
+
+/* CTA más limpio */
+.StartHereSection__cta {
+  display: inline-block;
+  margin-top: 15px;
+  color: var(--islas-primary);
+  font-weight: 600;
+  transition: opacity 0.2s ease;
+}
+
+.StartHereSection__cta:hover {
+  opacity: 0.7;
+}

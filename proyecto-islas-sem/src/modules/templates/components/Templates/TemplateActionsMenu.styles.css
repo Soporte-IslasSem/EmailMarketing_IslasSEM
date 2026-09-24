@@ -1,0 +1,87 @@
+/* El card padre debe tener position: relative para anclar el menú */
+.Templates__item {
+  position: relative;
+}
+
+/* Contenedor del menú */
+.TemplateActionsMenu {
+  position: absolute;
+  top: 12px; /* 🔹 fija el botón dentro del card */
+  right: 12px; /* 🔹 alineado al borde derecho */
+  z-index: 50;
+}
+
+/* Botón de los tres puntos */
+.TemplateActionsMenu__trigger {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  color: #1A9190;
+  transition: 0.25s ease;
+}
+
+.TemplateActionsMenu__trigger:hover {
+  color: #157a78;
+}
+
+/* Dropdown */
+.TemplateActionsMenu__dropdown {
+  position: absolute;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  width: 190px;
+  padding: 6px 0;
+  z-index: 9999;
+}
+
+/* 🔥 MENÚ HACIA ARRIBA Y A LA DERECHA — FIJO DENTRO DEL CARD */
+.TemplateActionsMenu__dropdown--top-right {
+  top: -10px; /* 🔹 se coloca arriba del botón */
+  right: 0;   /* 🔹 alineado al borde derecho del card */
+  transform: translateY(-100%); /* 🔹 sube el menú completamente */
+  transform-origin: top right;
+  animation: fadeUp 0.25s ease-out;
+}
+
+/* Animación suave */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(-80%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-100%);
+  }
+}
+
+/* Botones del menú */
+.TemplateActionsMenu__dropdown button {
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: 0.25s ease;
+}
+
+.TemplateActionsMenu__dropdown button:hover {
+  background: #f0f7f7;
+}
+
+.TemplateActionsMenu__dropdown .danger {
+  color: #d9534f;
+}
+
+.TemplateActionsMenu__dropdown hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 6px 0;
+}

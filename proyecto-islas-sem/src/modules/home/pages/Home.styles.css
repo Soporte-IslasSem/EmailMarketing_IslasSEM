@@ -1,0 +1,31 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-bg-soft: #E8F4F3;
+  --islas-text-dark: #1A1A1A;
+  --islas-text-soft: #555;
+}
+
+.Home {
+  width: 100%;
+  overflow-x: hidden;
+  background: #ffffff;
+}
+
+/* Espaciado global entre secciones */
+.Home section {
+  scroll-margin-top: 80px;
+}
+
+/* Corrección para evitar saltos visuales en el Hero */
+.Home > .Hero {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Ajuste para que nada sobresalga en móviles */
+@media (max-width: 768px) {
+  .Home {
+    overflow-x: hidden;
+  }
+}

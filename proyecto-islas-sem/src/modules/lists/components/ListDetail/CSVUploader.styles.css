@@ -1,0 +1,110 @@
+.CSVUploader {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 20px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Título */
+.csv-title {
+  font-size: 14px;
+  color: #000;
+  margin-bottom: 5px;
+}
+
+/* Zona de arrastrar archivo */
+.csv-dropzone {
+  border: 2px dashed #cfcfcf;
+  background: #fafafa;
+  padding: 30px;
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: 0.25s ease;
+  color: #555;
+}
+
+.csv-dropzone:hover {
+  background: #f0f0f0;
+}
+
+.csv-dropzone.dragging {
+  background: #e6f4f4;
+  border-color: #1A9190;
+  color: #1A9190;
+}
+
+/* Nombre del archivo */
+.csv-file {
+  font-weight: 600;
+  color: #000;
+}
+
+/* Errores */
+.csv-error {
+  color: #d93636;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Opciones avanzadas */
+.csv-advanced {
+  margin-top: 10px;
+}
+
+.csv-advanced-toggle {
+  background: none;
+  border: none;
+  color: #1A9190;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.csv-advanced-toggle:hover {
+  text-decoration: underline;
+}
+
+.csv-advanced-content {
+  margin-top: 12px;
+  padding: 15px;
+  background: #f4f7f8;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.csv-advanced-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.csv-advanced-row label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+.csv-advanced-row select,
+.csv-advanced-row input[type="text"] {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Checkbox */
+.checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-row label {
+  font-weight: 500;
+  cursor: pointer;
+}

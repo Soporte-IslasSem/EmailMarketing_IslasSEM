@@ -1,0 +1,171 @@
+.TagList {
+  margin-top: 30px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* HEADER */
+.TagList__header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+/* BOTÓN ISLAS SEM */
+.TagList__newButton {
+  background: #1A9190;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.25s ease;
+  box-shadow: 0 2px 6px rgba(26, 145, 144, 0.25);
+}
+
+.TagList__newButton:hover {
+  background: #157a78;
+}
+
+/* BOTÓN EN ESTADO VACÍO */
+.TagList__newButton--empty {
+  margin-top: 20px;
+  box-shadow: none;
+}
+
+/* EMPTY STATE */
+.TagList__empty {
+  text-align: center;
+  margin-top: 60px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.TagList__empty img {
+  width: 260px;
+  margin-bottom: 25px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.TagList__empty h3 {
+  margin-bottom: 10px;
+  color: #000;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.TagList__empty p {
+  opacity: 0.7;
+  margin-bottom: 10px;
+  color: #000;
+  font-size: 15px;
+}
+
+/* TABLE */
+.TagList__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+}
+
+.TagList__table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: #444;
+  background: #f7f7f7;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.TagList__table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  color: #000;
+}
+
+.TagList__table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ACTIONS MENU */
+.TagList__actions {
+  position: relative;
+  z-index: 10;
+}
+
+.TagList__menuButton {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.TagList__menuButton:hover {
+  opacity: 0.7;
+}
+
+.TagList__menu {
+  position: absolute;
+  right: 0;
+  top: 28px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  min-width: 150px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 2000;
+}
+
+.TagList__menu button {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+}
+
+.TagList__menu button:hover {
+  background: #f2f2f2;
+}
+
+.TagList__edit {
+  color: #000;
+}
+
+.TagList__delete {
+  color: #e63946;
+}
+
+/* CHECKBOX */
+.TagList__table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .TagList__table th,
+  .TagList__table td {
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .TagList__newButton {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}

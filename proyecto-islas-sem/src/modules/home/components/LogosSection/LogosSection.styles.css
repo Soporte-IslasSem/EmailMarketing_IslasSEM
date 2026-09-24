@@ -1,0 +1,57 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-bg-soft: #E8F4F3;
+  --islas-text-dark: #1A1A1A;
+}
+
+.LogosSection {
+  width: 100%;
+  padding: 60px 0;
+  background: var(--islas-bg-soft);
+  text-align: center;
+}
+
+.LogosSection__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--islas-text-dark);
+  margin-bottom: 40px;
+  font-family: "Inter", sans-serif;
+}
+
+.LogosSection__grid {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 35px;
+  align-items: center;
+}
+
+.LogosSection__item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0.75;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.LogosSection__item:hover {
+  opacity: 1;
+  transform: translateY(-3px);
+}
+
+.LogosSection__logo {
+  max-width: 120px;
+  max-height: 55px;
+  object-fit: contain;
+  filter: grayscale(100%);
+  transition: filter 0.25s ease;
+}
+
+.LogosSection__item:hover .LogosSection__logo {
+  filter: grayscale(0%);
+}

@@ -1,0 +1,45 @@
+.particles-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 3; /* Encima del overlay y degradado, debajo del contenido */
+  pointer-events: none;
+}
+
+/* Burbujas blancas con borde y centro translúcido */
+.bubble {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.6),
+    rgba(255, 255, 255, 0.1) 45%,
+    transparent 70%
+  );
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.7);
+  animation-name: bubbleRise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  opacity: 0.95;
+}
+
+/* Movimiento de abajo hacia arriba, recorriendo todo el Hero */
+@keyframes bubbleRise {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, -140vh, 0);
+    opacity: 0;
+  }
+}

@@ -1,0 +1,116 @@
+.DashboardHome {
+  padding: 32px;
+  font-family: "Inter", sans-serif;
+  color: #0F0F0F;
+}
+
+/* TITULOS */
+.DashboardHome__title {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.DashboardHome__subtitle {
+  font-size: 16px;
+  opacity: 0.7;
+  margin-bottom: 32px;
+}
+
+/* FILA DE ESTADÍSTICAS */
+.DashboardHome__stats {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.DashboardHome__statTile {
+  flex: 1;
+  background: white;
+  border: 1px solid #eaeaea;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.DashboardHome__statLabel {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.DashboardHome__statValue {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* TARJETA PRINCIPAL (horizontal) */
+.DashboardHome__mainCard {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  border: 1px solid #eaeaea;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 26px 32px;
+  margin-bottom: 18px;
+}
+
+.DashboardHome__mainCardImage {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.DashboardHome__mainCardBody {
+  text-align: left;
+}
+
+.DashboardHome__cardTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.DashboardHome__cardText {
+  font-size: 15px;
+  opacity: 0.75;
+  margin-bottom: 18px;
+}
+
+/* ENLACE DE AYUDA */
+.DashboardHome__helpLink {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #1A9190;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* BOTONES */
+.DashboardHome__button {
+  display: inline-block;
+  padding: 12px 20px;
+  background: #1A9190;
+  color: white;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.DashboardHome__button:hover {
+  background: #157a78;
+}
+
+.DashboardHome__button.secondary {
+  background: #000;
+}
+
+.DashboardHome__button.secondary:hover {
+  background: #333;
+}

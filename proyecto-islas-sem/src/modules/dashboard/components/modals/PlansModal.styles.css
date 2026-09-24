@@ -1,0 +1,142 @@
+/* OVERLAY */
+.PlansModal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+/* CONTENEDOR */
+.PlansModal__content {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 40px;
+  width: 90%;
+  max-width: 900px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+  position: relative;
+  animation: slideUp 0.3s ease forwards;
+  font-family: 'Inter', sans-serif;
+}
+
+/* BOTÓN CERRAR */
+.PlansModal__close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: #f3f4f6;
+  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.PlansModal__close:hover {
+  background: #e5e7eb;
+}
+
+/* TITULOS */
+.PlansModal__title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #136B68;
+  margin-bottom: 8px;
+}
+
+.PlansModal__subtitle {
+  font-size: 15px;
+  color: #555;
+  margin-bottom: 28px;
+}
+
+/* GRID */
+.PlansModal__grid {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* CARD */
+.PlansModal__card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 26px;
+  width: 260px;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.PlansModal__card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+}
+
+/* CARD TITLE */
+.PlansModal__cardTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #136B68;
+  margin-bottom: 10px;
+}
+
+/* PRECIO */
+.PlansModal__price {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 10px 0 16px;
+  color: #000;
+}
+
+/* FEATURES */
+.PlansModal__features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  color: #444;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.PlansModal__features li::before {
+  content: "✔";
+  color: #1A9190;
+  margin-right: 6px;
+}
+
+/* BOTÓN */
+.PlansModal__selectBtn {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.PlansModal__selectBtn:hover {
+  background: #157a7a;
+}
+
+/* ANIMACIONES */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

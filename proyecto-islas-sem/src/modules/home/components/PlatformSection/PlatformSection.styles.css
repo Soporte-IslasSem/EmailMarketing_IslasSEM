@@ -1,0 +1,94 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-bg-soft: #F4FAF9;
+  --islas-text-dark: #1A1A1A;
+  --islas-text-soft: #555;
+  --islas-gold: #D4A017; /* Amarillo del Hero */
+}
+
+.PlatformSection {
+  width: 100%;
+  padding: 80px 0;
+  background: #ffffff;
+}
+
+.PlatformSection__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+/* TÍTULO */
+.PlatformSection__title {
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--islas-primary);
+  margin-bottom: 10px;
+}
+
+/* SUBTÍTULO PREMIUM */
+.PlatformSection__subtitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--islas-gold);
+  margin-bottom: 55px;
+
+  letter-spacing: 0.4px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+/* GRID 3 + 3 */
+.PlatformSection__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .PlatformSection__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .PlatformSection__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* CARD */
+.PlatformSection__item {
+  background: var(--islas-bg-soft);
+  border-radius: 18px;
+  padding: 28px 24px;
+  border: 1px solid #d6e7e6;
+  text-align: left;
+
+  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  transition: all 0.25s ease;
+}
+
+.PlatformSection__item:hover {
+  transform: translateY(-6px);
+  background: #ffffff;
+  border-color: var(--islas-primary);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+}
+
+/* TÍTULO DE CADA ITEM */
+.PlatformSection__itemTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--islas-primary-dark);
+  margin-bottom: 12px;
+}
+
+/* TEXTO */
+.PlatformSection__itemText {
+  font-size: 15px;
+  color: var(--islas-text-soft);
+  line-height: 1.55;
+}

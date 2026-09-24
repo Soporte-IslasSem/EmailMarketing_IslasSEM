@@ -1,0 +1,68 @@
+/* TABLA en formato filas-tarjeta */
+.SegmentTable {
+  width: 100%;
+  margin-top: 20px;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ENCABEZADOS */
+.SegmentTable th {
+  text-align: left;
+  padding: 0 14px 6px;
+  background: none;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #7c8888;
+  border: none;
+}
+
+/* CELDAS */
+.SegmentTable td {
+  padding: 12px 14px;
+  border-top: 1px solid #eef1f1;
+  border-bottom: 1px solid #eef1f1;
+  font-size: 14px;
+  color: #333;
+  background: white;
+}
+
+.SegmentTable td:first-child {
+  border-left: 1px solid #eef1f1;
+  border-radius: 10px 0 0 10px;
+}
+
+.SegmentTable td:last-child {
+  border-right: 1px solid #eef1f1;
+  border-radius: 0 10px 10px 0;
+}
+
+/* HOVER FILA */
+.SegmentTable tr:hover td {
+  background: #FAFCFC;
+}
+
+/* BOTÓN ELIMINAR (ESTILO ISLAS SEM) */
+.SegmentTable__delete {
+  background: none;
+  color: #d93636;
+  border: 1px solid #f0c9c9;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: background 0.25s ease, transform 0.1s ease;
+}
+
+.SegmentTable__delete:hover {
+  background: #fdecec;
+  transform: translateY(-1px);
+}
+
+.SegmentTable__delete:active {
+  transform: translateY(0);
+}

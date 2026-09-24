@@ -1,0 +1,166 @@
+.Hero {
+  position: relative;
+  width: 100%;
+  height: 60vh; /* MÁS PEQUEÑO Y MODERNO */
+  background: linear-gradient(135deg, #0e7490, #1A9190); /* ← DEGRADADO SIN IMAGEN */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* Overlay oscuro general (más suave) */
+.Hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25); /* antes 0.35 */
+  z-index: 1;
+}
+
+/* Degradado superior suave */
+.Hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 25%;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.25),
+    rgba(0, 0, 0, 0)
+  );
+  z-index: 2;
+}
+
+/* Degradado inferior */
+.Hero::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 40%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0.25) 40%,
+    rgba(0, 0, 0, 0.10) 70%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  z-index: 2;
+}
+
+/* --- BURBUJAS PREMIUM --- */
+.particles-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* Burbujas con borde blanco y centro translúcido */
+.bubble {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0.15) 45%,
+    transparent 70%
+  );
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+  animation-name: bubbleRise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  opacity: 0.95;
+}
+
+/* Movimiento vertical */
+@keyframes bubbleRise {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, -100vh, 0); /* ajustado a 60vh */
+    opacity: 0;
+  }
+}
+
+/* Contenido principal */
+.Hero__content {
+  position: relative;
+  z-index: 4;
+  max-width: 800px;
+  padding: 20px;
+  color: #ffffff;
+  margin-top: -20px; /* sube el contenido para centrarlo mejor */
+}
+
+.Hero__title {
+  font-size: 42px; /* antes 48px */
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+/* Amarillo con sombra fuerte */
+.Hero__subtitle {
+  font-size: 20px;
+  font-weight: 400;
+  margin-bottom: 28px;
+  color: #D4A017;
+  text-shadow:
+    0px 2px 4px rgba(0, 0, 0, 0.9),
+    0px 0px 8px rgba(0, 0, 0, 0.7);
+}
+
+/* Botones */
+.Hero__actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.Hero__btn {
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: 0.25s ease;
+}
+
+.Hero__btn--primary {
+  background: #1A9190;
+  color: white;
+}
+
+.Hero__btn--primary:hover {
+  background: #15726f;
+}
+
+.Hero__btn--outline {
+  border: 2px solid white;
+  color: white;
+}
+
+.Hero__btn--outline:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.Hero__btn--secondary {
+  background: #D4A017;
+  color: white;
+}
+
+.Hero__btn--secondary:hover {
+  background: #b98a12;
+}

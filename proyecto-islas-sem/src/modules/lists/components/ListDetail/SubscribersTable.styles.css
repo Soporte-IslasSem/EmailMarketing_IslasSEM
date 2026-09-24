@@ -1,0 +1,106 @@
+/* CONTENEDOR */
+.SubscribersTable {
+  margin-top: 30px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* TABLA en formato filas-tarjeta separadas */
+.SubscribersTable table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  font-size: 14px;
+}
+
+/* CABECERA */
+.SubscribersTable th {
+  background: none;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #7c8888;
+  padding: 0 14px 6px;
+  border: none;
+  text-align: left;
+}
+
+/* CELDAS */
+.SubscribersTable td {
+  padding: 14px 12px;
+  border-top: 1px solid #eef1f1;
+  border-bottom: 1px solid #eef1f1;
+  color: #333;
+  vertical-align: middle;
+  background: white;
+}
+
+.SubscribersTable td:first-child {
+  border-left: 1px solid #eef1f1;
+  border-radius: 10px 0 0 10px;
+}
+
+.SubscribersTable td:last-child {
+  border-right: 1px solid #eef1f1;
+  border-radius: 0 10px 10px 0;
+}
+
+/* HOVER */
+.SubscribersTable tr:hover td {
+  background: #FAFCFC;
+}
+
+/* ESTADOS */
+.loading-msg {
+  color: #777;
+  margin-top: 20px;
+  font-size: 15px;
+}
+
+.empty-state {
+  margin-top: 20px;
+  padding: 25px;
+  background: #fafafa;
+  border-radius: 10px;
+  text-align: center;
+  color: #666;
+  font-size: 15px;
+}
+
+/* 🔥 PAGINACIÓN */
+.Pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  margin-bottom: 10px;
+}
+
+/* 🔥 BOTONES */
+.Pagination__btn {
+  background: white;
+  color: #136B68;
+  border: 1px solid #d5dede;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.Pagination__btn:hover:not(:disabled) {
+  background: #EEF1F1;
+}
+
+.Pagination__btn:disabled {
+  color: #bbb;
+  border-color: #eee;
+  cursor: not-allowed;
+}
+
+/* 🔥 INFO */
+.Pagination__info {
+  font-size: 14px;
+  color: #333;
+}

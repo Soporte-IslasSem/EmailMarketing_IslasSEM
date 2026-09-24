@@ -1,0 +1,74 @@
+.StepDesign {
+  padding: 30px;
+  font-family: 'Inter', sans-serif;
+  animation: fadeIn 0.25s ease;
+}
+
+.StepDesign__title {
+  font-size: 28px;
+  margin-bottom: 5px;
+  font-weight: 700;
+  color: #000;
+}
+
+.StepDesign__subtitle {
+  opacity: 0.7;
+  margin-bottom: 30px;
+  color: #000;
+}
+
+.StepDesign__editor {
+  margin-bottom: 30px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(26, 145, 144, 0.15);
+}
+
+/* BUTTONS */
+.StepDesign__buttons {
+  display: flex;
+  gap: 15px;
+}
+
+.StepDesign__buttons .primary {
+  background: #1A9190;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+  box-shadow: 0 2px 6px rgba(26, 145, 144, 0.25);
+}
+
+.StepDesign__buttons .primary:hover {
+  background: #157a78;
+}
+
+.StepDesign__buttons .secondary {
+  background: #1f2937;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.StepDesign__buttons .secondary:hover {
+  background: #111827;
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

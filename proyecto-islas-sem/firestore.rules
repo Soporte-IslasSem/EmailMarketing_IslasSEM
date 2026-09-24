@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Cada usuario solo puede leer/escribir su propio perfil
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Listas: dueño mediante el campo "userId"
+    match /lists/{listId} {
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+
+      // Subcolecciones de una lista: mismo dueño que la lista "padre"
+      match /fields/{fieldId} {
+        allow read, write: if request.auth != null &&
+          get(/databases/$(database)/documents/lists/$(listId)).data.userId == request.auth.uid;
+      }
+
+      match /segments/{segmentId} {
+        allow read, write: if request.auth != null &&
+          get(/databases/$(database)/documents/lists/$(listId)).data.userId == request.auth.uid;
+      }
+    }
+
+    // Suscriptores: dueño mediante "userId"
+    match /subscribers/{subId} {
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Campañas: dueño mediante "ownerId" (nombre distinto al resto de colecciones)
+    match /campaigns/{campaignId} {
+      allow read, update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // Plantillas: dueño mediante "userId"
+    match /templates/{templateId} {
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Formularios: dueño mediante "userId"
+    match /forms/{formId} {
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Etiquetas de plantillas/campañas: dueño mediante "userEmail"
+    match /templateTags/{tagId} {
+      allow read, update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;
+      allow create: if request.auth != null && request.resource.data.userEmail == request.auth.token.email;
+    }
+
+    // Colección "tags": código muerto, no se usa desde ninguna pantalla. Bloqueada por defecto.
+    match /tags/{tagId} {
+      allow read, write: if false;
+    }
+
+    // Informes: solo el dueño de la campaña puede leerlos.
+    // Los crea únicamente la Cloud Function (Admin SDK), nunca el navegador.
+    match /reports/{reportId} {
+      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Todo lo demás, bloqueado por defecto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

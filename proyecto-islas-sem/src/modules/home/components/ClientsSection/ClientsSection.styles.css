@@ -1,0 +1,67 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-bg-soft: #E8F4F3;
+  --islas-text-dark: #1A1A1A;
+}
+
+.ClientsSection {
+  width: 100%;
+  padding: 90px 0;
+  background: #ffffff;
+}
+
+.ClientsSection__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.ClientsSection__title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--islas-text-dark);
+  margin-bottom: 60px;
+}
+
+/* 🔹 Distribución horizontal adaptable */
+.ClientsSection__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 40px;
+  align-items: center;
+  justify-items: center;
+}
+
+/* 🔹 Estilo de cada logo */
+.ClientsSection__item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 18px;
+  background: var(--islas-bg-soft);
+  border-radius: 14px;
+  border: 1px solid #d6e7e6;
+  transition: all 0.25s ease;
+}
+
+.ClientsSection__item:hover {
+  transform: translateY(-6px);
+  border-color: var(--islas-primary);
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+
+/* 🔹 Logo con efecto elegante */
+.client-logo {
+  max-width: 120px;
+  max-height: 60px;
+  object-fit: contain;
+  filter: grayscale(100%);
+  transition: filter 0.25s ease;
+}
+
+.ClientsSection__item:hover .client-logo {
+  filter: grayscale(0%);
+}

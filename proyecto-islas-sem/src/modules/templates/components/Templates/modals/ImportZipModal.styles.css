@@ -1,0 +1,137 @@
+.ImportZipModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.ImportZipModal__content {
+  background: #fff;
+  width: 480px;
+  padding: 28px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.ImportZipModal__content h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1A9190;
+  margin-bottom: 16px;
+}
+
+.ImportZipModal__content label {
+  display: block;
+  margin-top: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ✅ Input con estilo ISLAS SEM */
+.ImportZipModal__nameInput {
+  width: 92%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 14px;
+  background-color: #f9fafb;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ImportZipModal__nameInput:focus {
+  outline: none;
+  border-color: #1A9190;
+  box-shadow: 0 0 0 3px rgba(26,145,144,0.25);
+}
+
+/* ✅ Área de arrastre */
+.ImportZipModal__dropzone {
+  width: 92%;
+  margin: 0 auto;
+  padding: 20px;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  text-align: center;
+  color: #555;
+  font-size: 14px;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+
+.ImportZipModal__dropzone:hover {
+  border-color: #1A9190;
+  background-color: #f0fdfa;
+}
+
+/* ✅ Botón alternativo centrado */
+.ImportZipModal__fileButton {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.ImportZipModal__fileButton input[type="file"]::-webkit-file-upload-button {
+  background: #1A9190;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.25s ease;
+}
+
+.ImportZipModal__fileButton input[type="file"]::-webkit-file-upload-button:hover {
+  background: #157a78;
+}
+
+.fileName {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+.error {
+  color: #ff0077;
+  margin-top: 10px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.ImportZipModal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.ImportZipModal__actions button {
+  background: #1A9190;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.25s ease;
+}
+
+.ImportZipModal__actions button:hover {
+  background: #157a78;
+}
+
+.ImportZipModal__actions .cancel {
+  background: #ccc;
+  color: #000;
+}

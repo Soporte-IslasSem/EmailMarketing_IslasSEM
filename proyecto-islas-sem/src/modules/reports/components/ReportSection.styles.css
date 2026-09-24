@@ -1,0 +1,56 @@
+.ReportSection {
+  margin-top: 40px;
+}
+
+.ReportSection__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #136B68;
+  margin-bottom: 16px;
+}
+
+.ReportSection__content {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.ReportSection__table {
+  flex: 1;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.ReportSection__table th,
+.ReportSection__table td {
+  padding: 14px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.ReportSection__table th {
+  background: #f8f8f8;
+  font-weight: 600;
+  color: #136B68;
+}
+
+.ReportSection__chart {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ReportSection__info {
+  margin-top: 12px;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.ReportSection__link {
+  color: #1A9190;
+  cursor: pointer;
+  font-weight: 600;
+}

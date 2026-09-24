@@ -1,0 +1,13 @@
+.AuthLayout {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background: #f5f7fa; /* Fondo suave estilo Islas SEM */
+  overflow: hidden;
+}

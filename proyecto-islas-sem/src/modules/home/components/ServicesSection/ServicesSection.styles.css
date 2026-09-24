@@ -1,0 +1,63 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-text-dark: #1A1A1A;
+}
+
+.ServicesSection {
+  padding: 80px 0;
+  text-align: center;
+}
+
+.ServicesSection__title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--islas-text-dark);
+}
+
+.ServicesSection__subtitle {
+  margin-top: 10px;
+  font-size: 18px;
+  color: #555;
+}
+
+.ServicesSection__grid {
+  margin-top: 50px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 35px;
+  padding: 0 20px;
+}
+
+.ServicesSection__card {
+  background: #fff;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ServicesSection__card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+}
+
+.ServicesSection__icon {
+  width: 70px;
+  height: 70px;
+  margin-bottom: 20px;
+  stroke: var(--islas-primary);
+}
+
+.ServicesSection__link {
+  display: inline-block;
+  margin-top: 15px;
+  color: var(--islas-primary);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.ServicesSection__link:hover {
+  color: var(--islas-primary-dark);
+}

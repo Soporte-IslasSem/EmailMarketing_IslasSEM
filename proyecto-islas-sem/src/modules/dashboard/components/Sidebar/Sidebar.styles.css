@@ -1,0 +1,120 @@
+.Sidebar {
+  width: 250px;
+  background: linear-gradient(180deg, #1A9190, #136B68); /* Degradado premium ISLAS SEM */
+  color: rgba(255, 255, 255, 0.95);
+  padding: 28px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: "Inter", sans-serif;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Logo */
+.Sidebar__logoWrapper {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.Sidebar__logo {
+  width: 150px;
+}
+
+/* Secciones */
+.Sidebar__sectionTitle {
+  font-size: 13px;
+  opacity: 0.55;
+  margin-top: 22px;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.Sidebar__sectionTitle:first-child {
+  margin-top: 0;
+}
+
+/* Navegación */
+.Sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.Sidebar__link {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  padding: 12px 16px;
+  border-radius: 10px;
+  transition: 0.25s ease;
+  font-size: 15px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-left: 3px solid transparent;
+}
+
+/* Íconos */
+.Sidebar__link img {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(1); /* Íconos blancos */
+  transition: filter 0.25s ease;
+}
+
+/* Hover */
+.Sidebar__link:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.Sidebar__link:hover img {
+  filter: brightness(1.2) invert(0.9);
+}
+
+/* Activo */
+.Sidebar__link.active {
+  background: rgba(255, 255, 255, 0.25);
+  border-left: 3px solid #E2B83C; /* Amarillo premium ISLAS SEM */
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.Sidebar__link.active img {
+  filter: brightness(1.5) sepia(1) hue-rotate(20deg) saturate(3); /* Ícono dorado activo */
+}
+
+/* Deshabilitado */
+.Sidebar__link.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Parte inferior */
+.Sidebar__bottom {
+  margin-top: 40px;
+}
+
+.Sidebar__user {
+  font-size: 14px;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+
+/* Botón de logout */
+.Sidebar__logoutButton {
+  padding: 12px;
+  background: #E2B83C;
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  width: 100%;
+  transition: 0.25s ease;
+}
+
+.Sidebar__logoutButton:hover {
+  background: #cfa32f;
+}

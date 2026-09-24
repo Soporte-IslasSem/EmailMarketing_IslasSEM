@@ -1,0 +1,185 @@
+.ListFormularios {
+  padding: 24px;
+  font-family: 'Inter', sans-serif;
+}
+
+.ListFormularios__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.ListFormularios__header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #222;
+}
+
+.ListFormularios__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ListFormularios__backBtn {
+  background: white;
+  color: #333;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #d5dede;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.ListFormularios__backBtn:hover {
+  background: #EEF1F1;
+}
+
+.ListFormularios__createBtn {
+  background: #1A9190;
+  color: white;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.ListFormularios__createBtn:hover {
+  background: #15726f;
+}
+
+.ListFormularios__loading,
+.ListFormularios__empty {
+  font-size: 15px;
+  color: #555;
+}
+
+/* Tabla */
+.ListFormularios__tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ListFormularios__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.ListFormularios__table thead {
+  background: none;
+}
+
+.ListFormularios__table th,
+.ListFormularios__table td {
+  padding: 10px 12px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.ListFormularios__table th {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #7c8888;
+  border: none;
+  padding: 0 12px 6px;
+}
+
+.ListFormularios__table td {
+  background: white;
+  border-top: 1px solid #eef1f1;
+  border-bottom: 1px solid #eef1f1;
+}
+
+.ListFormularios__table td:first-child {
+  border-left: 1px solid #eef1f1;
+  border-radius: 10px 0 0 10px;
+}
+
+.ListFormularios__table td:last-child {
+  border-right: 1px solid #eef1f1;
+  border-radius: 0 10px 10px 0;
+}
+
+.ListFormularios__row:hover td {
+  background: #FAFCFC;
+}
+
+/* Vista previa */
+.ListFormularios__preview {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+
+/* 🔹 Paginación centrada y con estilo ISLAS SEM */
+.ListFormularios__pagination {
+  display: flex;
+  justify-content: center; /* centra horizontalmente */
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 10px 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.ListFormularios__pageBtn {
+  background: white;
+  color: #136B68;
+  border: 1px solid #d5dede;
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.25s ease;
+}
+
+.ListFormularios__pageBtn:disabled {
+  color: #bbb;
+  border-color: #eee;
+  cursor: not-allowed;
+}
+
+.ListFormularios__pageBtn:hover:not(:disabled) {
+  background: #157a7a;
+}
+
+.ListFormularios__pageInfo {
+  font-size: 15px;
+  color: #333;
+  font-weight: 500;
+}
+/* 🔹 Corrige el recorte del menú de acciones */
+.ListFormularios__tableWrapper {
+  position: relative;
+  overflow: visible !important; /* permite que el menú se muestre fuera del contenedor */
+  z-index: 1;
+}
+
+.ListFormularios__table {
+  overflow: visible !important;
+}
+
+.ListFormularios__row {
+  position: relative;
+  z-index: 1;
+}
+
+/* 🔹 Refuerzo para el menú */
+.FormActionsMenu {
+  position: relative;
+  z-index: 1000; /* asegura que esté por encima de la tabla */
+}
+
+.FormActionsMenu__menu {
+  z-index: 9999; /* máxima prioridad visual */
+}

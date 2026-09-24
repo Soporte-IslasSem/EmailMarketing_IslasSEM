@@ -1,0 +1,39 @@
+.WizardSteps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  padding: 15px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 6px rgba(26, 145, 144, 0.08);
+}
+
+.WizardSteps__step a {
+  text-decoration: none;
+  color: #6b7280;
+  font-weight: 500;
+  transition: color 0.25s ease;
+}
+
+.WizardSteps__step a:hover {
+  color: #1A9190;
+}
+
+.WizardSteps__step.active a {
+  color: #1A9190;
+  font-weight: 700;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .WizardSteps {
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .WizardSteps__step a {
+    font-size: 14px;
+  }
+}

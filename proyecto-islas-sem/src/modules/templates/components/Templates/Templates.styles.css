@@ -1,0 +1,210 @@
+/* ================================
+   PLANTILLAS - ISLAS SEM
+   ================================ */
+
+.Templates {
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 60px;
+  color: #111;
+}
+
+/* ================================
+   HEADER
+   ================================ */
+.Templates__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.Templates__header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1A9190;
+}
+
+/* Botón Crear plantilla */
+.Templates__button {
+  background: #1A9190;
+  color: #ffffff !important;
+  padding: 10px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.25s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.Templates__button:hover {
+  background: #157a78;
+  color: #ffffff !important;
+}
+
+/* ================================
+   GRID
+   ================================ */
+.Templates__grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  padding-top: 10px;
+}
+
+/* ================================
+   CARD
+   ================================ */
+.Templates__item {
+  position: relative; /* 🔹 necesario para ubicar el menú de acciones */
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  transition: 0.25s ease;
+}
+
+.Templates__item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+/* ================================
+   MINIATURA CONTROLADA
+   ================================ */
+.Templates__thumbnail {
+  width: 100%;
+  max-width: 260px;
+  height: 160px;
+  margin: 0 auto 12px auto;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.Templates__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* 🔹 Vista previa HTML */
+.Templates__thumbnail iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 10px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* ================================
+   TÍTULO
+   ================================ */
+.Templates__item h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+/* ================================
+   BOTONES
+   ================================ */
+.Templates__edit {
+  background: #1A9190;
+  color: #ffffff !important;
+  padding: 8px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.25s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.Templates__edit:hover {
+  background: #157a78;
+  color: #ffffff !important;
+}
+
+/* ================================
+   ACCIONES
+   ================================ */
+.Templates__actionsWrapper {
+  position: absolute; /* 🔹 para ubicar el menú flotante */
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ================================
+   ESTADO VACÍO
+   ================================ */
+.Templates__empty {
+  color: #555;
+  font-style: italic;
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* ================================
+   NOTA TÉCNICA
+   ================================ */
+/* Para evitar conflictos con SystemTemplates.styles.css:
+   Asegúrate de que este bloque se cargue DESPUÉS de SystemTemplates.styles.css
+   o usa mayor especificidad si se sobrescriben estilos:
+   Ejemplo:
+   .Templates .Templates__thumbnail img { object-fit: contain; }
+*/
+
+/* 🔵 Tabs */
+.Templates__tabs {
+  display: flex;
+  gap: 20px;
+  margin: 20px 0 25px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 10px;
+}
+
+.Templates__tab {
+  background: none;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  padding: 6px 0;
+  position: relative;
+}
+
+.Templates__tab:hover {
+  color: #1A9190;
+}
+
+.Templates__tab.active {
+  color: #1A9190;
+}
+
+.Templates__tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #1A9190;
+  border-radius: 2px;
+}

@@ -1,0 +1,272 @@
+/* Fondo general */
+.RegisterPage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  background: url("/fondo-login.jpg") no-repeat center center/cover;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* TARJETA */
+.register-card {
+  width: 380px; /* Igual que Login */
+  background: rgba(255, 255, 255, 0.92);
+  padding: 35px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 204, 0, 0.35);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+  text-align: left;
+  backdrop-filter: blur(6px);
+}
+
+/* LOGO */
+.register-logo-inside {
+  width: 140px;
+  margin-bottom: 10px;
+  display: block;
+  margin-left: auto;   /* Centrado */
+  margin-right: auto;  /* Centrado */
+}
+
+/* TÍTULO */
+.register-card h2 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 24px;
+  color: #333;
+  font-weight: 600;
+  text-align: center; /* Igual que Login */
+}
+
+/* SLOGAN */
+.register-slogan {
+  font-size: 14px;
+  color: #d4a017;
+  margin-bottom: 25px;
+  font-weight: 500;
+  text-align: center; /* Igual que Login */
+}
+
+/* BOTÓN GOOGLE */
+.google-btn {
+  width: 80%; /* Igual que Login */
+  margin-left: auto;
+  margin-right: auto;
+  background: white;
+  border: 2px solid #ddd;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.google-btn img {
+  width: 20px;
+}
+
+/* SEPARADOR */
+.divider {
+  width: 80%;
+  margin: 20px auto;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative;
+  text-align: initial !important;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #ddd;
+}
+
+.divider::before {
+  margin-right: 10px;
+}
+
+.divider::after {
+  margin-left: 10px;
+}
+
+.divider span {
+  font-size: 12px;
+  color: #777;
+  background: white;
+  padding: 0 8px;
+}
+
+/* INPUTS */
+form label {
+  display: block;
+  text-align: left;
+  margin-top: 12px;
+  font-size: 14px;
+  color: #444;
+  width: 80%; /* Igual que Login */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+form input[type="email"],
+form input[type="password"] {
+  width: 80%; /* Igual que Login */
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  margin-top: 6px;
+  font-size: 15px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* VALIDACIÓN DE CONTRASEÑA */
+.password-rules {
+  list-style: none;
+  padding: 0;
+  margin-top: 10px;
+  text-align: left;
+  font-size: 13px;
+  color: #777;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.password-rules li {
+  margin-bottom: 4px;
+}
+
+.password-rules li.ok {
+  color: #00bfa6;
+  font-weight: 600;
+}
+
+/* CHECKBOX */
+.checkbox {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #555;
+  text-align: left;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.checkbox input {
+  margin-right: 8px;
+}
+
+/* BOTÓN REGISTRAR */
+.register-btn {
+  width: 80%; /* Igual que Login */
+  margin-left: auto;
+  margin-right: auto;
+  background: #00bfa6;
+  color: white;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  margin-top: 25px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  display: block;
+  text-align: center;
+  transition: 0.2s;
+}
+
+.register-btn:hover {
+  background: #009e8c;
+  box-shadow: 0 4px 12px rgba(0, 191, 166, 0.35);
+}
+
+/* ERROR */
+.error-msg {
+  color: #d93636;
+  margin-top: 10px;
+  font-weight: 600;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* TEXTO LEGAL */
+.legal-text {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* MODAL */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-box {
+  width: 420px;
+  background: white;
+  padding: 25px;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  text-align: left;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-box h3 {
+  margin-top: 0;
+  color: #1f2937;
+}
+
+.modal-buttons {
+  margin-top: 20px;
+  text-align: right;
+}
+
+.modal-accept {
+  background: #00bfa6;
+  color: white;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.modal-accept:hover {
+  background: #009e8c;
+}
+
+/* ENLACE LEGAL */
+.legal-link {
+  color: #00bfa6;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  text-decoration: underline;
+}

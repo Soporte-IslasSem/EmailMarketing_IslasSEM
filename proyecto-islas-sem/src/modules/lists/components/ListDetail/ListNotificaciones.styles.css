@@ -1,0 +1,167 @@
+/* ----------------------------- */
+/* SUBMENÚ INTERNO               */
+/* ----------------------------- */
+
+.ListNotificaciones__subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 25px;
+  background: #EEF1F1;
+  padding: 5px;
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.ListNotificaciones__subnav a {
+  text-decoration: none;
+  color: #5b6666;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 9px;
+  transition: 0.2s ease;
+}
+
+.ListNotificaciones__subnav a.active {
+  color: #136B68;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+}
+
+.ListNotificaciones__content {
+  margin-top: 20px;
+}
+
+/* ----------------------------- */
+/* CARD GENERAL                  */
+/* ----------------------------- */
+
+.NotificacionesCard {
+  background: #ffffff;
+  padding: 25px;
+  border-radius: 14px;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  max-width: 700px;
+}
+
+.NotificacionesCard h3 {
+  margin-bottom: 20px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ----------------------------- */
+/* CAMPOS GENERALES              */
+/* ----------------------------- */
+
+.NotificacionesField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.NotificacionesField label {
+  font-weight: 600;
+  color: #444;
+}
+
+/* 🔥 Estilo ISLAS SEM para inputs */
+.NotificacionesField input,
+.NotificacionesField textarea {
+  width: 90%;
+  align-self: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  font-size: 15px;
+  transition: border-color 0.25s ease;
+}
+
+.NotificacionesField input:focus,
+.NotificacionesField textarea:focus {
+  border-color: #1A9190;
+  outline: none;
+}
+
+/* 🔥 Separación entre label e input */
+.NotificacionesField label {
+  margin-bottom: 6px;
+}
+
+
+/* ----------------------------- */
+/* FILAS (toggle, etc.)          */
+/* ----------------------------- */
+
+.NotificacionesRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+/* ----------------------------- */
+/* BOTONES                       */
+/* ----------------------------- */
+
+.NotificacionesActions {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.NotificacionesPreview {
+  background: none;
+  color: #333;
+  padding: 10px 18px;
+  border: 1px solid #d5dede;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.NotificacionesPreview:hover {
+  background: #f5f5f5;
+}
+
+.NotificacionesSave {
+  background: #1A9190;
+  color: white;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.NotificacionesSave:hover {
+  background: #157a78;
+}
+
+/* ----------------------------- */
+/* SECCIONES ESPECÍFICAS         */
+/* ----------------------------- */
+
+.NotificacionesGeneral,
+.NotificacionesConfirmEmail,
+.NotificacionesConfirmPage,
+.NotificacionesUnsubscribe {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Modo de selección (Confirm Page) */
+.NotificacionesModes {
+  display: flex;
+  gap: 25px;
+  margin-bottom: 10px;
+}
+
+.NotificacionesModes label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

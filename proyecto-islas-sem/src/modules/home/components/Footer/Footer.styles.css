@@ -1,0 +1,108 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-bg-soft: #E8F4F3;
+  --islas-text-dark: #1A1A1A;
+  --islas-text-soft: #555;
+}
+
+.Footer {
+  width: 100%;
+  background: var(--islas-primary-dark);
+  color: #ffffff;
+  padding: 70px 0 40px;
+}
+
+.Footer__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.Footer__top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 50px;
+}
+
+.Footer__brand {
+  max-width: 300px;
+}
+
+.Footer__logo {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.Footer__tagline {
+  font-size: 15px;
+  color: #e3f2f1;
+  line-height: 1.5;
+}
+
+.Footer__menus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+}
+
+.Footer__menuTitle {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: #ffffff;
+}
+
+.Footer__menuList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.Footer__menuList li {
+  margin-bottom: 10px;
+}
+
+.Footer__menuList a {
+  color: #d9f0ef;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.Footer__menuList a:hover {
+  color: #ffffff;
+}
+
+.Footer__bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  padding-top: 30px;
+  text-align: center;
+}
+
+.Footer__social {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.Footer__socialLink img {
+  width: 22px;
+  height: 22px;
+  filter: brightness(0) invert(1);
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.Footer__socialLink:hover img {
+  opacity: 1;
+}
+
+.Footer__copy {
+  font-size: 14px;
+  color: #d9f0ef;
+}

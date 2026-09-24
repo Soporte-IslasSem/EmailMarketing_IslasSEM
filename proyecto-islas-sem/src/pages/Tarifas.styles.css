@@ -1,0 +1,40 @@
+.tarifas-hero {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--color-bg-light);
+}
+
+.tarifas-grid {
+  padding: 3rem 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+}
+
+.plan-card {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.plan-card.destacado {
+  border: 2px solid var(--color-primary);
+}
+
+.price {
+  font-size: 2rem;
+  color: var(--color-primary);
+  margin: 1rem 0;
+}
+
+.plan-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.plan-card li {
+  margin: 0.5rem 0;
+}

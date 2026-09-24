@@ -1,0 +1,170 @@
+/* BOTÓN AÑADIR */
+.ListDetail__add {
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.25s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.ListDetail__add.disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.ListDetail__add.enabled {
+  background: #1A9190;
+  color: white;
+}
+
+.ListDetail__add.enabled:hover {
+  background: #157a78;
+}
+
+/* MÉTODOS */
+.ListDetail__methods {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.method-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: white;
+  padding: 18px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: 0.25s ease;
+}
+
+.method-card:hover {
+  box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+}
+
+.method-card.active {
+  border-color: #1A9190;
+  background: #e8f6f5;
+}
+
+.method-card input {
+  margin-top: 5px;
+}
+
+/* ÁREA DINÁMICA */
+.ListDetail__content {
+  margin-top: 25px;
+  grid-column: 1 / -1;
+}
+
+/* ERRORES */
+.ListDetail__error {
+  margin-top: 15px;
+  color: #d93636;
+  font-weight: 600;
+}
+
+/* Importar desde otras fuentes */
+.import-other-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.import-other-sources {
+  background: none;
+  border: none;
+  color: #1A9190;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 15px;
+  transition: 0.25s ease;
+}
+
+.import-other-sources:hover {
+  text-decoration: underline;
+}
+
+/* Panel de otras fuentes */
+.OtherSourcesPanel {
+  margin-top: 20px;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.source-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.source-item h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #000;
+}
+
+.source-item p {
+  margin: 4px 0 0;
+  color: #666;
+}
+
+/* 🔹 Campo de texto y tabla alineados */
+.ListSuscriptores__textarea {
+  width: 100%;
+  max-width: 880px; /* 🔥 igual ancho que la tabla */
+  margin: 0 auto 25px auto;
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: 'Inter', sans-serif;
+  resize: vertical;
+  transition: 0.25s ease;
+}
+
+.ListSuscriptores__textarea:focus {
+  border-color: #1A9190;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(26,145,144,0.15);
+}
+
+/* 🔹 Tabla de suscriptores */
+.ListSuscriptores__table {
+  width: 100%;
+  max-width: 880px; /* 🔥 mismo ancho que el textarea */
+  margin: 0 auto;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+
+.ListSuscriptores__table th {
+  background: #F5F7F7;
+  color: #333;
+  font-weight: 600;
+  text-align: left;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eee;
+}
+
+.ListSuscriptores__table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #555;
+  font-size: 15px;
+}

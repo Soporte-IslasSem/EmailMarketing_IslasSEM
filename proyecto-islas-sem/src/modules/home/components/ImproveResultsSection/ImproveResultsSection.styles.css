@@ -1,0 +1,32 @@
+.Improve {
+  padding: 80px 20px;
+  background: #f3f4f6;
+}
+
+.Improve__container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.Improve__title {
+  font-size: 36px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+.Improve__subtitle {
+  font-size: 18px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.Improve__graph img {
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}

@@ -1,0 +1,181 @@
+/* 🔹 Fondo oscuro */
+.FieldModal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* 🔹 Caja del modal */
+.FieldModal__box {
+  width: 480px;
+  max-width: 90%;
+  background: #ffffff;
+  padding: 28px 32px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  font-family: 'Inter', sans-serif;
+  animation: fadeIn 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* 🔹 Título */
+.FieldModal__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: #222;
+  text-align: center;
+}
+
+/* 🔹 Etiquetas */
+.FieldModal__label {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px; /* 🔥 Espaciado mejorado entre label e input */
+}
+
+/* 🔹 Inputs y selects */
+.FieldModal__input,
+.FieldModal__select {
+  width: 90%;
+  align-self: center;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.25s ease;
+}
+
+.FieldModal__input:focus,
+.FieldModal__select:focus {
+  border-color: #1A9190;
+  outline: none;
+}
+
+/* 🔹 Bloque LISTA */
+.FieldModal__listBlock {
+  background: #f4f7f8;
+  padding: 14px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.FieldModal__listOption {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.FieldModal__listOption input {
+  flex: 1;
+}
+
+.add-option {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.add-option:hover {
+  background: #157a7a;
+}
+
+.delete-option {
+  background: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.delete-option:hover {
+  background: #e63b3b;
+}
+
+.FieldModal__toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: #333;
+}
+
+/* 🔹 Radios */
+.FieldModal__radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+.FieldModal__radio {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* 🔹 Contenedor visibilidad */
+.FieldModal__visibility {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* 🔹 Botones */
+.FieldModal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.FieldModal__actions .cancel {
+  background: none;
+  color: #555;
+  border: 1px solid #d5dede;
+  padding: 10px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.FieldModal__actions .cancel:hover {
+  background: #f5f5f5;
+}
+
+.FieldModal__actions .save {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.FieldModal__actions .save:hover {
+  background: #157a7a;
+}
+
+/* 🔹 Animación */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

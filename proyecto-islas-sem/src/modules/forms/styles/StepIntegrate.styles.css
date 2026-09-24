@@ -1,0 +1,142 @@
+/* 🔹 Contenedor general */
+.StepIntegrate__container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* 🔹 Título */
+.StepIntegrate__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #222;
+}
+
+/* 🔹 Subtítulo */
+.StepIntegrate__subtitle {
+  margin: 0;
+  font-size: 15px;
+  color: #555;
+}
+
+/* 🔹 Caja de código */
+.StepIntegrate__codeBox {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 18px 20px;
+  border-radius: 12px;
+  overflow-x: auto;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+.StepIntegrate__codeBox pre {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #333;
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* 🔹 Botón copiar */
+.StepIntegrate__copyButton {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #1A9190;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.25s ease;
+  width: fit-content;
+}
+
+.StepIntegrate__copyButton:hover {
+  background: #157a7a;
+}
+
+/* 🔹 Vista previa */
+.StepIntegrate__previewTitle {
+  margin: 10px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #222;
+}
+
+.StepIntegrate__preview {
+  padding: 26px;
+  border: 1px solid #e5e7eb;
+  max-width: 420px;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.StepIntegrate__preview input {
+  padding: 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+}
+
+.StepIntegrate__preview button {
+  padding: 12px;
+  font-size: 14px;
+  color: #ffffff;
+  border: none;
+  cursor: default;
+}
+
+/* 🔹 Acciones */
+.StepIntegrate__actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.StepIntegrate__backButton {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #333;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.StepIntegrate__backButton:hover {
+  background: #f3f4f6;
+}
+
+/* 🔹 Botón crear formulario */
+.StepIntegrate__createButton {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #1A9190;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.StepIntegrate__createButton:hover {
+  background: #157a7a;
+}
+
+/* 🔹 Error */
+.StepIntegrate__error {
+  color: #d93636;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}

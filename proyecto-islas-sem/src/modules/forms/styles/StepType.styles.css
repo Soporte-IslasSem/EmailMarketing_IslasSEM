@@ -1,0 +1,144 @@
+/* 🔹 Contenedor general */
+.StepType__container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* 🔹 Título */
+.StepType__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #222;
+}
+
+/* 🔹 Subtítulo */
+.StepType__subtitle {
+  margin: 0;
+  font-size: 15px;
+  color: #555;
+}
+
+/* 🔹 Grid de tarjetas */
+.StepType__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 22px;
+  margin-top: 10px;
+}
+
+/* 🔹 Tarjeta */
+.StepType__card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 20px 22px;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+}
+
+.StepType__card:hover:not(.disabled) {
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+/* 🔹 Tarjeta seleccionada */
+.StepType__card.selected {
+  border-color: #1A9190;
+  box-shadow: 0 0 0 2px rgba(26,145,144,0.25);
+}
+
+/* 🔹 Tarjeta deshabilitada */
+.StepType__card.disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* 🔹 Header de tarjeta */
+.StepType__cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.StepType__card h4 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #222;
+}
+
+/* 🔹 Descripción */
+.StepType__description {
+  margin: 0;
+  font-size: 14px;
+  color: #555;
+}
+
+/* 🔹 Coming soon */
+.StepType__comingSoon {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* 🔹 Badge */
+.StepType__badge {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.badge--primary {
+  background: #1A9190;
+  color: #ffffff;
+}
+
+.badge--secondary {
+  background: #E2B83C;
+  color: #000000;
+}
+
+/* 🔹 Acciones */
+.StepType__actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.StepType__nextButton {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #1A9190;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.25s ease;
+}
+
+.StepType__nextButton:hover:not(:disabled) {
+  background: #157a7a;
+}
+
+.StepType__nextButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* 🔹 Error */
+.StepType__error {
+  color: #d93636;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}

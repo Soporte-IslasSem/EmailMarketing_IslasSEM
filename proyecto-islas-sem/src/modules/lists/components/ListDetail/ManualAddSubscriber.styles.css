@@ -1,0 +1,26 @@
+.ManualAddSubscriber {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+  font-family: 'Inter', sans-serif;
+}
+
+.ManualAddSubscriber label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+.ManualAddSubscriber input {
+  padding: 10px;
+  border: 1px solid #cfcfcf;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.manual-error {
+  color: #d93636;
+  font-size: 14px;
+  font-weight: 600;
+}

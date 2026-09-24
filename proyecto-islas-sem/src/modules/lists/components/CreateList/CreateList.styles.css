@@ -1,0 +1,29 @@
+.CreateList__form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 400px;
+  font-family: 'Inter', sans-serif;
+}
+
+.CreateList__input {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #cfcfcf;
+  font-size: 14px;
+}
+
+.CreateList__button {
+  padding: 12px;
+  background: #1A9190;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.CreateList__button:hover {
+  background: #157a78;
+}

@@ -1,0 +1,102 @@
+.ListResumen {
+  padding: 20px;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+/* 🔹 Bloque de resumen general */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* 🔹 Bloque de acciones rápidas */
+.acciones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* 🔹 Tarjetas de estadísticas: fondo de color suave, alineadas a la izquierda */
+.stat-card {
+  background: #EAF5F4;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: none;
+  border-left: 4px solid #1A9190;
+  text-align: left;
+  transition: 0.2s ease;
+}
+
+.stat-card:hover {
+  background: #DFF0EF;
+}
+
+.stat-card h3 {
+  font-size: 30px;
+  margin: 0;
+  color: #0F0F0F;
+  font-weight: 700;
+}
+
+.stat-card p {
+  margin-top: 6px;
+  color: #4a5555;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* 🔹 Tarjetas de acciones rápidas: estilo tarjeta blanca con borde */
+.accion-card {
+  background: white;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid #eee;
+  text-align: left;
+  transition: 0.2s ease;
+  cursor: pointer;
+}
+
+.accion-card:hover {
+  border-color: #1A9190;
+  transform: translateY(-2px);
+}
+
+.accion-card p {
+  margin-top: 8px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* 🔹 Títulos */
+.ListResumen h2,
+.acciones-title {
+  font-weight: 700;
+  color: #000;
+}
+
+/* 🔹 Bloque de gráficas independiente */
+.ListResumen__charts {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+/* 🔹 Canvas */
+canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}

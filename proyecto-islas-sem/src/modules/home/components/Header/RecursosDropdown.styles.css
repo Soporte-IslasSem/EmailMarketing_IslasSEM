@@ -1,0 +1,71 @@
+/* ============================
+   MEGA MENÚ PREMIUM RECURSOS
+   ============================ */
+
+.RecursosDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+
+  width: 650px;
+  padding: 25px;
+
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: 0.25s ease;
+
+  z-index: 999;
+}
+
+/* Mostrar menú al hacer hover */
+.Header__recursosWrapper:hover .RecursosDropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Tarjetas del menú */
+.RecursosDropdown__card {
+  display: block;
+  padding: 18px;
+  border-radius: 12px;
+  text-decoration: none;
+
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+
+  transition: 0.25s ease;
+}
+
+.RecursosDropdown__card:hover {
+  background: white;
+  border-color: rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Títulos */
+.RecursosDropdown__card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+}
+
+/* Descripción */
+.RecursosDropdown__card p {
+  font-size: 14px;
+  color: #444;
+  line-height: 1.4;
+}

@@ -1,0 +1,20 @@
+.integraciones-hero {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--color-bg-light);
+}
+
+.integraciones-grid {
+  padding: 3rem 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+}
+
+.integration-card {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}

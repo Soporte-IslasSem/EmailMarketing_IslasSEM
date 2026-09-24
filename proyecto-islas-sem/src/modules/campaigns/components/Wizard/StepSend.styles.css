@@ -1,0 +1,187 @@
+.StepSend {
+  padding: 30px;
+  font-family: 'Inter', sans-serif;
+  animation: fadeIn 0.25s ease;
+  position: relative;
+  z-index: 1;
+}
+
+/* TITLES */
+.StepSend__title {
+  font-size: 28px;
+  margin-bottom: 5px;
+  font-weight: 700;
+  color: #000;
+}
+
+.StepSend__subtitle {
+  opacity: 0.7;
+  margin-bottom: 30px;
+  color: #000;
+}
+
+/* SUMMARY GRID */
+.StepSend__summary {
+  background: #ffffff;
+  padding: 25px;
+  border-radius: 14px;
+  box-shadow: 0 3px 12px rgba(26, 145, 144, 0.12);
+  border: 1px solid #e5e7eb;
+  margin-bottom: 40px;
+}
+
+.StepSend__summary h3 {
+  margin-top: 25px;
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
+}
+
+.StepSend__summary p,
+.StepSend__summary li {
+  font-size: 15px;
+  color: #000;
+  opacity: 0.85;
+  margin-bottom: 6px;
+}
+
+.StepSend__summary ul {
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+/* SUBSCRIBERS LIST */
+.StepSend__subscribersList {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #f9fafa;
+  margin-bottom: 25px;
+}
+
+.StepSend__subscribersList li {
+  padding: 6px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.StepSend__subscribersList li:last-child {
+  border-bottom: none;
+}
+
+/* INPUT */
+.StepSend__summary input[type="email"] {
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 15px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: 0.25s ease;
+}
+
+.StepSend__summary input[type="email"]:focus {
+  outline: none;
+  border-color: #1A9190;
+  box-shadow: 0 0 0 3px rgba(26, 145, 144, 0.25);
+}
+
+/* BUTTONS */
+.StepSend__buttons {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.StepSend__buttons .primary {
+  background: #1A9190;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+  box-shadow: 0 2px 6px rgba(26, 145, 144, 0.25);
+}
+
+.StepSend__buttons .primary:hover {
+  background: #157a78;
+}
+
+.StepSend__buttons .secondary {
+  background: #1f2937;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.StepSend__buttons .secondary:hover {
+  background: #111827;
+}
+
+/* BUTTON INSIDE SUMMARY (Enviar prueba) */
+.StepSend__summary .secondary {
+  background: #1f2937;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.StepSend__summary .secondary:hover {
+  background: #111827;
+}
+
+.StepSend__summary .secondary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* PROGRESS BOX */
+.StepSend__progress {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(26, 145, 144, 0.15);
+  animation: fadeIn 0.25s ease;
+}
+
+.StepSend__progress h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.StepSend__progress p {
+  margin: 0;
+  font-size: 15px;
+  color: #115e59;
+  font-weight: 500;
+}
+

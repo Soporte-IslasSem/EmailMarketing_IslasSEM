@@ -1,0 +1,130 @@
+/* ================================
+   PLANTILLAS DEL SISTEMA - ISLAS SEM
+   ================================ */
+
+.SystemTemplates {
+  margin-bottom: 50px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* HEADER */
+.SystemTemplates__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.SystemTemplates__controls {
+  display: flex;
+  gap: 12px;
+}
+
+.SystemTemplates__controls input,
+.SystemTemplates__controls select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  background: white;
+  transition: 0.25s ease;
+}
+
+.SystemTemplates__controls input:focus,
+.SystemTemplates__controls select:focus {
+  border-color: #1A9190;
+  outline: none;
+}
+
+/* Botón Importar */
+.SystemTemplates__import {
+  background: #1A9190;
+  color: #ffffff !important;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.SystemTemplates__import:hover {
+  background: #157a78;
+  color: #ffffff !important;
+}
+
+/* ================================
+   GRID
+   ================================ */
+
+.SystemTemplates__grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  padding-top: 10px;
+}
+
+/* ================================
+   CARD
+   ================================ */
+
+.SystemTemplates__item {
+  background: white;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  border: 1px solid #ececec;
+  text-align: center;
+  padding-bottom: 22px;
+  transition: 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.SystemTemplates__item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+/* MINIATURA CONTROLADA */
+.SystemTemplates__item img {
+  width: 100%;
+  max-width: 240px;      /* tamaño ideal */
+  height: 160px;         /* altura fija */
+  object-fit: contain;   /* NO se deforma */
+  background: #fafafa;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  display: block;
+  margin: 0 auto;
+}
+
+/* TÍTULO */
+.SystemTemplates__item h3 {
+  margin-top: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #000;
+}
+
+/* ================================
+   BOTÓN USAR PLANTILLA
+   ================================ */
+
+.SystemTemplates__use {
+  margin-top: 14px;
+  background: #1A9190;
+  color: #ffffff !important;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.SystemTemplates__use:hover {
+  background: #157a78;
+  color: #ffffff !important;
+}

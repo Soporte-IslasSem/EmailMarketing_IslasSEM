@@ -1,0 +1,30 @@
+.Testimonials {
+  padding: 80px 20px;
+  background: #ffffff;
+}
+
+.Testimonials__container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.Testimonials__card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  padding: 32px;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+}
+
+.Testimonials__text {
+  font-size: 18px;
+  color: #111827;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.Testimonials__person {
+  font-size: 16px;
+  color: #1A9190;
+  font-weight: 600;
+}

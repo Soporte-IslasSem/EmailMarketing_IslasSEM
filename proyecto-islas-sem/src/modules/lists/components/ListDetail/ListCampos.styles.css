@@ -1,0 +1,119 @@
+/* CONTENEDOR PRINCIPAL */
+.ListCampos {
+  padding: 20px;
+}
+
+/* TÍTULOS */
+.ListCampos h2 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.ListCampos p {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+/* BOTÓN AÑADIR CAMPO */
+.add-field-btn {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.add-field-btn:hover {
+  background: #157a7a;
+}
+
+/* TABLA en formato filas-tarjeta */
+.fields-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin-top: 10px;
+}
+
+.fields-table th,
+.fields-table td {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.fields-table th {
+  background: none;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #7c8888;
+  border: none;
+  padding: 0 14px 6px;
+}
+
+.fields-table td {
+  background: white;
+  border-top: 1px solid #eef1f1;
+  border-bottom: 1px solid #eef1f1;
+  color: #333;
+}
+
+.fields-table td:first-child {
+  border-left: 1px solid #eef1f1;
+  border-radius: 10px 0 0 10px;
+}
+
+.fields-table td:last-child {
+  border-right: 1px solid #eef1f1;
+  border-radius: 0 10px 10px 0;
+}
+
+/* ACCIONES (3 PUNTOS) */
+.field-actions-cell {
+  position: relative;
+}
+
+/* 🔹 PAGINACIÓN ISLAS SEM */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+.page-btn {
+  background: white;
+  color: #136B68;
+  border: 1px solid #d5dede;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #EEF1F1;
+}
+
+.page-btn:disabled {
+  color: #bbb;
+  border-color: #eee;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 15px;
+  color: #333;
+  font-weight: 500;
+}

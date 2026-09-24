@@ -1,0 +1,194 @@
+import { createBrowserRouter } from "react-router-dom";
+
+// Layouts
+import DashboardLayout from "../modules/dashboard/layout/DashboardLayout.jsx";
+import AuthLayout from "../modules/dashboard/layout/AuthLayout/AuthLayout.jsx";
+
+// Home
+import Home from "../modules/home/pages/Home.jsx";
+
+// Auth
+import Login from "../modules/auth/pages/Login/Login.jsx";
+import Register from "../modules/auth/pages/Register/Register.jsx";
+import ForgotPassword from "../modules/auth/pages/ForgotPassword/ForgotPassword.jsx";
+import ResetPassword from "../modules/auth/pages/ResetPassword/ResetPassword.jsx";
+
+// Dashboard Home
+import DashboardHome from "../modules/dashboard/components/DashboardHome/DashboardHome.jsx";
+
+// Campaigns
+import Campaigns from "../modules/campaigns/components/Campaigns/Campaigns.jsx";
+import CreateCampaign from "../modules/campaigns/components/CreateCampaign/CreateCampaign.jsx";
+import EditCampaign from "../modules/campaigns/components/EditCampaign/EditCampaign.jsx";
+
+// Wizard Steps (Campaigns)
+import StepConfig from "../modules/campaigns/components/Wizard/StepConfig.jsx";
+import StepLists from "../modules/campaigns/components/Wizard/StepLists.jsx";
+import StepTemplates from "../modules/campaigns/components/Wizard/StepTemplates.jsx";
+import StepDesign from "../modules/campaigns/components/Wizard/StepDesign.jsx";
+import StepSend from "../modules/campaigns/components/Wizard/StepSend.jsx";
+
+// Lists
+import Lists from "../modules/lists/components/Lists/Lists.jsx";
+import CreateList from "../modules/lists/components/CreateList/CreateList.jsx";
+import ListDetail from "../modules/lists/components/ListDetail/ListDetail.jsx";
+
+// ListDetail submodules
+import ListResumen from "../modules/lists/components/ListDetail/ListResumen.jsx";
+import ListSuscriptores from "../modules/lists/components/ListDetail/ListSuscriptores.jsx";
+import ListCampos from "../modules/lists/components/ListDetail/ListCampos.jsx";
+import ListFormularios from "../modules/lists/components/ListDetail/ListFormularios.jsx";
+import ListSegmentos from "../modules/lists/components/segments/ListSegmentos.jsx";
+import ListAjustes from "../modules/lists/components/ListDetail/ListAjustes.jsx";
+import ListNotificaciones from "../modules/lists/components/ListDetail/ListNotificaciones.jsx";
+import ListAudiencias from "../modules/lists/components/ListDetail/ListAudiencias.jsx";
+import ListHerramientas from "../modules/lists/components/ListDetail/ListHerramientas.jsx";
+
+// NOTIFICACIONES (subpantallas internas)
+import ListNotificacionesGeneral from "../modules/lists/components/ListDetail/notifications/ListNotificacionesGeneral.jsx";
+import ListNotificacionesConfirmEmail from "../modules/lists/components/ListDetail/notifications/ListNotificacionesConfirmEmail.jsx";
+import ListNotificacionesConfirmPage from "../modules/lists/components/ListDetail/notifications/ListNotificacionesConfirmPage.jsx";
+import ListNotificacionesUnsubscribe from "../modules/lists/components/ListDetail/notifications/ListNotificacionesUnsubscribe.jsx";
+
+// Templates
+import Templates from "../modules/templates/components/Templates/Templates.jsx";
+import CreateTemplate from "../modules/templates/components/CreateTemplate/CreateTemplate.jsx";
+import TemplateEditor from "../modules/templates/components/TemplateEditor/TemplateEditor.jsx";
+import TemplateTagsPage from "../modules/templates/pages/TemplateTagsPage.jsx";
+
+// Subscribers
+import AddSubscriber from "../modules/subscribers/components/AddSubscriber/AddSubscriber.jsx";
+
+// FORMS WIZARD
+import FormWizardWrapper from "../modules/forms/FormWizardWrapper.jsx";
+
+// NUEVO: listado y detalle de formularios
+import FormsList from "../modules/forms/FormsList.jsx";
+import FormDetail from "../modules/forms/FormDetail.jsx";
+
+// REPORTES (NUEVOS)
+import ReportsList from "../modules/reports/components/ReportsList.jsx";
+import ReportDetail from "../modules/reports/components/ReportDetail.jsx";
+
+// RECURSOS (público)
+import Blog from "../pages/Blog.jsx";
+import Glosario from "../pages/Glosario.jsx";
+import OtrosRecursos from "../pages/OtrosRecursos.jsx";
+import HerramientasGratuitas from "../pages/HerramientasGratuitas.jsx";
+
+// NUEVAS PÁGINAS PÚBLICAS
+import Servicios from "../pages/Servicios.jsx";
+import Tarifas from "../pages/Tarifas.jsx";
+import Integraciones from "../pages/Integraciones.jsx";
+import Soporte from "../pages/Soporte.jsx";
+
+const router = createBrowserRouter([
+  // PUBLIC ROUTES
+  {
+    path: "/",
+    element: <Home />,
+  },
+
+  // RECURSOS
+  { path: "/blog", element: <Blog /> },
+  { path: "/glosario", element: <Glosario /> },
+  { path: "/otros-recursos", element: <OtrosRecursos /> },
+  { path: "/herramientas-gratuitas", element: <HerramientasGratuitas /> },
+
+  // NUEVAS PÁGINAS PÚBLICAS
+  { path: "/servicios", element: <Servicios /> },
+  { path: "/tarifas", element: <Tarifas /> },
+  { path: "/integraciones", element: <Integraciones /> },
+  { path: "/soporte", element: <Soporte /> },
+
+  // AUTH
+  {
+    path: "/auth",
+    element: <AuthLayout />,
+    children: [
+      { path: "login", element: <Login /> },
+      { path: "register", element: <Register /> },
+      { path: "forgot-password", element: <ForgotPassword /> },
+      { path: "reset-password", element: <ResetPassword /> },
+    ],
+  },
+
+  // DASHBOARD
+  {
+    path: "/dashboard",
+    element: <DashboardLayout />,
+    children: [
+      { index: true, element: <DashboardHome /> },
+
+      // CAMPAIGNS
+      { path: "campaigns", element: <Campaigns /> },
+      { path: "campaigns/create", element: <CreateCampaign /> },
+
+      // WIZARD
+      { path: "campaigns/create/config", element: <StepConfig /> },
+      { path: "campaigns/create/lists", element: <StepLists /> },
+      { path: "campaigns/create/templates", element: <StepTemplates /> },
+      { path: "campaigns/create/design", element: <StepDesign /> },
+      { path: "campaigns/create/send", element: <StepSend /> },
+      { path: "campaigns/edit/:id", element: <EditCampaign /> },
+
+      // REPORTES
+      { path: "reports", element: <ReportsList /> },
+      { path: "reports/:id", element: <ReportDetail /> },
+
+      // AUTOMATIZACIONES
+      { path: "automations", element: <DashboardHome /> },
+
+      // LISTS
+      { path: "lists", element: <Lists /> },
+      { path: "lists/create", element: <CreateList /> },
+
+      {
+        path: "lists/:id",
+        element: <ListDetail />,
+        children: [
+          { index: true, element: <ListResumen /> },
+          { path: "suscriptores", element: <ListSuscriptores /> },
+          { path: "campos", element: <ListCampos /> },
+          { path: "formularios", element: <ListFormularios /> },
+
+          // 🔥 FORM WIZARD CORREGIDO
+          { path: "formularios/nuevo", element: <FormWizardWrapper isNew={true} /> },
+          { path: "formularios/:formId", element: <FormWizardWrapper isNew={false} /> },
+
+          { path: "segmentos", element: <ListSegmentos /> },
+          { path: "ajustes", element: <ListAjustes /> },
+
+          {
+            path: "notificaciones",
+            element: <ListNotificaciones />,
+            children: [
+              { index: true, element: <ListNotificacionesGeneral /> },
+              { path: "confirm-email", element: <ListNotificacionesConfirmEmail /> },
+              { path: "confirm-page", element: <ListNotificacionesConfirmPage /> },
+              { path: "unsubscribe", element: <ListNotificacionesUnsubscribe /> },
+            ],
+          },
+
+          { path: "audiencias", element: <ListAudiencias /> },
+          { path: "herramientas", element: <ListHerramientas /> },
+        ],
+      },
+
+      // TEMPLATES
+      { path: "templates", element: <Templates /> },
+      { path: "templates/create", element: <CreateTemplate /> },
+      { path: "templates/edit/:id", element: <TemplateEditor /> },
+      { path: "templates/tags", element: <TemplateTagsPage /> },
+
+      // SUBSCRIBERS
+      { path: "subscribers/add", element: <AddSubscriber /> },
+
+      // FORMS (nuevo módulo global)
+      { path: "forms", element: <FormsList /> },
+      { path: "forms/:id", element: <FormDetail /> },
+    ],
+  },
+]);
+
+export default router;

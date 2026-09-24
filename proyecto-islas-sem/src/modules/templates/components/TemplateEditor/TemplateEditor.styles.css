@@ -1,0 +1,104 @@
+.TemplateEditor {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #E8F4F3;
+}
+
+/* Barra superior */
+.TemplateEditor__topbar {
+  height: 60px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  justify-content: space-between;
+}
+
+/* Cuerpo principal */
+.TemplateEditor__body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar izquierdo */
+.LeftSidebar {
+  width: 260px;
+  background: white;
+  border-right: 1px solid #ddd;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* Canvas central — ahora ocupa TODA el área disponible */
+.TemplateEditor__canvas-wrapper {
+  flex: 1;
+  background: #2b2b2b; /* área de edición */
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.TemplateEditor__canvas {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  background: #2b2b2b;
+  border: none;
+  position: relative;
+}
+
+/* Panel derecho */
+.RightPanel {
+  width: 280px;
+  background: white;
+  border-left: 1px solid #ddd;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* Botones superiores */
+.TemplateEditor__thumb,
+.TemplateEditor__send,
+.TemplateEditor__topbar button {
+  background: #1A9190;
+  color: #ffffff !important;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.TemplateEditor__thumb:hover,
+.TemplateEditor__send:hover,
+.TemplateEditor__topbar button:hover {
+  background: #157a78;
+  color: #ffffff !important;
+}
+
+/* Estado de carga */
+.TemplateEditor__loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.9);
+  padding: 20px 30px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A9190;
+  z-index: 999;
+}
+
+/* Título */
+.TemplateEditor__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}

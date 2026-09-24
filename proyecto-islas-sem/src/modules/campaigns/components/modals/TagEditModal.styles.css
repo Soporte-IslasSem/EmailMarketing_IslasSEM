@@ -1,0 +1,56 @@
+.TagEditModal__overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.TagEditModal__content {
+  background: #fff;
+  border-radius: 10px;
+  padding: 25px;
+  width: 420px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  position: relative;
+}
+
+.TagEditModal__close {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.TagEditModal__content input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.TagEditModal__save {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 15px;
+}
+
+.TagEditModal__save:hover {
+  background: #157a78;
+}

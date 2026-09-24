@@ -1,0 +1,36 @@
+.AddSubscriber {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  max-width: 400px;
+  font-family: 'Inter', sans-serif;
+}
+
+.AddSubscriber__form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.AddSubscriber__input {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #cfcfcf;
+  font-size: 14px;
+}
+
+.AddSubscriber__button {
+  padding: 12px;
+  background: #1A9190;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.AddSubscriber__button:hover {
+  background: #157a78;
+}

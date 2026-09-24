@@ -1,0 +1,155 @@
+/* 🔹 Overlay */
+.SegmentModal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+/* 🔹 Caja del modal */
+.SegmentModal__box {
+  background: white;
+  padding: 28px 32px;
+  border-radius: 12px;
+  width: 520px;
+  max-width: 95%;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  font-family: 'Inter', sans-serif;
+  animation: fadeIn 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 🔹 Título */
+.SegmentModal__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+  color: #222;
+}
+
+/* 🔹 Labels */
+.SegmentModal__label {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+/* 🔹 Inputs y selects */
+.SegmentModal__input,
+.SegmentModal__select {
+  width: 92%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  transition: border-color 0.25s ease;
+}
+
+.SegmentModal__input:focus,
+.SegmentModal__select:focus {
+  border-color: #1A9190;
+  outline: none;
+}
+
+/* 🔹 Condiciones */
+.SegmentModal__conditions {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.SegmentModal__conditionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 40px;
+  gap: 10px;
+}
+
+/* 🔹 Botón eliminar */
+.SegmentModal__delete {
+  background: #ff4d4d;
+  border: none;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.SegmentModal__delete:hover {
+  background: #e63b3b;
+}
+
+/* 🔹 Botones principales */
+.SegmentModal__add,
+.SegmentModal__recalc {
+  margin-top: 10px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  background: #1A9190;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.SegmentModal__add:hover,
+.SegmentModal__recalc:hover {
+  background: #157a7a;
+}
+
+/* 🔹 Resultado */
+.SegmentModal__matches {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #333;
+}
+
+/* 🔹 Acciones */
+.SegmentModal__actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.SegmentModal__cancel {
+  background: none;
+  border: 1px solid #d5dede;
+  padding: 10px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #555;
+}
+
+.SegmentModal__cancel:hover {
+  background: #f5f5f5;
+}
+
+.SegmentModal__save {
+  background: #1A9190;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s ease;
+}
+
+.SegmentModal__save:hover {
+  background: #157a7a;
+}
+
+/* 🔹 Animación */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

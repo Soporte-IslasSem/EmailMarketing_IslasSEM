@@ -1,0 +1,145 @@
+.FormsList__container {
+  padding: 24px;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* 🔹 Botón volver */
+.FormsList__back {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
+.FormsList__backBtn {
+  background: #1A9190;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.25s ease;
+}
+
+.FormsList__backBtn:hover {
+  background: #157a7a;
+}
+
+.FormsList__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #222;
+  margin: 0;
+}
+
+.FormsList__loading,
+.FormsList__empty {
+  font-size: 15px;
+  color: #555;
+}
+
+.FormsList__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.FormsList__table th {
+  background: #f3f4f6;
+  color: #333;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.FormsList__table td {
+  padding: 12px;
+  font-size: 14px;
+  color: #444;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: top;
+}
+
+.FormsList__row {
+  cursor: pointer;
+  transition: background 0.25s ease;
+}
+
+.FormsList__row:hover {
+  background: #f9fafb;
+}
+
+.FormsList__preview {
+  width: 240px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.FormsList__preview p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.FormsList__preview input {
+  padding: 8px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+}
+
+.FormsList__preview button {
+  padding: 8px;
+  font-size: 13px;
+  color: #fff;
+  border: none;
+  cursor: default;
+}
+
+/* 🔹 Paginación */
+.FormsList__pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.FormsList__pageBtn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #1A9190;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.FormsList__pageBtn:hover:not(:disabled) {
+  background: #157a7a;
+}
+
+.FormsList__pageBtn:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+}
+
+.FormsList__pageInfo {
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+}

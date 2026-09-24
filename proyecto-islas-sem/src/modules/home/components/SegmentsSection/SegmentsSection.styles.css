@@ -1,0 +1,97 @@
+:root {
+  --islas-primary: #1A9190;
+  --islas-primary-dark: #136B68;
+  --islas-bg-soft: #E8F4F3;
+  --islas-text-dark: #1A1A1A;
+  --islas-text-soft: #555;
+  --islas-gold: #D4A017; /* Amarillo del Hero */
+}
+
+/* Sección general */
+.SegmentsSection {
+  width: 100%;
+  padding: 70px 0;
+  background: #ffffff;
+}
+
+.SegmentsSection__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.SegmentsSection__title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--islas-primary);
+  margin-bottom: 50px;
+}
+
+/* GRID */
+.SegmentsSection__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 32px;
+}
+
+/* CARD */
+.SegmentsSection__card {
+  background: var(--islas-bg-soft);
+  border-radius: 18px;
+  padding: 32px 26px;
+  border: 1px solid #d6e7e6;
+  text-align: left;
+
+  /* Sombra premium */
+  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  transition: all 0.25s ease;
+}
+
+.SegmentsSection__card:hover {
+  transform: translateY(-6px);
+  border-color: var(--islas-primary);
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+}
+
+/* Título de cada segmento */
+.SegmentsSection__cardTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--islas-primary-dark);
+  margin-bottom: 14px;
+}
+
+/* Texto */
+.SegmentsSection__text {
+  font-size: 15px;
+  color: var(--islas-text-soft);
+  line-height: 1.55;
+  margin-bottom: 22px;
+}
+
+/* Footer */
+.SegmentsSection__footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Logo */
+.SegmentsSection__logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 4px;
+  border: 1px solid #dfe7e6;
+}
+
+/* Persona */
+.SegmentsSection__person {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--islas-gold); /* Amarillo del Hero */
+}

@@ -1,0 +1,84 @@
+.servicios-hero {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--color-bg-light);
+}
+
+.servicios-hero h1 {
+  font-size: 2.6rem;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.servicios-hero p {
+  max-width: 700px;
+  margin: 1rem auto;
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+.servicios-grid {
+  padding: 3rem 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+}
+
+.servicio-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: 0.2s ease;
+}
+
+.servicio-card:hover {
+  transform: translateY(-5px);
+}
+
+.servicio-icon {
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background-size: 40px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.servicio-icon.email {
+  background-color: #00bcd4;
+  background-image: url("../assets/icons/email.svg");
+}
+
+.servicio-icon.sms {
+  background-color: #4caf50;
+  background-image: url("../assets/icons/sms.svg");
+}
+
+.servicio-icon.landing {
+  background-color: #ff9800;
+  background-image: url("../assets/icons/landing.svg");
+}
+
+.servicio-icon.automation {
+  background-color: #673ab7;
+  background-image: url("../assets/icons/automation.svg");
+}
+
+.servicios-cta {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--color-bg-accent);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.9rem 2rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
