@@ -1,0 +1,80 @@
+/* Barra superior de pestañas por área (portada del prototipo) */
+.TopNav {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border-bottom: 1px solid #e6e6e6;
+  padding: 0 26px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.TopNav__tab {
+  border: none;
+  background: none;
+  padding: 13px 15px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: inherit;
+}
+.TopNav__tab:hover {
+  color: #136b68;
+  background: #f6fbfb;
+}
+.TopNav__tab.on {
+  color: #136b68;
+  border-bottom-color: #1a9190;
+}
+.TopNav__caret {
+  font-size: 11px;
+  color: #9aa;
+}
+.TopNav__dd {
+  position: relative;
+}
+.TopNav__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #fff;
+  border: 1px solid #e6ecec;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  z-index: 40;
+  min-width: 220px;
+}
+.TopNav__menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2a2a;
+  font-family: inherit;
+}
+.TopNav__menu button:hover {
+  background: #f4f7f7;
+}
+.TopNav__menu button.on {
+  color: #136b68;
+}
+@media (max-width: 720px) {
+  .TopNav {
+    padding: 0 12px;
+  }
+}

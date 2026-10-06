@@ -1,0 +1,176 @@
+/* ============================================================
+   Kanban de Negociaciones — diseño portado 1:1 del prototipo
+   (islas-sem-demo). Mismas clases y estilos que el prototipo.
+   ============================================================ */
+.crmpipe {
+  --teal: #1a9190;
+  --teal-dark: #136b68;
+  --gold: #e2b83c;
+  --ink: #1f2a2a;
+  --muted: #6b7d7d;
+  --line: #dce4e4;
+  --line2: #e7eded;
+  --bg-soft: #f4f7f7;
+  --danger: #d94f70;
+  color: var(--ink);
+}
+
+/* Barra de herramientas (clavada a Bitrix) */
+.dealbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
+.dealbar-l { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dealbar h1 { margin: 0; font-size: 24px; }
+.crear-split { display: inline-flex; align-items: center; gap: 7px; background: #39a852; color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.crear-split:hover { background: #2f9445; }
+.crear-split .cx { opacity: .85; border-left: 1px solid #ffffff55; padding-left: 8px; margin-left: 2px; }
+.pipesel { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+.pipesel:hover { border-color: var(--teal); }
+.viewchip { display: inline-flex; align-items: center; gap: 8px; background: #eef2f2; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #41514f; font-weight: 600; }
+.viewchip b { cursor: pointer; color: #98a7a7; font-weight: 700; }
+.viewchip b:hover { color: var(--danger); }
+.dealsearch { display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; min-width: 150px; }
+.dealsearch input { border: none; outline: none; font-size: 13.5px; width: 100%; background: none; }
+.iconbtn { width: 38px; height: 38px; border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer; font-size: 16px; color: #6b7d7d; }
+.iconbtn:hover { border-color: var(--teal); }
+.neg-flag { background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; margin-left: 6px; }
+
+/* Sub-barra: tabs + contadores + acciones */
+.dealsub { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; border-bottom: 1px solid var(--line2); margin: 14px 0 16px; }
+.viewtabs { display: flex; gap: 2px; }
+.dealtabs { margin: 0 !important; border: none !important; }
+.viewtabs button { border: none; background: none; padding: 9px 15px; font-weight: 600; font-size: 14px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+.viewtabs button.on { color: var(--teal-dark); border-bottom-color: var(--teal); }
+.dealtabs .tab-neg { color: #c9445a; }
+.dealtabs .tab-neg.on { color: #c9445a; border-bottom-color: #c9445a !important; }
+.dealcounters { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+.dealcounters b { color: var(--ink); }
+.dealactions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 8px; }
+.dealactions button { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; color: #4b5d5d; cursor: pointer; white-space: nowrap; }
+.dealactions button:hover { border-color: var(--teal); color: var(--teal-dark); }
+
+/* Tablero */
+.board.deals { display: flex; align-items: flex-start; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.board.deals .col { min-width: 0; position: relative; padding: 10px; background: #f3f6f6; border: 1px solid var(--line2); border-radius: 12px; box-sizing: border-box; }
+.board.deals > .col { flex: 0 0 240px; }
+.board.deals > .addstage-col { flex: 0 0 200px; }
+.col.dragover { background: #e2f0ef; border-color: var(--teal); }
+
+.deal-colhead { color: #fff; font-weight: 700; font-size: 13.5px; padding: 9px 13px; border-radius: 11px 11px 0 0; margin: -10px -10px 12px; display: flex; align-items: center; gap: 8px; box-shadow: inset 0 -2px 0 #00000018; }
+.deal-colhead .dcnt { background: #ffffff38; padding: 1px 8px; border-radius: 999px; font-size: 12px; }
+.deal-total { background: #e9eeee; border-radius: 999px; text-align: center; font-weight: 700; font-size: 14px; padding: 6px; margin-bottom: 10px; color: #41514f; font-variant-numeric: tabular-nums; }
+.colhead-add { margin-left: auto; width: 20px; height: 20px; border: none; background: #ffffff30; color: #fff; border-radius: 6px; font-size: 15px; line-height: 1; cursor: pointer; }
+.colhead-add:hover { background: #ffffff55; }
+.colhead-name { cursor: pointer; }
+.colhead-pen { opacity: 0; font-size: 11px; transition: opacity .15s; }
+.deal-colhead:hover .colhead-pen, .group-head:hover .colhead-pen { opacity: .85; }
+.colmove { display: inline-flex; gap: 2px; margin-right: 5px; opacity: 0; transition: opacity .12s; vertical-align: middle; }
+.deal-colhead:hover .colmove, .group-head:hover .colmove { opacity: .95; }
+.colmove button { border: none; background: #ffffff40; color: inherit; border-radius: 4px; font-size: 9px; cursor: pointer; width: 16px; height: 16px; line-height: 1; padding: 0; }
+.colmove button:hover { background: #ffffff70; }
+.sub-head .colmove button { background: #00000010; }
+.sub-head .colmove button:hover { background: #00000022; }
+
+/* Alta rápida inline */
+.deal-quick { width: 100%; background: #fff; border: 1px dashed #cdd8d8; border-radius: 8px; padding: 9px; color: #6b7d7d; font-weight: 600; font-size: 12.5px; cursor: pointer; margin-bottom: 12px; }
+.deal-quick:hover { border-color: var(--teal); color: var(--teal); }
+.quick-add { background: #fff; border: 1px solid var(--teal); border-radius: 8px; padding: 9px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.qa-in { width: 100%; border: 1px solid #d7e0e0; border-radius: 6px; padding: 7px 9px; font-size: 12.5px; margin-bottom: 6px; box-sizing: border-box; }
+.qa-in:focus { outline: none; border-color: var(--teal); }
+.qa-row { display: flex; gap: 6px; margin-top: 2px; }
+.qa-save { flex: 1; background: var(--teal); color: #fff; border: none; border-radius: 6px; padding: 7px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.qa-save:hover { background: var(--teal-dark); }
+.qa-cancel { background: #f1f4f4; color: #6b7d7d; border: none; border-radius: 6px; padding: 7px 10px; font-size: 12.5px; cursor: pointer; }
+
+/* Tarjetas */
+.col__body { display: flex; flex-direction: column; gap: 0; }
+.kcard { background: #fff; border: 1px solid var(--line2); border-radius: 10px; padding: 12px; margin-bottom: 10px; cursor: grab; box-shadow: 0 1px 2px #0000000d; }
+.kcard:active { cursor: grabbing; }
+.kcard .kn { font-weight: 600; font-size: 13px; line-height: 1.3; }
+.kcard .kc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.deal-card { position: relative; padding: 10px 32px 10px 11px; }
+.deal-amt { font-size: 12.5px; margin: 2px 0 6px; font-variant-numeric: tabular-nums; }
+.deal-contact { font-size: 13.5px; display: inline-block; }
+.deal-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.deal-date2 { font-size: 11.5px; color: #9aa; margin-top: 6px; }
+.deal-act { font-size: 12px; color: var(--teal); font-weight: 600; cursor: pointer; }
+.deal-badge { position: absolute; top: 10px; right: 9px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #eef1f1; color: #8a9a9a; font-size: 11px; display: grid; place-items: center; font-weight: 700; }
+.est-tag { background: var(--gold); color: #3a2c00; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; }
+.card-tools { position: absolute; top: 6px; right: 26px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.deal-card:hover .card-tools { opacity: 1; }
+.card-tools button { width: 22px; height: 22px; border: none; background: #f1f4f4; border-radius: 5px; font-size: 12px; line-height: 1; cursor: pointer; color: #5b6b6b; padding: 0; }
+.card-tools button:hover { background: #e3eaea; color: var(--teal); }
+.card-tools .ct-del:hover { background: #fde8e8; color: var(--danger); }
+.card-tools .ct-move:hover { background: #e6f4f1; color: var(--teal); }
+.av { display: inline-grid; place-items: center; background: var(--teal); color: #fff; border-radius: 50%; font-weight: 700; }
+.deal-icons { position: absolute; top: 34px; right: 9px; display: flex; flex-direction: column; gap: 9px; }
+.deal-icons span { color: #c2cbcb; cursor: pointer; line-height: 0; }
+.deal-icons svg { width: 15px; height: 15px; }
+.deal-icons span:hover { color: var(--teal); }
+.deal-prod { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11.5px; font-weight: 600; color: var(--teal-dark); background: #eef6f6; border-radius: 6px; padding: 4px 7px; line-height: 1.25; }
+.deal-prod b { color: var(--teal); }
+.deal-date2 { font-size: 11.5px; color: #9aa; margin-top: 6px; }
+.col-sort { font-size: 11.5px; color: #7a8a8a; cursor: pointer; opacity: .8; margin-bottom: 8px; user-select: none; }
+.col-sort:hover { color: var(--teal); opacity: 1; }
+.prio-arrows { display: inline-flex; flex-direction: column; }
+.prio-arrows button { border: none; background: none; color: #b9c2c2; cursor: pointer; font-size: 9px; line-height: .9; padding: 0; }
+.prio-arrows button:hover { color: var(--teal); }
+
+/* Columna "añadir etapa" */
+.addstage-col { background: transparent !important; border: none !important; cursor: pointer; }
+.addstage-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 64px; border: 2px dashed #cdd8d8; border-radius: 10px; color: #8a9a9a; font-weight: 600; font-size: 13px; transition: all .12s; }
+.addstage-col:hover .addstage-inner { border-color: var(--teal); color: var(--teal); background: #f3fbfb; }
+.addstage-plus { font-size: 22px; line-height: 1; }
+
+/* Grupos con sub-columnas (plazos 72h/7d/28d) */
+.col-group { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; background: #f4f7f7; border: 1px solid #e2eaea; border-radius: 12px; padding: 10px; align-self: flex-start; }
+.group-head { color: #fff; border-radius: 9px; padding: 9px 12px; font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
+.group-head .dcnt { background: #ffffff33; color: #fff; padding: 1px 8px; border-radius: 999px; font-size: 12px; }
+.group-head .group-tot { margin-left: auto; font-size: 12px; font-weight: 600; opacity: .95; }
+.group-cols { display: flex; gap: 10px; }
+.col-group .col { flex: 0 0 185px; background: #fff !important; }
+.sub-head { border-radius: 8px; font-size: 12px; padding: 7px 9px; }
+.sub-head .colhead-name { font-weight: 600; }
+
+/* ===== Ficha de negociación (página completa, clavada al prototipo) ===== */
+.dficha { color: var(--ink); }
+.dficha__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+.dficha__title { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 700; margin: 0; }
+.editpen { font-size: 16px; color: #b9c2c2; cursor: pointer; }
+.editpen:hover { color: var(--teal); }
+.dstage-bar { display: flex; gap: 3px; margin: 12px 0 18px; overflow-x: auto; padding-bottom: 2px; }
+.dstage { flex: 1; min-width: 96px; background: #e9eeee; color: #7a8a8a; font-size: 12px; font-weight: 600; padding: 11px 10px 11px 22px; text-align: center; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); transition: .15s; }
+.dstage:first-child { clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); padding-left: 14px; }
+.dstage.on { color: #fff; }
+.dstage:hover { filter: brightness(1.06); }
+.dstage-close { background: #eef2f2 !important; color: #7a8a8a !important; }
+.dtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line2); margin: 0 0 16px; flex-wrap: wrap; }
+.dtabs button { border: none; background: none; padding: 9px 14px; font-weight: 600; font-size: 13.5px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+.dtabs button.on { color: var(--teal-dark); border-bottom-color: var(--teal); }
+.dcols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 900px) { .dcols { grid-template-columns: 1fr; } }
+.cd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.cd-h { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.priocircle-row { display: flex; align-items: center; gap: 12px; }
+.priocircle { width: 52px; height: 52px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 11px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+
+/* Banner de oferta (ficha) */
+.offer-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff7ec; border: 1px solid #f2d9a8; border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; }
+
+/* Leyenda de presupuesto */
+.budleg { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 14px; font-size: 11.5px; color: var(--muted); align-items: center; }
+.budleg span { display: inline-flex; align-items: center; gap: 5px; }
+.budleg i { width: 12px; height: 12px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 8px; font-style: normal; }
+.budleg-cli i { color: #fff; }
+
+/* Menú de embudos */
+.pipemenu { position: absolute; top: 46px; left: 190px; background: #fff; border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 10px 30px #0002; padding: 8px; z-index: 30; min-width: 252px; }
+.pipemenu button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink); }
+.pipemenu button:hover { background: var(--bg-soft); }
+
+/* ===== Cerrar negociación (Ganado / Perdido) ===== */
+.close-banner{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid;border-radius:12px;margin-bottom:14px}
+.closepick{flex:1;padding:12px;border:2px solid #e3eaea;background:#fff;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;transition:.15s}
+.closepick:hover{border-color:#cdd8d8}
+.closepick.on.won{border-color:#1faa59;background:#e9f9ef;color:#1a7d43}
+.closepick.on.lost{border-color:#d94f70;background:#fdeef1;color:#b0304c}
+.deal-closed{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;margin-bottom:5px;letter-spacing:.2px}
+.sla-timer{font-size:12px;font-weight:800;padding:3px 10px;border-radius:20px;white-space:nowrap}

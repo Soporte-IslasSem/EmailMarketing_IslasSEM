@@ -9,10 +9,25 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .DashboardLayout__main {
   flex: 1;
-  padding: 32px;
+  padding: 28px;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Contenido centrado y limitado (como .content del prototipo, max-width 1240px) */
+.DashboardLayout__inner {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+}
+/* Tableros a todo el ancho (Kanban, automatización, ficha) */
+.DashboardLayout__inner.wide {
+  max-width: none;
 }

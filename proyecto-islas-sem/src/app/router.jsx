@@ -70,11 +70,38 @@ import FormDetail from "../modules/forms/FormDetail.jsx";
 import ReportsList from "../modules/reports/components/ReportsList.jsx";
 import ReportDetail from "../modules/reports/components/ReportDetail.jsx";
 
+// CRM (nuevo módulo)
+import Contacts from "../modules/crm/pages/Contacts.jsx";
+import ContactDetail from "../modules/crm/pages/ContactDetail.jsx";
+import DealDetail from "../modules/crm/pages/DealDetail.jsx";
+import Placeholder from "../modules/crm/pages/Placeholder.jsx";
+import Analytics from "../modules/crm/pages/Analytics.jsx";
+import Products from "../modules/crm/pages/Products.jsx";
+import Employees from "../modules/crm/pages/Employees.jsx";
+import SalesDocs from "../modules/crm/pages/SalesDocs.jsx";
+import Departments from "../modules/crm/pages/Departments.jsx";
+import SalesTeams from "../modules/crm/pages/SalesTeams.jsx";
+import Roles from "../modules/crm/pages/Roles.jsx";
+import Integrations from "../modules/crm/pages/Integrations.jsx";
+import CrmAutomation from "../modules/crm/pages/CrmAutomation.jsx";
+import Audit from "../modules/crm/pages/Audit.jsx";
+import Calendar from "../modules/crm/pages/Calendar.jsx";
+import NewDeal from "../modules/crm/pages/NewDeal.jsx";
+import Companies from "../modules/crm/pages/Companies.jsx";
+import Leads from "../modules/crm/pages/Leads.jsx";
+import Pipeline from "../modules/crm/pages/Pipeline.jsx";
+import Activities from "../modules/crm/pages/Activities.jsx";
+import Outbox from "../modules/crm/pages/Outbox.jsx";
+import CrmForms from "../modules/crm/pages/CrmForms.jsx";
+
 // RECURSOS (público)
 import Blog from "../pages/Blog.jsx";
 import Glosario from "../pages/Glosario.jsx";
 import OtrosRecursos from "../pages/OtrosRecursos.jsx";
 import HerramientasGratuitas from "../pages/HerramientasGratuitas.jsx";
+
+// FORMULARIOS PÚBLICOS (SEPA / Datos Jurídicos)
+import PublicForm from "../modules/forms/public/PublicForm.jsx";
 
 // NUEVAS PÁGINAS PÚBLICAS
 import Servicios from "../pages/Servicios.jsx";
@@ -94,6 +121,10 @@ const router = createBrowserRouter([
   { path: "/glosario", element: <Glosario /> },
   { path: "/otros-recursos", element: <OtrosRecursos /> },
   { path: "/herramientas-gratuitas", element: <HerramientasGratuitas /> },
+
+  // FORMULARIOS PÚBLICOS RELLENABLES (sin login): /f/sepa/:dealId , /f/juridicos/:dealId
+  { path: "/f/:formType", element: <PublicForm /> },
+  { path: "/f/:formType/:dealId", element: <PublicForm /> },
 
   // NUEVAS PÁGINAS PÚBLICAS
   { path: "/servicios", element: <Servicios /> },
@@ -135,6 +166,40 @@ const router = createBrowserRouter([
       // REPORTES
       { path: "reports", element: <ReportsList /> },
       { path: "reports/:id", element: <ReportDetail /> },
+
+      // CRM
+      { path: "crm/contacts", element: <Contacts /> },
+      { path: "crm/contacts/:id", element: <ContactDetail /> },
+      { path: "crm/companies", element: <Companies /> },
+      { path: "crm/leads", element: <Leads /> },
+      { path: "crm/pipeline", element: <Pipeline /> },
+      { path: "crm/newdeal", element: <NewDeal /> },
+      { path: "crm/deals/:id", element: <DealDetail /> },
+      { path: "crm/automation", element: <CrmAutomation /> },
+      { path: "crm/activities", element: <Activities /> },
+
+      // CRM · pestañas en construcción (mismo nav que el prototipo)
+      { path: "crm/analytics", element: <Analytics /> },
+      { path: "crm/outbox", element: <Outbox /> },
+      { path: "crm/forms", element: <CrmForms /> },
+      { path: "crm/quotes", element: <SalesDocs type="quotes" /> },
+      { path: "crm/invoices", element: <SalesDocs type="invoices" /> },
+      { path: "crm/products", element: <Products /> },
+      { path: "crm/history", element: <Placeholder title="Historial de CRM" /> },
+      { path: "crm/recyclebin", element: <Placeholder title="Papelera de reciclaje" /> },
+      { path: "crm/settings", element: <Placeholder title="Ajustes de CRM" /> },
+
+      // Tareas
+      { path: "tasks", element: <Activities /> },
+      { path: "tasks/calendar", element: <Calendar /> },
+
+      // Administración
+      { path: "admin/team", element: <Employees /> },
+      { path: "admin/departments", element: <Departments /> },
+      { path: "admin/salesteams", element: <SalesTeams /> },
+      { path: "admin/roles", element: <Roles /> },
+      { path: "admin/integraciones", element: <Integrations /> },
+      { path: "admin/audit", element: <Audit /> },
 
       // AUTOMATIZACIONES
       { path: "automations", element: <DashboardHome /> },

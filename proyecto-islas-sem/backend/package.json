@@ -1,0 +1,23 @@
+{
+  "name": "islassem-backend",
+  "version": "1.0.0",
+  "description": "Backend de envío de correo (cola outbox) y automatización 24/7 (SLA) para ISLAS SEM. Se aloja en Loading (Node.js + cron).",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "tick": "node tick.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase-admin": "^12.7.0",
+    "imapflow": "^1.0.191",
+    "mailparser": "^3.7.2",
+    "nodemailer": "^6.9.16",
+    "pdfmake": "^0.2.20"
+  }
+}

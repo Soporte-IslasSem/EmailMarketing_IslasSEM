@@ -14,7 +14,8 @@ import {
   where,
   getDocs
 } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { useOrg } from "../../../crm/lib/useOrg";
+import { enqueueCampaign, enqueueTest } from "../../lib/campaignSend";
 
 // Modal
 import CampaignSendModal from "./modals/CampaignSendModal";
@@ -23,6 +24,7 @@ export default function StepSend() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const campaignId = params.get("id");
+  const { orgId } = useOrg();
 
   const [campaign, setCampaign] = useState(null);
   const [subscribers, setSubscribers] = useState([]);
@@ -100,20 +102,11 @@ export default function StepSend() {
     setTestMessage("");
 
     try {
-      const functions = getFunctions();
-      const sendTestEmailFn = httpsCallable(functions, "sendTestEmail");
-
-      await sendTestEmailFn({
-        to: testEmail,
-        subject: campaign.config.subject,
-        html: campaign.template?.html,
-        from: campaign.config.senderEmail,
-      });
-
-      setTestMessage("Correo de prueba enviado correctamente");
+      await enqueueTest(orgId, campaign, testEmail);
+      setTestMessage("Prueba en cola — se enviará en el próximo ciclo del backend (~1 min).");
     } catch (error) {
       console.error(error);
-      setTestMessage("Error al enviar el correo de prueba");
+      setTestMessage("Error al poner la prueba en cola");
     }
 
     setSendingTest(false);
@@ -122,38 +115,16 @@ export default function StepSend() {
   // 3️⃣ Envío real uno por uno
   const handleConfirmSend = async () => {
     setSending(true);
-    setProgress("Enviando campaña...");
+    setProgress("Poniendo la campaña en cola...");
+    setShowModal(false);
 
     try {
-      const functions = getFunctions();
-      const sendCampaignEmailFn = httpsCallable(functions, "sendCampaignEmail");
-
-      const result = await sendCampaignEmailFn({
-        campaign: { id: campaignId, ...campaign },
-        subscribers,
-      });
-
-      const data = result.data; // { success: true, reportId: "..." }
-
-      setProgress("Campaña enviada ✔");
-
-      await updateDoc(doc(db, "campaigns", campaignId), {
-        status: "sent",
-        send: {
-          scheduleType: "now",
-          scheduledAt: null,
-          status: "sent",
-        },
-        step: 5,
-        updatedAt: new Date(),
-      });
-
-      setTimeout(() => {
-        navigate(`/dashboard/reports/${data.reportId}`); // 👈 antes era campaignId
-      }, 1500);
+      const { enqueued, skipped } = await enqueueCampaign(orgId, campaignId, campaign, subscribers);
+      setProgress(`Campaña en cola: ${enqueued} destinatario(s)${skipped ? ` · ${skipped} omitido(s)` : ""}. El backend los enviará con throttle.`);
+      setTimeout(() => navigate(`/dashboard/campaigns`), 1800);
     } catch (err) {
-      console.error("❌ Error enviando campaña:", err);
-      alert("Error enviando campaña");
+      console.error("❌ Error encolando campaña:", err);
+      alert("Error al poner la campaña en cola: " + (err.message || err));
     }
 
     setSending(false);

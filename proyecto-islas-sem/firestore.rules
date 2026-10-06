@@ -3,9 +3,101 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===== Helpers multi-tenant (CRM) =====
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    // orgId al que pertenece el usuario actual (según su perfil en /users)
+    function myOrg() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.orgId;
+    }
+    function isMember(orgId) {
+      return isSignedIn() && myOrg() == orgId;
+    }
+    // Un documento del CRM pertenece a la organización del usuario
+    function ownDocOrg() {
+      return isSignedIn() && resource.data.orgId == myOrg();
+    }
+    function createInMyOrg() {
+      return isSignedIn() && request.resource.data.orgId == myOrg();
+    }
+
     // Cada usuario solo puede leer/escribir su propio perfil
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ===== Organizaciones (multi-tenant) =====
+    match /organizations/{orgId} {
+      allow read: if isMember(orgId);
+      allow create: if isSignedIn(); // bootstrap de la org por defecto (TODO: endurecer al abrir el SaaS)
+      allow update, delete: if isMember(orgId);
+    }
+
+    // ===== Colecciones del CRM (aisladas por orgId) =====
+    match /contacts/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /companies/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /leads/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /deals/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /pipelines/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /activities/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /products/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /quotes/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /invoices/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /outbox/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    // Envíos de formularios PÚBLICOS (SEPA / Datos Jurídicos): cualquiera puede CREAR
+    // (sin login), pero solo los miembros de la org pueden leer/gestionar. Sin lectura pública.
+    match /formSubmissions/{docId} {
+      allow create: if request.resource.data.orgId is string
+                    && request.resource.data.formType is string
+                    && request.resource.data.status == "recibido";
+      allow read, update, delete: if ownDocOrg();
+    }
+    match /employees/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /departments/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /salesteams/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /roles/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
     }
 
     // Listas: dueño mediante el campo "userId"
