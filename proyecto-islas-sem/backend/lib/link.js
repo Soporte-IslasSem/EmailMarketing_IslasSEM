@@ -15,13 +15,13 @@ async function findByEmail(collection, orgId, email) {
 }
 
 // Devuelve { contactId, leadId, created } para colgar actividades de la persona correcta.
-async function resolvePerson(orgId, { email, firstName, lastName, phone, company, source, notes }) {
+async function resolvePerson(orgId, { email, firstName, lastName, phone, company, source, notes, create = true }) {
   const e = norm(email);
   const contact = await findByEmail("contacts", orgId, e);
   if (contact) return { contactId: contact.id, leadId: "", created: false };
   const lead = await findByEmail("leads", orgId, e);
   if (lead) return { contactId: "", leadId: lead.id, created: false };
-  if (!e) return { contactId: "", leadId: "", created: false };
+  if (!e || !create) return { contactId: "", leadId: "", created: false };
   const ref = await db.collection("leads").add({
     orgId, firstName: firstName || e.split("@")[0], lastName: lastName || "", email: e,
     phone: phone || "", whatsapp: "", company: company || "", source: source || "Email",

@@ -29,6 +29,14 @@ function isAutoReply(parsed) {
   return /out of office|automatic reply|vacation|fuera de la oficina|respuesta autom/i.test(parsed.subject || "");
 }
 
+// Correo masivo (newsletter, publicidad, notificación automática): no debe crear prospectos.
+function isBulk(parsed, fromEmail) {
+  const h = parsed.headers;
+  if (h?.get?.("list-unsubscribe") || h?.get?.("list-id")) return true;
+  if (String(h?.get?.("precedence") || "").toLowerCase() === "list") return true;
+  return /^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifica(tions?|ciones)|news(letter)?|marketing|info@.*(mailchimp|sendgrid|hubspot))/i.test(fromEmail || "");
+}
+
 // Busca la negociación a la que corresponde la respuesta.
 async function matchDeal(refIds, fromEmail) {
   // 1) Por hilo: outbox cuyo messageId esté en las referencias del correo.
@@ -97,9 +105,11 @@ async function handleNewEmail(parsed, fromEmail, snippet) {
   const fromName = parsed.from?.value?.[0]?.name || "";
   const [firstName, ...rest] = fromName.split(" ");
   const person = await resolvePerson(orgId, {
+    create: !isBulk(parsed, fromEmail), // masivos: solo si ya es contacto/prospecto
     email: fromEmail, firstName, lastName: rest.join(" "),
     source: "Email", notes: `Entró por correo: "${(parsed.subject || "").slice(0, 120)}"`,
   });
+  if (!person.contactId && !person.leadId) return { matched: false }; // masivo de desconocido
   await db.collection("inbound").add({
     orgId, dealId: "", contactId: person.contactId, leadId: person.leadId,
     from: fromEmail, subject: parsed.subject || "", snippet, createdAt: new Date(),
@@ -115,6 +125,9 @@ async function handleNewEmail(parsed, fromEmail, snippet) {
   return { matched: true, newLead: person.created };
 }
 
+// Cursor por UID en Firestore (system/imapCursor): solo se procesan los correos que
+// llegan DESPUÉS de activar el backend, sin tocar los existentes (la bandeja ya tiene
+// miles) y sin marcarlos como leídos — la bandeja la siguen usando personas.
 async function processReplies() {
   if (!imapConfigured()) return { skipped: "IMAP no configurado" };
   const { ImapFlow } = require("imapflow");
@@ -124,27 +137,44 @@ async function processReplies() {
     host: process.env.IMAP_HOST, port, secure: port === 993,
     auth: { user: process.env.IMAP_USER, pass: process.env.IMAP_PASSWORD }, logger: false,
   });
-  let matched = 0, scanned = 0;
+  let matched = 0, scanned = 0, newLeads = 0;
   await client.connect();
   const pipesSnap = await db.collection("pipelines").get();
   const pipelines = pipesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const cursorRef = db.collection("system").doc("imapCursor");
   const lock = await client.getMailboxLock("INBOX");
   try {
-    const uids = [];
-    for await (const msg of client.fetch({ seen: false }, { uid: true, source: true })) {
-      scanned++;
-      try {
-        const parsed = await simpleParser(msg.source);
-        if (!isAutoReply(parsed)) { const r = await handleReply(parsed, pipelines); if (r.matched) matched++; }
-      } catch (e) { console.warn("[inbox] parse:", e.message); }
-      uids.push(msg.uid);
+    const box = client.mailbox;
+    const uidValidity = String(box.uidValidity);
+    const cur = (await cursorRef.get()).data();
+    // Primera ejecución (o buzón recreado): arrancar desde "ahora", sin procesar historial.
+    if (!cur || cur.uidValidity !== uidValidity) {
+      await cursorRef.set({ uidValidity, lastUid: box.uidNext - 1, startedAt: new Date() });
+      return { initialized: true, from: box.uidNext };
     }
-    if (uids.length) await client.messageFlagsAdd(uids, ["\\Seen"], { uid: true });
+    let lastUid = cur.lastUid;
+    if (box.uidNext - 1 > lastUid) {
+      for await (const msg of client.fetch(`${lastUid + 1}:*`, { uid: true, source: true }, { uid: true })) {
+        if (msg.uid <= lastUid) continue; // "N:*" devuelve el último aunque sea anterior
+        scanned++;
+        try {
+          const parsed = await simpleParser(msg.source);
+          if (!isAutoReply(parsed)) {
+            const r = await handleReply(parsed, pipelines);
+            if (r.matched) matched++;
+            if (r.newLead) newLeads++;
+          }
+        } catch (e) { console.warn("[inbox] parse:", e.message); }
+        lastUid = Math.max(lastUid, msg.uid);
+        if (scanned >= 100) break; // tope por pasada; el resto en la siguiente
+      }
+      await cursorRef.set({ uidValidity, lastUid, updatedAt: new Date() }, { merge: true });
+    }
   } finally {
     lock.release();
     await client.logout().catch(() => {});
   }
-  return { scanned, matched };
+  return { scanned, matched, newLeads };
 }
 
-module.exports = { processReplies };
+module.exports = { processReplies, isBulk };
