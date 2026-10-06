@@ -6,6 +6,7 @@ import { usePipelines, getStages, flattenStages, findStage, budgetTier, STAGE_CO
 import { runStageAutomations, markResponded } from "../lib/automations";
 import { downloadDocPDF, openDocPDF } from "../lib/pdf";
 import { queueEmail, basicEmail } from "../lib/outbox";
+import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -304,7 +305,10 @@ export default function DealDetail() {
                 <div className="row"><dt>Embudo</dt><dd>{pipeline?.name}</dd></div>
                 <div className="row"><dt>Etapa</dt><dd>{stages[ci]?.name || "—"}</dd></div>
                 <div className="row"><dt>Creada</dt><dd>{fmtDate(deal.createdAt)}</dd></div>
+                {deal.bitrixFunnel && <div className="row"><dt>En Bitrix</dt><dd>{deal.bitrixFunnel} › {deal.bitrixStage}</dd></div>}
+                <CustomFieldsView entity="deals" values={deal.custom} />
               </dl>
+              <DealCustomFields deal={deal} onSave={(custom) => upd({ custom })} />
             </div>
           </div>
 
@@ -551,5 +555,24 @@ function OfferModal({ deal, onClose, onSend }) {
         Al enviar, la negociación <b>cambia de etapa automáticamente</b> y se registra en el historial.
       </p>
     </CrmModal>
+  );
+}
+
+function DealCustomFields({ deal, onSave }) {
+  const [edit, setEdit] = useState(null);
+  if (!edit)
+    return (
+      <button className="crm-btn ghost sm" style={{ marginTop: 8 }} onClick={() => setEdit({ ...(deal.custom || {}) })}>
+        ✏️ Campos personalizados
+      </button>
+    );
+  return (
+    <>
+      <CustomFieldsForm entity="deals" values={edit} onChange={setEdit} />
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button className="crm-btn sm" onClick={async () => { await onSave(edit); setEdit(null); }}>Guardar</button>
+        <button className="crm-btn ghost sm" onClick={() => setEdit(null)}>Cancelar</button>
+      </div>
+    </>
   );
 }

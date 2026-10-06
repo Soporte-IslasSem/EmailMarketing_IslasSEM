@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useCrmCollection, crmGet, crmCreate, logActivity, money, fmtDate, ACTIVITY_TYPES, CLIENT_TIERS } from "../lib/crm";
+import { useCrmCollection, crmGet, crmCreate, crmUpdate, logActivity, money, fmtDate, ACTIVITY_TYPES, CLIENT_TIERS } from "../lib/crm";
 import { useOrg } from "../lib/useOrg";
+import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
 import "../crm.styles.css";
 
 export default function ContactDetail() {
@@ -17,6 +18,13 @@ export default function ContactDetail() {
 
   const [note, setNote] = useState("");
   const [noteType, setNoteType] = useState("Nota");
+  const [editCustom, setEditCustom] = useState(null); // null | objeto en edición
+
+  const saveCustom = async () => {
+    await crmUpdate("contacts", id, { custom: editCustom });
+    setContact((c) => ({ ...c, custom: editCustom }));
+    setEditCustom(null);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -40,9 +48,9 @@ export default function ContactDetail() {
   const contactForms = useMemo(() => {
     const dealIds = new Set(relatedDeals.map((d) => d.id));
     return formSubs
-      .filter((s) => dealIds.has(s.dealId))
+      .filter((s) => dealIds.has(s.dealId) || s.contactId === id || (contact?.fromLeadId && s.leadId === contact.fromLeadId))
       .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-  }, [formSubs, relatedDeals]);
+  }, [formSubs, relatedDeals, id, contact]);
 
   // Timeline COMPLETO de la persona: sus notas + todo lo de sus negociaciones
   // (ofertas, cambios de etapa, automatizaciones, formularios enviados, cierres…).
@@ -53,10 +61,12 @@ export default function ContactDetail() {
         (a) =>
           a.contactId === id ||
           (a.entity === "contact" && a.entityId === id) ||
+          // lo que llegó cuando aún era prospecto (correos, formularios)
+          (contact?.fromLeadId && (a.leadId === contact.fromLeadId || (a.entity === "lead" && a.entityId === contact.fromLeadId))) ||
           (a.entity === "deal" && dealIds.has(a.entityId))
       )
       .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-  }, [activities, id, relatedDeals]);
+  }, [activities, id, relatedDeals, contact]);
 
   const addNote = async () => {
     if (!note.trim()) return;
@@ -114,7 +124,21 @@ export default function ContactDetail() {
               <div className="row"><dt>Ciudad</dt><dd>{contact.city || "—"}{contact.province ? ` · ${contact.province}` : ""}</dd></div>
               <div className="row"><dt>Tipo</dt><dd>{tier ? `${tier.icon} ${tier.label}` : "—"}</dd></div>
               <div className="row"><dt>Alta</dt><dd>{fmtDate(contact.createdAt)}</dd></div>
+              <CustomFieldsView entity="contacts" values={contact.custom} />
             </dl>
+            {editCustom ? (
+              <>
+                <CustomFieldsForm entity="contacts" values={editCustom} onChange={setEditCustom} />
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button className="crm-btn sm" onClick={saveCustom}>Guardar</button>
+                  <button className="crm-btn ghost sm" onClick={() => setEditCustom(null)}>Cancelar</button>
+                </div>
+              </>
+            ) : (
+              <button className="crm-btn ghost sm" style={{ marginTop: 8 }} onClick={() => setEditCustom({ ...(contact.custom || {}) })}>
+                ✏️ Campos personalizados
+              </button>
+            )}
             {contact.notes && (
               <p style={{ marginTop: 12, color: "var(--crm-muted)", fontSize: 14 }}>{contact.notes}</p>
             )}
@@ -189,6 +213,12 @@ export default function ContactDetail() {
                     <div className="tl-t">
                       {a.type}: {a.title}
                     </div>
+                    {a.body && (
+                      <details style={{ fontSize: 13, color: "var(--crm-muted)" }}>
+                        <summary style={{ cursor: "pointer" }}>Ver correo{a.from ? ` de ${a.from}` : ""}</summary>
+                        <div style={{ whiteSpace: "pre-wrap", maxHeight: 320, overflowY: "auto", marginTop: 6, color: "#2a3a3a" }}>{a.body}</div>
+                      </details>
+                    )}
                     <div className="tl-m">{fmtDate(a.createdAt)}</div>
                   </li>
                 ))}

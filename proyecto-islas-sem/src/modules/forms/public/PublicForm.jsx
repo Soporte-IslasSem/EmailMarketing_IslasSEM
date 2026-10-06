@@ -2,13 +2,34 @@
 // (replicados del Bitrix real de ISLAS SEM): Orden de Domiciliación SEPA y
 // Solicitud Datos Jurídicos del Representante. Diseño clavado al prototipo:
 // título centrado, nombre del campo DENTRO del input (placeholder), consentimiento
-// con subtítulo teal + checkbox. Al enviar escribe en Firestore (formSubmissions).
-import { useState } from "react";
+// con subtítulo teal + checkbox.
+// Envío: con VITE_RECAPTCHA_SITE_KEY configurada, pasa por reCAPTCHA v3 y el backend
+// (que verifica el token y guarda). Sin ella, escribe directo en Firestore (formSubmissions).
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
 
 const DEFAULT_ORG_ID = "islas-sem";
+const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.islassem.com";
+
+function loadRecaptcha() {
+  if (!RECAPTCHA_KEY || document.getElementById("recaptcha-v3")) return;
+  const s = document.createElement("script");
+  s.id = "recaptcha-v3";
+  s.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_KEY}`;
+  s.async = true;
+  document.head.appendChild(s);
+}
+
+function recaptchaToken() {
+  return new Promise((resolve, reject) => {
+    const g = window.grecaptcha;
+    if (!g) return reject(new Error("reCAPTCHA no cargó"));
+    g.ready(() => g.execute(RECAPTCHA_KEY, { action: "form_submit" }).then(resolve, reject));
+  });
+}
 
 // Texto RGPD del modal de privacidad (idéntico al prototipo).
 const RGPD = [
@@ -78,6 +99,8 @@ export default function PublicForm() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(loadRecaptcha, []);
+
   if (!cfg) return <Shell><p style={{ textAlign: "center" }}>Formulario no encontrado.</p></Shell>;
   if (done) {
     return (
@@ -102,10 +125,21 @@ export default function PublicForm() {
     if (!consent) { setError("Debes aceptar el consentimiento."); return; }
     setSending(true);
     try {
-      await addDoc(collection(db, "formSubmissions"), {
-        orgId: DEFAULT_ORG_ID, formType, dealId: dealId || "",
-        data: values, status: "recibido", createdAt: serverTimestamp(),
-      });
+      if (RECAPTCHA_KEY) {
+        const token = await recaptchaToken();
+        const r = await fetch(`${API_BASE}/forms/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formType, dealId: dealId || "", data: values, recaptchaToken: token }),
+        });
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok || !out.ok) throw new Error(out.error || `HTTP ${r.status}`);
+      } else {
+        await addDoc(collection(db, "formSubmissions"), {
+          orgId: DEFAULT_ORG_ID, formType, dealId: dealId || "",
+          data: values, status: "recibido", createdAt: serverTimestamp(),
+        });
+      }
       setDone(true);
     } catch (err) {
       setError("No se pudo enviar. Inténtalo de nuevo. (" + (err.code || err.message) + ")");
@@ -153,6 +187,13 @@ export default function PublicForm() {
         <button type="submit" disabled={sending} style={btn}>{sending ? "Enviando…" : "ENVIAR"}</button>
         <p style={{ fontSize: 11, color: "#9aa8a8", marginTop: 16, textAlign: "center" }}>
           Tus datos se tratan conforme al RGPD para la gestión de tu relación con ISLAS SEM SLU.
+          {RECAPTCHA_KEY && (
+            <>
+              <br />Protegido por reCAPTCHA de Google: se aplican su{" "}
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" style={{ color: "#9aa8a8" }}>Política de Privacidad</a> y{" "}
+              <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" style={{ color: "#9aa8a8" }}>Términos</a>.
+            </>
+          )}
         </p>
       </form>
     </Shell>

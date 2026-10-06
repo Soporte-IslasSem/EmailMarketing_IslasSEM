@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmRemove, fmtDate } from "../lib/crm";
+import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
 const empty = { name: "", cif: "", iban: "", industry: "", website: "", email: "", phone: "", city: "", community: "", rgpd: "Pendiente", notes: "" };
@@ -131,6 +132,7 @@ export default function Companies() {
             </div>
           </div>
           <div className="crm-field"><label>Notas</label><textarea rows="2" value={form.notes} onChange={set("notes")} /></div>
+          <CustomFieldsForm entity="companies" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
         </CrmModal>
       )}
     </div>

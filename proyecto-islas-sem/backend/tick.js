@@ -5,13 +5,15 @@ require("dotenv").config({ path: require("path").join(__dirname, ".env") });
 const { drainOutbox } = require("./lib/outbox");
 const { runSLA } = require("./lib/sla");
 const { processReplies } = require("./lib/inbox");
+const { processFormSubmissions } = require("./lib/forms");
 
 (async () => {
   try {
     const mail = await drainOutbox();
     const replies = await processReplies();
+    const forms = await processFormSubmissions();
     const sla = await runSLA();
-    console.log(new Date().toISOString(), "OK", JSON.stringify({ mail, replies, sla }));
+    console.log(new Date().toISOString(), "OK", JSON.stringify({ mail, replies, forms, sla }));
     process.exit(0);
   } catch (e) {
     console.error(new Date().toISOString(), "ERROR", e.message);

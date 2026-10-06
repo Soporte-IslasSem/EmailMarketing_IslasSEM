@@ -2,6 +2,7 @@
 // Responsabilidades:
 //   1) Vaciar la cola de correos (outbox) y enviar por SMTP de Loading.
 //   2) Ejecutar el SLA 24/7 (ofertas sin respuesta -> Kanban Negativo).
+//   3) Recibir formularios públicos (reCAPTCHA) y vincularlos a la ficha del cliente.
 // El cron de Plesk llama a /tasks/run?key=CRON_SECRET cada minuto
 // (o ejecuta `node tick.js` directamente).
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
@@ -10,9 +11,27 @@ const { admin, db } = require("./lib/firebase");
 const { drainOutbox } = require("./lib/outbox");
 const { runSLA } = require("./lib/sla");
 const { processReplies } = require("./lib/inbox");
+const { submitForm, processFormSubmissions } = require("./lib/forms");
 
 const app = express();
-app.use(express.json());
+app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
+app.use(express.json({ limit: "100kb" }));
+
+// CORS solo para los orígenes de la app (formularios públicos llaman desde el navegador).
+const ORIGINS = (process.env.ALLOWED_ORIGINS || "https://email-marketing.islassem.com,http://localhost:5173")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+app.use("/forms", (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ORIGINS.includes(origin)) {
+    res.set({ "Access-Control-Allow-Origin": origin, "Vary": "Origin",
+      "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" });
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
+// --- Formularios públicos (SEPA / Datos Jurídicos) con reCAPTCHA v3 ---
+app.post("/forms/submit", submitForm);
 
 app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
@@ -47,8 +66,9 @@ async function runAll() {
   // Correos primero; luego respuestas (IMAP); luego SLA (por si una respuesta ya libró la oferta).
   const mail = await drainOutbox();
   const replies = await processReplies();
+  const forms = await processFormSubmissions();
   const sla = await runSLA();
-  return { mail, replies, sla };
+  return { mail, replies, forms, sla };
 }
 
 // Endpoint protegido por CRON_SECRET (para el cron de Plesk o un cron externo).

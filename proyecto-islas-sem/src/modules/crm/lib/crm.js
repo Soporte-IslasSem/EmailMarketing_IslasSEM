@@ -11,9 +11,10 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../../../config/firebaseConfig";
+import { db, auth } from "../../../config/firebaseConfig";
 import { useOrg } from "./useOrg";
 
 /* ============ Constantes de negocio ============ */
@@ -133,8 +134,33 @@ export async function crmUpdate(name, id, data) {
   return updateDoc(doc(db, name, id), { ...data, updatedAt: serverTimestamp() });
 }
 
+// Eliminar = mover a la Papelera de reciclaje (se puede restaurar desde CRM › Más).
+// Las colecciones de configuración/registro se borran directamente.
+const NO_RECYCLE = new Set(["activities", "outbox", "recyclebin", "customFields"]);
+
 export async function crmRemove(name, id) {
-  return deleteDoc(doc(db, name, id));
+  const ref = doc(db, name, id);
+  if (!NO_RECYCLE.has(name)) {
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      await setDoc(doc(db, "recyclebin", `${name}__${id}`), {
+        orgId: data.orgId,
+        collection: name,
+        docId: id,
+        label: data.title || data.name || [data.firstName, data.lastName].filter(Boolean).join(" ") || data.email || id,
+        data,
+        deletedBy: auth.currentUser?.email || "",
+        deletedAt: serverTimestamp(),
+      });
+    }
+  }
+  return deleteDoc(ref);
+}
+
+export async function crmRestore(item) {
+  await setDoc(doc(db, item.collection, item.docId), { ...item.data, updatedAt: serverTimestamp() });
+  return deleteDoc(doc(db, "recyclebin", item.id));
 }
 
 export async function crmGet(name, id) {

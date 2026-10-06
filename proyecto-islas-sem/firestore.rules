@@ -99,6 +99,15 @@ service cloud.firestore {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();
     }
+    // Campos personalizados (definiciones por entidad) y Papelera de reciclaje
+    match /customFields/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
+    match /recyclebin/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
 
     // Listas: dueño mediante el campo "userId"
     match /lists/{listId} {

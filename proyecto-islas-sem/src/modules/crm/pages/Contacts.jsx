@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmRemove, logActivity, CLIENT_TIERS, fmtDate } from "../lib/crm";
+import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
 const STAGES = ["Lead", "Contactado", "Propuesta", "Cliente"];
@@ -181,6 +182,7 @@ export default function Contacts() {
             <div className="crm-field"><label>Ciudad / Provincia</label><input value={form.city} onChange={set("city")} /></div>
           </div>
           <div className="crm-field"><label>Notas</label><textarea rows="2" value={form.notes} onChange={set("notes")} /></div>
+          <CustomFieldsForm entity="contacts" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
         </CrmModal>
       )}
     </div>

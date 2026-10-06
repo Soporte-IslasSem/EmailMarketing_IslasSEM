@@ -74,7 +74,6 @@ import ReportDetail from "../modules/reports/components/ReportDetail.jsx";
 import Contacts from "../modules/crm/pages/Contacts.jsx";
 import ContactDetail from "../modules/crm/pages/ContactDetail.jsx";
 import DealDetail from "../modules/crm/pages/DealDetail.jsx";
-import Placeholder from "../modules/crm/pages/Placeholder.jsx";
 import Analytics from "../modules/crm/pages/Analytics.jsx";
 import Products from "../modules/crm/pages/Products.jsx";
 import Employees from "../modules/crm/pages/Employees.jsx";
@@ -93,6 +92,9 @@ import Pipeline from "../modules/crm/pages/Pipeline.jsx";
 import Activities from "../modules/crm/pages/Activities.jsx";
 import Outbox from "../modules/crm/pages/Outbox.jsx";
 import CrmForms from "../modules/crm/pages/CrmForms.jsx";
+import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
+import RecycleBin from "../modules/crm/pages/RecycleBin.jsx";
+import History from "../modules/crm/pages/History.jsx";
 
 // RECURSOS (público)
 import Blog from "../pages/Blog.jsx";
@@ -185,9 +187,9 @@ const router = createBrowserRouter([
       { path: "crm/quotes", element: <SalesDocs type="quotes" /> },
       { path: "crm/invoices", element: <SalesDocs type="invoices" /> },
       { path: "crm/products", element: <Products /> },
-      { path: "crm/history", element: <Placeholder title="Historial de CRM" /> },
-      { path: "crm/recyclebin", element: <Placeholder title="Papelera de reciclaje" /> },
-      { path: "crm/settings", element: <Placeholder title="Ajustes de CRM" /> },
+      { path: "crm/history", element: <History /> },
+      { path: "crm/recyclebin", element: <RecycleBin /> },
+      { path: "crm/settings", element: <CrmSettings /> },
 
       // Tareas
       { path: "tasks", element: <Activities /> },

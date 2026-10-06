@@ -4,6 +4,7 @@
 // Corre en el mismo cron. Si no hay credenciales IMAP, se desactiva solo (no rompe).
 const { db } = require("./firebase");
 const { nextPosStage } = require("./stages");
+const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 
 function imapConfigured() {
   return process.env.IMAP_HOST && process.env.IMAP_USER && process.env.IMAP_PASSWORD;
@@ -54,9 +55,9 @@ async function handleReply(parsed, pipelines) {
   const fromEmail = (parsed.from?.value?.[0]?.address || "").toLowerCase();
   const refIds = collectRefIds(parsed);
   const match = await matchDeal(refIds, fromEmail);
-  if (!match) return { matched: false };
-  const deal = { id: match.ref.id, ...match.data };
   const snippet = (parsed.text || "").replace(/\s+/g, " ").trim().slice(0, 240);
+  if (!match) return handleNewEmail(parsed, fromEmail, snippet);
+  const deal = { id: match.ref.id, ...match.data };
 
   // Registro de auditoría del correo entrante (queda en la ficha del contacto).
   await db.collection("inbound").add({
@@ -85,6 +86,33 @@ async function handleReply(parsed, pipelines) {
     });
   }
   return { matched: true, dealId: deal.id };
+}
+
+// Correo que no responde a ninguna negociación: se guarda en la ficha del contacto
+// (o del prospecto); si el remitente es desconocido, se crea un prospecto con origen
+// "Email" — igual que hacía Bitrix (allí ~todos los prospectos entraban así).
+async function handleNewEmail(parsed, fromEmail, snippet) {
+  if (!fromEmail || fromEmail === norm(process.env.IMAP_USER)) return { matched: false };
+  const orgId = DEFAULT_ORG_ID;
+  const fromName = parsed.from?.value?.[0]?.name || "";
+  const [firstName, ...rest] = fromName.split(" ");
+  const person = await resolvePerson(orgId, {
+    email: fromEmail, firstName, lastName: rest.join(" "),
+    source: "Email", notes: `Entró por correo: "${(parsed.subject || "").slice(0, 120)}"`,
+  });
+  await db.collection("inbound").add({
+    orgId, dealId: "", contactId: person.contactId, leadId: person.leadId,
+    from: fromEmail, subject: parsed.subject || "", snippet, createdAt: new Date(),
+  });
+  await addActivity(orgId, {
+    type: "Email",
+    title: `📥 Correo recibido: "${(parsed.subject || "(sin asunto)").slice(0, 90)}"`,
+    body: (parsed.text || "").slice(0, 20000), from: fromEmail, subject: parsed.subject || "",
+    entity: person.leadId ? "lead" : person.contactId ? "contact" : null,
+    entityId: person.leadId || person.contactId || null,
+    contactId: person.contactId, leadId: person.leadId,
+  });
+  return { matched: true, newLead: person.created };
 }
 
 async function processReplies() {

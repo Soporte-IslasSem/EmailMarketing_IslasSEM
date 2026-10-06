@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
+import AssignImportedDeals from "../components/AssignImportedDeals";
 import { useCrmCollection, crmCreate, crmUpdate, crmRemove, logActivity, money } from "../lib/crm";
 import {
   usePipelines,
@@ -60,6 +61,8 @@ export default function Pipeline() {
   const [colSort, setColSort] = useState({}); // {stageId: modo}
   const dragId = useRef(null);
   const [overCol, setOverCol] = useState(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const unassigned = deals.filter((d) => !d.pipelineId);
 
   const pipeline = useMemo(
     () => pipelines.find((p) => p.id === pipeId) || pipelines[0],
@@ -314,6 +317,13 @@ export default function Pipeline() {
 
   return (
     <div className="crmpipe">
+      {unassigned.length > 0 && (
+        <div style={{ background: "#fff7e6", border: "1px solid #f0d9a8", borderRadius: 10, padding: "10px 14px", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span>📥 <b>{unassigned.length}</b> negociaciones importadas de Bitrix aún no tienen embudo.</span>
+          <button className="crm-btn sm" onClick={() => setAssignOpen(true)}>Asignar a embudos</button>
+        </div>
+      )}
+      {assignOpen && <AssignImportedDeals deals={unassigned} pipelines={pipelines} onClose={() => setAssignOpen(false)} />}
       {/* Barra de herramientas */}
       <div className="dealbar">
         <div className="dealbar-l">

@@ -15,6 +15,7 @@ import {
 } from "../lib/crm";
 import { usePipelines, getStages, flattenStages } from "../lib/pipelines";
 import { runStageAutomations } from "../lib/automations";
+import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
 const empty = {
@@ -54,6 +55,7 @@ export default function Leads() {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [convertLead, setConvertLead] = useState(null);
+  const [historyLead, setHistoryLead] = useState(null);
 
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
@@ -107,6 +109,7 @@ export default function Leads() {
       notes: lead.notes || "",
       source: lead.source || "",
       responsable: lead.responsable || "",
+      custom: lead.custom || {},
       fromLeadId: lead.id,
     });
 
@@ -212,6 +215,7 @@ export default function Leads() {
                     <td>{l.responsable || "—"}</td>
                     <td>{fmtDate(l.createdAt)}</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      <button className="crm-btn ghost sm" onClick={() => setHistoryLead(l)} title="Correos, formularios y actividad">📜</button>{" "}
                       {l.status !== "Convertido" && <button className="crm-btn sm" onClick={() => setConvertLead(l)}>Convertir</button>}{" "}
                       <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar prospecto?") && crmRemove("leads", l.id)}>✕</button>
                     </td>
@@ -262,9 +266,11 @@ export default function Leads() {
             <div className="crm-field"><label>Valor estimado (€)</label><input type="number" value={form.estimatedValue} onChange={set("estimatedValue")} /></div>
           </div>
           <div className="crm-field"><label>Notas</label><textarea rows="2" value={form.notes} onChange={set("notes")} /></div>
+          <CustomFieldsForm entity="leads" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
         </CrmModal>
       )}
 
+      {historyLead && <LeadHistoryModal lead={historyLead} onClose={() => setHistoryLead(null)} />}
       {convertLead && <ConvertModal lead={convertLead} onClose={() => setConvertLead(null)} onConfirm={runConvert} />}
     </div>
   );
@@ -311,6 +317,49 @@ function ConvertModal({ lead, onClose, onConfirm }) {
           <p className="sub" style={{ fontSize: 12, color: "var(--crm-muted)", margin: 0 }}>Entrará en <b>{money(amount)}</b> en la primera etapa y disparará sus automatizaciones.</p>
         </div>
       )}
+    </CrmModal>
+  );
+}
+
+// Historial del prospecto: correos recibidos, formularios rellenados y notas
+// (todo lo que entró antes de convertirlo en contacto).
+function LeadHistoryModal({ lead, onClose }) {
+  const { items: activities } = useCrmCollection("activities");
+  const { items: formSubs } = useCrmCollection("formSubmissions");
+  const name = `${lead.firstName || ""} ${lead.lastName || ""}`.trim() || lead.email || "Prospecto";
+  const acts = activities
+    .filter((a) => a.leadId === lead.id || (a.entity === "lead" && a.entityId === lead.id))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const forms = formSubs.filter((f) => f.leadId === lead.id);
+  return (
+    <CrmModal title={`Historial · ${name}`} onClose={onClose} footer={<button className="crm-btn" onClick={onClose}>Cerrar</button>}>
+      {forms.map((f) => (
+        <details key={f.id} style={{ borderBottom: "1px solid #eef3f3", padding: "6px 0" }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
+            📋 {f.formType === "sepa" ? "Orden SEPA" : f.formType === "juridicos" ? "Datos Jurídicos" : f.formType} · {fmtDate(f.createdAt)}
+          </summary>
+          <dl className="crm-dl" style={{ marginTop: 6 }}>
+            {Object.entries(f.data || {}).map(([k, v]) => <div className="row" key={k}><dt>{k}</dt><dd>{String(v) || "—"}</dd></div>)}
+          </dl>
+        </details>
+      ))}
+      {acts.length ? (
+        <ul className="crm-timeline">
+          {acts.map((a) => (
+            <li key={a.id} className="crm-tl-item">
+              <span className="dot" />
+              <div className="tl-t">{a.type}: {a.title}</div>
+              {a.body && (
+                <details style={{ fontSize: 13, color: "var(--crm-muted)" }}>
+                  <summary style={{ cursor: "pointer" }}>Ver correo{a.from ? ` de ${a.from}` : ""}</summary>
+                  <div style={{ whiteSpace: "pre-wrap", maxHeight: 300, overflowY: "auto", marginTop: 6, color: "#2a3a3a" }}>{a.body}</div>
+                </details>
+              )}
+              <div className="tl-m">{fmtDate(a.createdAt)}</div>
+            </li>
+          ))}
+        </ul>
+      ) : !forms.length && <p style={{ color: "var(--crm-muted)", margin: 0 }}>Sin correos ni formularios todavía.</p>}
     </CrmModal>
   );
 }
