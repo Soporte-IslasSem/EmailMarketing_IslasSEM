@@ -1,11 +1,13 @@
-// Servidor del backend ISLAS SEM (Node + Express), alojado en Loading.
-// Responsabilidades:
+// Servidor ISLAS SEM (Node + Express) en email-marketing.islassem.com (Loading/Plesk).
+// Una sola app sirve la web (SPA compilada en ./public) y la API bajo /api.
+// Responsabilidades de la API:
 //   1) Vaciar la cola de correos (outbox) y enviar por SMTP de Loading.
 //   2) Ejecutar el SLA 24/7 (ofertas sin respuesta -> Kanban Negativo).
 //   3) Recibir formularios públicos (reCAPTCHA) y vincularlos a la ficha del cliente.
-// El cron de Plesk llama a /tasks/run?key=CRON_SECRET cada minuto
+// El cron de Plesk llama a /api/tasks/run?key=CRON_SECRET cada minuto
 // (o ejecuta `node tick.js` directamente).
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
+const path = require("path");
 const express = require("express");
 const { admin, db } = require("./lib/firebase");
 const { drainOutbox } = require("./lib/outbox");
@@ -15,12 +17,13 @@ const { submitForm, processFormSubmissions } = require("./lib/forms");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
-app.use(express.json({ limit: "100kb" }));
+const api = express.Router();
+api.use(express.json({ limit: "100kb" }));
 
 // CORS solo para los orígenes de la app (formularios públicos llaman desde el navegador).
 const ORIGINS = (process.env.ALLOWED_ORIGINS || "https://email-marketing.islassem.com,http://localhost:5173")
   .split(",").map((s) => s.trim()).filter(Boolean);
-app.use("/forms", (req, res, next) => {
+api.use("/forms", (req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ORIGINS.includes(origin)) {
     res.set({ "Access-Control-Allow-Origin": origin, "Vary": "Origin",
@@ -31,12 +34,12 @@ app.use("/forms", (req, res, next) => {
 });
 
 // --- Formularios públicos (SEPA / Datos Jurídicos) con reCAPTCHA v3 ---
-app.post("/forms/submit", submitForm);
+api.post("/forms/submit", submitForm);
 
-app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
+api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 // --- Email marketing: baja (unsubscribe) ---
-app.get("/u/:subscriberId", async (req, res) => {
+api.get("/u/:subscriberId", async (req, res) => {
   try {
     await db.collection("subscribers").doc(req.params.subscriberId)
       .set({ status: "unsubscribed", unsubscribedAt: Date.now() }, { merge: true });
@@ -51,7 +54,7 @@ app.get("/u/:subscriberId", async (req, res) => {
 
 // --- Email marketing: pixel de apertura (1x1 transparente) ---
 const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
-app.get("/o/:campaignId/:sid", async (req, res) => {
+api.get("/o/:campaignId/:sid", async (req, res) => {
   try {
     const subscriberId = String(req.params.sid).replace(/\.png$/i, "");
     await db.collection("campaigns").doc(req.params.campaignId)
@@ -72,7 +75,7 @@ async function runAll() {
 }
 
 // Endpoint protegido por CRON_SECRET (para el cron de Plesk o un cron externo).
-app.all("/tasks/run", async (req, res) => {
+api.all("/tasks/run", async (req, res) => {
   const key = req.query.key || req.headers["x-cron-key"];
   if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
     return res.status(403).json({ error: "forbidden" });
@@ -85,6 +88,19 @@ app.all("/tasks/run", async (req, res) => {
     res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });
+
+app.use("/api", api);
+app.use("/api", (_req, res) => res.status(404).json({ error: "not found" }));
+
+// --- Web (SPA): archivos estáticos + cualquier otra ruta devuelve index.html ---
+const WEB = path.join(__dirname, "public");
+app.use(express.static(WEB, {
+  setHeaders: (res, file) => {
+    if (file.endsWith("index.html")) res.set("Cache-Control", "no-cache");
+    else if (file.includes(`${path.sep}assets${path.sep}`)) res.set("Cache-Control", "public, max-age=31536000, immutable");
+  },
+}));
+app.get(/.*/, (_req, res) => res.sendFile(path.join(WEB, "index.html")));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`[islassem-backend] escuchando en :${PORT}`));

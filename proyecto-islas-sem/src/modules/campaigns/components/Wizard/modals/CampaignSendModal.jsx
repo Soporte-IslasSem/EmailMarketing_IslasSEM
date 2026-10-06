@@ -71,7 +71,7 @@ export default function CampaignSendModal({
             <p>Ya puedes acceder al informe del envío.</p>
 
             <div className="CampaignSendModal__illustration">
-              <img src="/assets/placeholders/sent.png" alt="Campaña enviada" />
+              <img src="/img/sent.svg" alt="Campaña enviada" />
             </div>
 
             <button

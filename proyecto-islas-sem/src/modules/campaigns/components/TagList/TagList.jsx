@@ -45,7 +45,7 @@ export default function TagList({ onCreate }) {
     <div className="TagList">
       {tags.length === 0 ? (
         <div className="TagList__empty">
-          <img src="/assets/campaigns/empty-tags.png" alt="Sin etiquetas" />
+          <img src="/img/empty-tags.svg" alt="Sin etiquetas" />
           <h3>Aún no has creado ninguna etiqueta</h3>
           <p>
             Crea tu primera etiqueta haciendo clic sobre el botón “Nueva etiqueta”.

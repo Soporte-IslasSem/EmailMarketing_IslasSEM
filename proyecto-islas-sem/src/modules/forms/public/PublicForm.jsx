@@ -12,7 +12,7 @@ import { db } from "../../../config/firebaseConfig";
 
 const DEFAULT_ORG_ID = "islas-sem";
 const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.islassem.com";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://email-marketing.islassem.com/api";
 
 function loadRecaptcha() {
   if (!RECAPTCHA_KEY || document.getElementById("recaptcha-v3")) return;

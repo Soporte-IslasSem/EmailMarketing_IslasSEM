@@ -5,7 +5,7 @@ import { db } from "../../../config/firebaseConfig";
 import { collection, doc, writeBatch, updateDoc, serverTimestamp } from "firebase/firestore";
 
 // Base pública del backend (para links de baja y pixel de tracking). Se configura por entorno.
-const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || "https://api.islassem.com";
+const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || "https://email-marketing.islassem.com/api";
 const BATCH = 400; // Firestore admite 500 escrituras/lote; dejamos margen.
 
 // ¿Este suscriptor puede recibir? (no dado de baja, no rebotado, con email)

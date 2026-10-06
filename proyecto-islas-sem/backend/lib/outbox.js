@@ -33,6 +33,42 @@ async function buildAttachments(item) {
   }
 }
 
+// Cuando todos los correos de una campaña se han procesado (enviados o fallidos
+// definitivamente), la campaña pasa a "sent" para que la app la muestre como Enviada.
+async function settleCampaign(campaignId, field) {
+  const ref = db.collection("campaigns").doc(campaignId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return;
+    const c = snap.data();
+    const sentCount = (c.sentCount || 0) + (field === "sentCount" ? 1 : 0);
+    const failedCount = (c.failedCount || 0) + (field === "failedCount" ? 1 : 0);
+    const patch = { [field]: admin.firestore.FieldValue.increment(1) };
+    const total = Number(c.recipientsCount) || 0;
+    if (total > 0 && sentCount + failedCount >= total && c.status !== "sent") {
+      patch.status = "sent";
+      patch.sentAt = Date.now();
+      patch.send = { ...(c.send || {}), status: "sent" };
+    }
+    tx.update(ref, patch);
+  });
+}
+
+// Red de seguridad: campañas en "sending" que ya no tienen correos pendientes en cola
+// (p. ej. enviadas antes de existir settleCampaign) se marcan como enviadas.
+async function sweepCampaigns() {
+  const snap = await db.collection("campaigns").where("status", "==", "sending").limit(20).get();
+  let closed = 0;
+  for (const c of snap.docs) {
+    const pending = await db.collection("outbox").where("campaignId", "==", c.id).where("status", "==", "pending").limit(1).get();
+    if (pending.empty) {
+      await c.ref.update({ status: "sent", sentAt: c.data().sentAt || Date.now(), send: { ...(c.data().send || {}), status: "sent" } });
+      closed++;
+    }
+  }
+  return closed;
+}
+
 async function drainOutbox() {
   // Cuánto se ha enviado hoy (throttle).
   const cRef = counterRef();
@@ -63,18 +99,22 @@ async function drainOutbox() {
       }
       // En campañas, cuenta enviados en la campaña.
       if (item.kind === "campaign" && item.campaignId && !item.isTest) {
-        try { await db.collection("campaigns").doc(item.campaignId).update({ sentCount: admin.firestore.FieldValue.increment(1) }); } catch (_) {}
+        try { await settleCampaign(item.campaignId, "sentCount"); } catch (e) { console.warn("[outbox] campaña:", e.message); }
       }
       sent++;
     } catch (e) {
       const attempts = (item.attempts || 0) + 1;
       await d.ref.update({ status: attempts >= 3 ? "failed" : "pending", attempts, error: String(e.message || e) });
+      if (attempts >= 3 && item.kind === "campaign" && item.campaignId && !item.isTest) {
+        try { await settleCampaign(item.campaignId, "failedCount"); } catch (_) { /* no crítico */ }
+      }
       failed++;
     }
   }
   // Actualiza el contador diario con lo enviado en esta pasada.
   if (sent > 0) await cRef.set({ count: admin.firestore.FieldValue.increment(sent), updatedAt: Date.now() }, { merge: true });
-  return { sent, failed, scanned: snap.size, today };
+  const closed = await sweepCampaigns();
+  return { sent, failed, scanned: snap.size, today, closed };
 }
 
 module.exports = { drainOutbox };
