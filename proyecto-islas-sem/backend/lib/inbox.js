@@ -97,15 +97,17 @@ async function handleReply(parsed, pipelines) {
 }
 
 // Correo que no responde a ninguna negociación: se guarda en la ficha del contacto
-// (o del prospecto); si el remitente es desconocido, se crea un prospecto con origen
-// "Email" — igual que hacía Bitrix (allí ~todos los prospectos entraban así).
+// (o del prospecto) si el remitente ya existe en el CRM. Los desconocidos se ignoran
+// salvo EMAIL_NEW_LEADS=true (entonces crean un prospecto con origen "Email").
 async function handleNewEmail(parsed, fromEmail, snippet) {
   if (!fromEmail || fromEmail === norm(process.env.IMAP_USER)) return { matched: false };
   const orgId = DEFAULT_ORG_ID;
   const fromName = parsed.from?.value?.[0]?.name || "";
   const [firstName, ...rest] = fromName.split(" ");
   const person = await resolvePerson(orgId, {
-    create: !isBulk(parsed, fromEmail), // masivos: solo si ya es contacto/prospecto
+    // Por defecto solo se registran correos de contactos/prospectos existentes; crear
+    // prospectos desde remitentes desconocidos se activa con EMAIL_NEW_LEADS=true.
+    create: process.env.EMAIL_NEW_LEADS === "true" && !isBulk(parsed, fromEmail),
     email: fromEmail, firstName, lastName: rest.join(" "),
     source: "Email", notes: `Entró por correo: "${(parsed.subject || "").slice(0, 120)}"`,
   });
