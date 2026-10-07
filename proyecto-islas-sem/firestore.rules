@@ -150,6 +150,13 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
+    // Automatizaciones de email marketing: dueño mediante "userId".
+    // Las inscripciones (automationEnrollments) solo las toca el backend (Admin SDK).
+    match /automations/{automationId} {
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
     // Etiquetas de plantillas/campañas: dueño mediante "userEmail"
     match /templateTags/{tagId} {
       allow read, update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;

@@ -20,6 +20,10 @@ import { enqueueCampaign, enqueueTest } from "../../lib/campaignSend";
 // Modal
 import CampaignSendModal from "./modals/CampaignSendModal";
 
+// Mínimo programable: dentro de 5 minutos, en hora local, formato datetime-local.
+const minScheduleValue = () =>
+  new Date(Date.now() + 5 * 60e3 - new Date().getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+
 export default function StepSend() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -38,6 +42,11 @@ export default function StepSend() {
 
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState("");
+
+  // Programación del envío: "now" o "scheduled" con fecha/hora local
+  const [scheduleType, setScheduleType] = useState("now");
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [minSchedule] = useState(minScheduleValue);
 
   // 1️⃣ Cargar campaña + listas + suscriptores
   useEffect(() => {
@@ -119,8 +128,13 @@ export default function StepSend() {
     setShowModal(false);
 
     try {
-      const { enqueued, skipped } = await enqueueCampaign(orgId, campaignId, campaign, subscribers);
-      setProgress(`Campaña en cola: ${enqueued} destinatario(s)${skipped ? ` · ${skipped} omitido(s)` : ""}. El backend los enviará con throttle.`);
+      const sendAt = scheduleType === "scheduled" && scheduleAt ? new Date(scheduleAt) : undefined;
+      const { enqueued, skipped, scheduled } = await enqueueCampaign(orgId, campaignId, campaign, subscribers, { sendAt });
+      setProgress(
+        scheduled
+          ? `Campaña programada para el ${sendAt.toLocaleString("es-ES")}: ${enqueued} destinatario(s)${skipped ? ` · ${skipped} omitido(s)` : ""}.`
+          : `Campaña en cola: ${enqueued} destinatario(s)${skipped ? ` · ${skipped} omitido(s)` : ""}. El backend los enviará con throttle.`
+      );
       setTimeout(() => navigate(`/dashboard/campaigns`), 1800);
     } catch (err) {
       console.error("❌ Error encolando campaña:", err);
@@ -164,6 +178,26 @@ export default function StepSend() {
               <h3>Destinatarios reales</h3>
               <p><strong>Total:</strong> {subscribers.length}</p>
 
+              <h3>¿Cuándo se envía?</h3>
+              <div className="StepSend__schedule">
+                <label>
+                  <input type="radio" name="schedule" checked={scheduleType === "now"} onChange={() => setScheduleType("now")} />
+                  {" "}Enviar ahora
+                </label>
+                <label>
+                  <input type="radio" name="schedule" checked={scheduleType === "scheduled"} onChange={() => setScheduleType("scheduled")} />
+                  {" "}Programar
+                </label>
+                {scheduleType === "scheduled" && (
+                  <input
+                    type="datetime-local"
+                    min={minSchedule}
+                    value={scheduleAt}
+                    onChange={(e) => setScheduleAt(e.target.value)}
+                  />
+                )}
+              </div>
+
               {sending && (
                 <div className="StepSend__progress">
                   <h3>Estado del envío:</h3>
@@ -200,9 +234,9 @@ export default function StepSend() {
           <button
             className="primary"
             onClick={() => setShowModal(true)}
-            disabled={sending}
+            disabled={sending || (scheduleType === "scheduled" && (!scheduleAt || new Date(scheduleAt) <= new Date()))}
           >
-            Enviar campaña
+            {scheduleType === "scheduled" ? "Programar campaña" : "Enviar campaña"}
           </button>
         </div>
       </div>

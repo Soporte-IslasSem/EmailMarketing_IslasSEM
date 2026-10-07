@@ -59,9 +59,10 @@ export default function ReportDetail() {
 
           const totalSent = results.filter(r => r.status === "sent").length;
           const totalErrors = results.filter(r => r.status === "error").length;
-          // Todavía no hay seguimiento de aperturas ni clics implementado
-          const totalOpened = 0;
-          const totalClicked = 0;
+          // Aperturas y clics únicos por suscriptor (los registra el backend: pixel y /api/c)
+          const subs = Object.values(data.subscribers || {});
+          const totalOpened = subs.filter(s => s.opened).length;
+          const totalClicked = subs.filter(s => s.clicked).length;
 
           setReport({
             id,

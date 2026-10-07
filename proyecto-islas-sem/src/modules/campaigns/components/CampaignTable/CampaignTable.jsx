@@ -43,6 +43,10 @@ export default function CampaignTable({ campaigns, onContinue }) {
         return "Inactiva";
       case "pending":
         return "Pendiente";
+      case "scheduled":
+        return "Programada";
+      case "sending":
+        return "Enviando";
       default:
         return "Pendiente";
     }
@@ -105,7 +109,7 @@ export default function CampaignTable({ campaigns, onContinue }) {
 
               <td>{c.lists?.totalSubscribers || 0}</td>
 
-              <td>{translateScheduleType(c.send?.scheduleType)}</td>
+              <td>{c.send?.scheduleType === "scheduled" && c.send?.scheduledAt ? new Date(c.send.scheduledAt).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : translateScheduleType(c.send?.scheduleType)}</td>
 
               <td className="CampaignTable__actionsCell">
 

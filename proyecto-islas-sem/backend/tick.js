@@ -6,14 +6,16 @@ const { drainOutbox } = require("./lib/outbox");
 const { runSLA } = require("./lib/sla");
 const { processReplies } = require("./lib/inbox");
 const { processFormSubmissions } = require("./lib/forms");
+const { processAutomations } = require("./lib/automations");
 
 (async () => {
   try {
     const mail = await drainOutbox();
     const replies = await processReplies();
     const forms = await processFormSubmissions();
+    const automations = await processAutomations();
     const sla = await runSLA();
-    console.log(new Date().toISOString(), "OK", JSON.stringify({ mail, replies, forms, sla }));
+    console.log(new Date().toISOString(), "OK", JSON.stringify({ mail, replies, forms, automations, sla }));
     process.exit(0);
   } catch (e) {
     console.error(new Date().toISOString(), "ERROR", e.message);

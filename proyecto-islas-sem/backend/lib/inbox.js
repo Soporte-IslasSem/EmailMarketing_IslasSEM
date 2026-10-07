@@ -5,6 +5,7 @@
 const { db } = require("./firebase");
 const { nextPosStage } = require("./stages");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
+const { recordBounce } = require("./reports");
 
 function imapConfigured() {
   return process.env.IMAP_HOST && process.env.IMAP_USER && process.env.IMAP_PASSWORD;
@@ -27,6 +28,38 @@ function isAutoReply(parsed) {
   const prec = String(h?.get?.("precedence") || "").toLowerCase();
   if (["bulk", "auto_reply", "junk"].includes(prec)) return true;
   return /out of office|automatic reply|vacation|fuera de la oficina|respuesta autom/i.test(parsed.subject || "");
+}
+
+// Aviso de no entrega (DSN) de Gmail u otro servidor: devuelve { email, hard } o null.
+function parseBounce(parsed) {
+  const from = String(parsed.from?.value?.[0]?.address || "").toLowerCase();
+  const ctype = String(parsed.headers?.get?.("content-type")?.value || parsed.headers?.get?.("content-type") || "").toLowerCase();
+  const isDsn = /^(mailer-daemon|postmaster)@/.test(from) || ctype.includes("report-type=delivery-status") ||
+    /delivery status notification|undeliverable|undelivered mail|returned mail|no se ha entregado|mail delivery failed/i.test(parsed.subject || "");
+  if (!isDsn) return null;
+  const text = [parsed.text || "", ...(parsed.attachments || []).map((a) => a.content?.toString?.("utf8") || "")].join("\n");
+  const failed = parsed.headers?.get?.("x-failed-recipients");
+  const m = (failed && String(failed).match(/[\w.+-]+@[\w.-]+\.\w+/)) ||
+    text.match(/Final-Recipient:\s*rfc822;\s*([^\s<>]+@[^\s<>]+)/i) ||
+    text.match(/(?:wasn't delivered to|no se ha entregado a|delivery to the following recipients? failed[^\n]*\n)\s*<?([\w.+-]+@[\w.-]+\.\w+)/i);
+  const email = m ? String(m[1] || m[0]).toLowerCase() : "";
+  if (!email) return null;
+  const status = (text.match(/Status:\s*([245])\.\d+\.\d+/i) || [])[1];
+  const hard = status ? status === "5" : !/temporar|try again|mailbox full|quota|4\.\d\.\d/i.test(text);
+  return { email, hard };
+}
+
+async function handleBounce(b) {
+  // Campaña más reciente enviada a ese email (sin índice compuesto: se filtra en código).
+  const snap = await db.collection("outbox").where("to", "==", b.email).limit(50).get().catch(() => null);
+  const last = snap?.docs.map((d) => d.data()).filter((x) => x.kind === "campaign" && x.campaignId)
+    .sort((x, y) => (y.sentAt || 0) - (x.sentAt || 0))[0];
+  if (last) await recordBounce(last.campaignId, b.email, b.hard);
+  if (b.hard) {
+    const subs = await db.collection("subscribers").where("email", "==", b.email).get().catch(() => null);
+    for (const d of subs?.docs || []) await d.ref.update({ status: "bounced", bouncedAt: Date.now() });
+  }
+  return { bounced: true };
 }
 
 // Correo masivo (newsletter, publicidad, notificación automática): no debe crear prospectos.
@@ -139,7 +172,7 @@ async function processReplies() {
     host: process.env.IMAP_HOST, port, secure: port === 993,
     auth: { user: process.env.IMAP_USER, pass: process.env.IMAP_PASSWORD }, logger: false,
   });
-  let matched = 0, scanned = 0, newLeads = 0;
+  let matched = 0, scanned = 0, newLeads = 0, bounces = 0;
   await client.connect();
   const pipesSnap = await db.collection("pipelines").get();
   const pipelines = pipesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -161,7 +194,9 @@ async function processReplies() {
         scanned++;
         try {
           const parsed = await simpleParser(msg.source);
-          if (!isAutoReply(parsed)) {
+          const bounce = parseBounce(parsed);
+          if (bounce) { await handleBounce(bounce); bounces++; }
+          else if (!isAutoReply(parsed)) {
             const r = await handleReply(parsed, pipelines);
             if (r.matched) matched++;
             if (r.newLead) newLeads++;
@@ -176,7 +211,7 @@ async function processReplies() {
     lock.release();
     await client.logout().catch(() => {});
   }
-  return { scanned, matched, newLeads };
+  return { scanned, matched, newLeads, bounces };
 }
 
-module.exports = { processReplies, isBulk };
+module.exports = { processReplies, isBulk, parseBounce };

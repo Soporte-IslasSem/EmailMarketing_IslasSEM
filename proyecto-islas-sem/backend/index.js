@@ -14,6 +14,8 @@ const { drainOutbox } = require("./lib/outbox");
 const { runSLA } = require("./lib/sla");
 const { processReplies } = require("./lib/inbox");
 const { submitForm, processFormSubmissions } = require("./lib/forms");
+const { recordOpen, recordClick } = require("./lib/reports");
+const { processAutomations } = require("./lib/automations");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -39,11 +41,18 @@ api.post("/forms/submit", submitForm);
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 // --- Email marketing: baja (unsubscribe) ---
+// GET = enlace del pie del correo; POST = baja en un clic (List-Unsubscribe-Post de Gmail/Yahoo).
+// Solo actualiza suscriptores que existen (antes un id inventado creaba un documento).
+async function unsubscribe(subscriberId) {
+  const ref = db.collection("subscribers").doc(String(subscriberId).slice(0, 64));
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  if (snap.data().status !== "unsubscribed") {
+    await ref.update({ status: "unsubscribed", unsubscribedAt: Date.now() });
+  }
+}
 api.get("/u/:subscriberId", async (req, res) => {
-  try {
-    await db.collection("subscribers").doc(req.params.subscriberId)
-      .set({ status: "unsubscribed", unsubscribedAt: Date.now() }, { merge: true });
-  } catch (e) { console.warn("[unsubscribe]", e.message); }
+  try { await unsubscribe(req.params.subscriberId); } catch (e) { console.warn("[unsubscribe]", e.message); }
   res.set("Content-Type", "text/html; charset=utf-8").send(
     `<div style="font-family:Arial;max-width:480px;margin:60px auto;text-align:center;color:#2a3a3a">
       <h2 style="color:#136B68">Baja confirmada</h2>
@@ -51,18 +60,59 @@ api.get("/u/:subscriberId", async (req, res) => {
     </div>`
   );
 });
+api.post("/u/:subscriberId", async (req, res) => {
+  try { await unsubscribe(req.params.subscriberId); } catch (e) { console.warn("[unsubscribe]", e.message); }
+  res.sendStatus(200);
+});
+
+async function subscriberEmail(sid) {
+  if (!sid) return "";
+  const snap = await db.collection("subscribers").doc(String(sid).slice(0, 64)).get().catch(() => null);
+  return snap && snap.exists ? String(snap.data().email || "").toLowerCase() : "";
+}
 
 // --- Email marketing: pixel de apertura (1x1 transparente) ---
 const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
 api.get("/o/:campaignId/:sid", async (req, res) => {
-  try {
-    const subscriberId = String(req.params.sid).replace(/\.png$/i, "");
-    await db.collection("campaigns").doc(req.params.campaignId)
-      .set({ openCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
-    if (subscriberId) await db.collection("subscribers").doc(subscriberId)
-      .set({ lastOpenAt: Date.now(), opened: true }, { merge: true });
-  } catch (e) { console.warn("[open]", e.message); }
   res.set({ "Content-Type": "image/gif", "Cache-Control": "no-store" }).send(PIXEL);
+  try {
+    const campaignId = String(req.params.campaignId).slice(0, 64);
+    const subscriberId = String(req.params.sid).replace(/\.png$/i, "");
+    const camp = await db.collection("campaigns").doc(campaignId).get();
+    if (!camp.exists) return;
+    await camp.ref.update({ openCount: admin.firestore.FieldValue.increment(1) });
+    const email = await subscriberEmail(subscriberId);
+    if (email) {
+      await db.collection("subscribers").doc(subscriberId).update({ lastOpenAt: Date.now(), opened: true });
+      await recordOpen(campaignId, email);
+    }
+  } catch (e) { console.warn("[open]", e.message); }
+});
+
+// --- Email marketing: seguimiento de clics ---
+// /api/c/:campaignId/:sid?u=<url> registra el clic y redirige. Para no ser un
+// "redirector abierto", solo redirige a URLs http(s) que aparecen en la propia campaña.
+api.get("/c/:campaignId/:sid", async (req, res) => {
+  const url = String(req.query.u || "");
+  const fallback = "https://email-marketing.islassem.com/";
+  try {
+    if (!/^https?:\/\//i.test(url)) return res.redirect(302, fallback);
+    const campaignId = String(req.params.campaignId).slice(0, 64);
+    const camp = await db.collection("campaigns").doc(campaignId).get();
+    const html = camp.exists ? String(camp.data().template?.html || "") : "";
+    let path = url;
+    try { const u = new URL(url); path = u.pathname + u.search; } catch (_) { return res.redirect(302, fallback); }
+    const known = html.includes(url) || html.includes(url.replace(/&/g, "&amp;")) ||
+      (url.startsWith("https://email-marketing.islassem.com/") && html.includes(`"${path}"`));
+    if (!known) return res.redirect(302, fallback);
+    res.redirect(302, url);
+    await camp.ref.update({ clickCount: admin.firestore.FieldValue.increment(1) });
+    const email = await subscriberEmail(req.params.sid);
+    await recordClick(campaignId, email, url);
+  } catch (e) {
+    console.warn("[click]", e.message);
+    if (!res.headersSent) res.redirect(302, fallback);
+  }
 });
 
 async function runAll() {
@@ -70,8 +120,9 @@ async function runAll() {
   const mail = await drainOutbox();
   const replies = await processReplies();
   const forms = await processFormSubmissions();
+  const automations = await processAutomations();
   const sla = await runSLA();
-  return { mail, replies, forms, sla };
+  return { mail, replies, forms, automations, sla };
 }
 
 // Endpoint protegido por CRON_SECRET (para el cron de Plesk o un cron externo).

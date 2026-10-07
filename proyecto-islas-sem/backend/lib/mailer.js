@@ -24,7 +24,7 @@ function mailDomain() {
 }
 
 // Envía un correo. Devuelve { messageId } para poder emparejar respuestas por hilo.
-// opts: { to, subject, html, text, attachments, messageId, replyTo, references }
+// opts: { to, subject, html, text, attachments, messageId, replyTo, references, unsubscribeUrl }
 async function sendMail(opts) {
   const from = process.env.SMTP_FROM || process.env.SMTP_USER;
   const messageId = opts.messageId || `<${Date.now()}.${Math.random().toString(36).slice(2)}@${mailDomain()}>`;
@@ -38,6 +38,11 @@ async function sendMail(opts) {
     messageId,
     replyTo: opts.replyTo || process.env.REPLY_TO || undefined,
     references: opts.references || undefined,
+    // Baja en un clic (RFC 8058): Gmail/Yahoo la exigen a los envíos masivos.
+    ...(opts.unsubscribeUrl ? {
+      list: { unsubscribe: { url: opts.unsubscribeUrl, comment: "Darse de baja" } },
+      headers: { "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+    } : {}),
   });
   return { messageId };
 }

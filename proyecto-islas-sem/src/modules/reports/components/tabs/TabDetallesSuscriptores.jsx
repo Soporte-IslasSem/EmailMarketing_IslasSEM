@@ -9,19 +9,23 @@ export default function TabDetallesSuscriptores({ report }) {
     return "Sin actividad";
   };
 
-  // 🔹 Apertura y clic no tienen seguimiento implementado todavía —
-  // se muestran siempre como "Sin abrir" / "Sin clic" con honestidad,
-  // en vez de aparentar datos que no existen.
-  const subs = (report.results || []).map((r) => ({
-    email: r.email,
-    status: r.status || "desconocido",
-    opened: "Sin abrir",
-    clicked: "Sin clic",
-    lastAction: formatDate(report.sentAt),
-    sentAt: formatDate(report.sentAt),
-    openedAt: "Sin actividad",
-    clickedAt: "Sin actividad",
-  }));
+  // 🔹 Estado por destinatario: envío (results) + aperturas/clics/rebotes (subscribers),
+  // ambos escritos por el backend.
+  const ms = (v) => (v ? new Date(v).toLocaleString() : "Sin actividad");
+  const subs = (report.results || []).map((r) => {
+    const s = report.subscribers?.[r.email] || {};
+    const last = Math.max(s.clickedAt || 0, s.lastOpenedAt || s.openedAt || 0, s.sentAt || 0);
+    return {
+      email: r.email,
+      status: s.bounced ? `rebotado (${s.bounceType === "hard" ? "definitivo" : "temporal"})` : r.status || "desconocido",
+      opened: s.opened ? `Abierto${s.openCount > 1 ? ` (${s.openCount})` : ""}` : "Sin abrir",
+      clicked: s.clicked ? `Clic${s.clickCount > 1 ? ` (${s.clickCount})` : ""}` : "Sin clic",
+      lastAction: last ? ms(last) : formatDate(report.sentAt),
+      sentAt: s.sentAt ? ms(s.sentAt) : formatDate(report.sentAt),
+      openedAt: ms(s.openedAt),
+      clickedAt: ms(s.clickedAt),
+    };
+  });
 
   // 🔹 Paginación
   const [currentPage, setCurrentPage] = useState(1);

@@ -4,6 +4,7 @@
 const { admin, db } = require("./firebase");
 const { sendMail, mailDomain } = require("./mailer");
 const { renderDocPDF } = require("./pdf");
+const { recordSend, closeReport } = require("./reports");
 
 const MAX_PER_RUN = Number(process.env.MAX_PER_RUN) || 30;      // por ejecución (cada minuto)
 const DAILY_LIMIT = Number(process.env.SMTP_DAILY_LIMIT) || 1800; // margen bajo el tope de Gmail
@@ -51,7 +52,8 @@ async function settleCampaign(campaignId, field) {
       patch.send = { ...(c.send || {}), status: "sent" };
     }
     tx.update(ref, patch);
-  });
+    return patch.status === "sent";
+  }).then((closed) => closed && closeReport(campaignId));
 }
 
 // Red de seguridad: campañas en "sending" que ya no tienen correos pendientes en cola
@@ -63,13 +65,38 @@ async function sweepCampaigns() {
     const pending = await db.collection("outbox").where("campaignId", "==", c.id).where("status", "==", "pending").limit(1).get();
     if (pending.empty) {
       await c.ref.update({ status: "sent", sentAt: c.data().sentAt || Date.now(), send: { ...(c.data().send || {}), status: "sent" } });
+      await closeReport(c.id).catch(() => {});
       closed++;
     }
   }
   return closed;
 }
 
+// Envíos programados: los correos con status "scheduled" pasan a la cola cuando llega
+// su hora (sendAfter, ms). Sin índice compuesto: se filtra la hora en código.
+async function promoteScheduled() {
+  const now = Date.now();
+  const snap = await db.collection("outbox").where("status", "==", "scheduled").limit(500).get();
+  let promoted = 0;
+  const due = snap.docs.filter((d) => (d.data().sendAfter || 0) <= now);
+  for (let i = 0; i < due.length; i += 400) {
+    const batch = db.batch();
+    due.slice(i, i + 400).forEach((d) => batch.update(d.ref, { status: "pending" }));
+    await batch.commit();
+    promoted += Math.min(400, due.length - i);
+  }
+  // Campañas programadas cuya hora llegó pasan a "sending".
+  if (promoted) {
+    const ids = [...new Set(due.map((d) => d.data().campaignId).filter(Boolean))];
+    for (const id of ids) {
+      await db.collection("campaigns").doc(id).update({ status: "sending" }).catch(() => {});
+    }
+  }
+  return promoted;
+}
+
 async function drainOutbox() {
+  const promoted = await promoteScheduled();
   // Cuánto se ha enviado hoy (throttle).
   const cRef = counterRef();
   const cSnap = await cRef.get();
@@ -86,7 +113,7 @@ async function drainOutbox() {
       const attachments = await buildAttachments(item);
       // Message-ID determinista por envío: permite emparejar la respuesta por hilo.
       const messageId = `<obx-${d.id}@${mailDomain()}>`;
-      const { messageId: sentId } = await sendMail({ to: item.to, subject: item.subject, html: item.html, text: item.text, attachments, messageId });
+      const { messageId: sentId } = await sendMail({ to: item.to, subject: item.subject, html: item.html, text: item.text, attachments, messageId, unsubscribeUrl: item.unsubscribeUrl });
       await d.ref.update({ status: "sent", sentAt: Date.now(), attempts: (item.attempts || 0) + 1, error: "", messageId: sentId });
       today++;
       // En ofertas, guarda el messageId en la negociación (respaldo para emparejar respuestas).
@@ -99,6 +126,7 @@ async function drainOutbox() {
       }
       // En campañas, cuenta enviados en la campaña.
       if (item.kind === "campaign" && item.campaignId && !item.isTest) {
+        try { await recordSend(item.campaignId, item.to, true); } catch (e) { console.warn("[outbox] informe:", e.message); }
         try { await settleCampaign(item.campaignId, "sentCount"); } catch (e) { console.warn("[outbox] campaña:", e.message); }
       }
       sent++;
@@ -106,6 +134,7 @@ async function drainOutbox() {
       const attempts = (item.attempts || 0) + 1;
       await d.ref.update({ status: attempts >= 3 ? "failed" : "pending", attempts, error: String(e.message || e) });
       if (attempts >= 3 && item.kind === "campaign" && item.campaignId && !item.isTest) {
+        try { await recordSend(item.campaignId, item.to, false, e.message); } catch (_) { /* no crítico */ }
         try { await settleCampaign(item.campaignId, "failedCount"); } catch (_) { /* no crítico */ }
       }
       failed++;
@@ -114,7 +143,7 @@ async function drainOutbox() {
   // Actualiza el contador diario con lo enviado en esta pasada.
   if (sent > 0) await cRef.set({ count: admin.firestore.FieldValue.increment(sent), updatedAt: Date.now() }, { merge: true });
   const closed = await sweepCampaigns();
-  return { sent, failed, scanned: snap.size, today, closed };
+  return { sent, failed, scanned: snap.size, today, closed, promoted };
 }
 
 module.exports = { drainOutbox };

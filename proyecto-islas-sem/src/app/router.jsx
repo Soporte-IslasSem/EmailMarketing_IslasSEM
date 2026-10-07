@@ -15,6 +15,7 @@ import ResetPassword from "../modules/auth/pages/ResetPassword/ResetPassword.jsx
 
 // Dashboard Home
 import DashboardHome from "../modules/dashboard/components/DashboardHome/DashboardHome.jsx";
+import Automations from "../modules/automations/Automations.jsx";
 
 // Campaigns
 import Campaigns from "../modules/campaigns/components/Campaigns/Campaigns.jsx";
@@ -204,7 +205,7 @@ const router = createBrowserRouter([
       { path: "admin/audit", element: <Audit /> },
 
       // AUTOMATIZACIONES
-      { path: "automations", element: <DashboardHome /> },
+      { path: "automations", element: <Automations /> },
 
       // LISTS
       { path: "lists", element: <Lists /> },
