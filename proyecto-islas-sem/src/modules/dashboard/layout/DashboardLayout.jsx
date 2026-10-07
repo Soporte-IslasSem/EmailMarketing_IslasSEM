@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../../../shared/hooks/useAuth";
 import Sidebar from "../components/Sidebar/Sidebar.jsx";
 import Header from "../components/Header/Header.jsx";
 import TopNav from "../components/TopNav/TopNav.jsx";
@@ -20,6 +21,12 @@ export default function DashboardLayout() {
   useEffect(() => {
     window.openProUpgradeModal = () => setShowUpgradeModal(true);
   }, []);
+
+  // Sin sesión no se muestra el panel: antes se veía vacío (Firestore bloquea los datos)
+  // y algunas pantallas se quedaban en "Cargando…" para siempre.
+  const { user, loading } = useAuth();
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#6b7d7d" }}>Cargando…</div>;
+  if (!user) return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />;
 
   return (
     <>
