@@ -3,8 +3,8 @@ import useLists from "../../hooks/useLists";
 import CreateListModal from "../CreateListModal/CreateListModal";
 import ListActionsMenu from "./ListActionsMenu"; // 🔹 Import del nuevo componente
 import { useNavigate } from "react-router-dom";
-import { db } from "../../../../config/firebaseConfig";
-import { doc, deleteDoc } from "firebase/firestore";
+import { db, auth } from "../../../../config/firebaseConfig";
+import { collection, doc, deleteDoc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import "./Lists.styles.css";
 
 export default function Lists() {
@@ -33,12 +33,22 @@ export default function Lists() {
   }, [searchTerm]);
 
   // 🔹 Eliminar lista
+  // Borra la lista y sus suscriptores (antes quedaban huérfanos en la base de datos).
   const handleDelete = async (id) => {
+    const subsSnap = await getDocs(
+      query(collection(db, "subscribers"), where("listId", "==", id), where("userId", "==", auth.currentUser.uid))
+    );
     const confirmDelete = window.confirm(
-      "¿Estás seguro de que deseas eliminar esta lista?"
+      `¿Eliminar esta lista y sus ${subsSnap.size} suscriptor(es)? Esta acción no se puede deshacer.`
     );
     if (!confirmDelete) return;
 
+    const refs = subsSnap.docs.map((d) => d.ref);
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = writeBatch(db);
+      refs.slice(i, i + 400).forEach((r) => batch.delete(r));
+      await batch.commit();
+    }
     await deleteDoc(doc(db, "lists", id));
   };
 

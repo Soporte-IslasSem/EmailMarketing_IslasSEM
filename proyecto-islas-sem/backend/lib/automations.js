@@ -14,6 +14,7 @@ const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.
 const API = `${PUBLIC_URL}/api`;
 const UNIT_MS = { minutes: 60e3, hours: 3600e3, days: 86400e3 };
 const delayMs = (step) => Math.max(0, Number(step?.delayValue) || 0) * (UNIT_MS[step?.delayUnit] || UNIT_MS.days);
+const joinedAt = (s) => Math.max(toMs(s.confirmedAt), toMs(s.createdAt));
 const toMs = (ts) => (ts?.toMillis ? ts.toMillis() : typeof ts === "number" ? ts : ts?._seconds ? ts._seconds * 1000 : 0);
 
 const absolutize = (html) => String(html || "").replace(/\b(src|href)=(["'])\/(?!\/)/gi, `$1=$2${PUBLIC_URL}/`);
@@ -35,7 +36,7 @@ async function stepHtml(step) {
   return step.html || "";
 }
 
-const emailable = (s) => !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid"].includes(String(s.status || "").toLowerCase());
+const emailable = (s) => !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid", "pending"].includes(String(s.status || "").toLowerCase());
 
 // 1) Inscribe a los suscriptores nuevos de la lista disparadora.
 async function enrollNew(auto) {
@@ -45,8 +46,9 @@ async function enrollNew(auto) {
   const snap = await db.collection("subscribers").where("listId", "==", listId).get();
   const fresh = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((s) => (!auto.userId || s.userId === auto.userId) && toMs(s.createdAt) > since && emailable(s))
-    .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))
+    // Con doble opt-in cuenta el momento de la confirmación, no el del alta.
+    .filter((s) => (!auto.userId || s.userId === auto.userId) && joinedAt(s) > since && emailable(s))
+    .sort((a, b) => joinedAt(a) - joinedAt(b))
     .slice(0, 200);
   let cursor = since, enrolled = 0;
   for (const s of fresh) {
@@ -55,11 +57,11 @@ async function enrollNew(auto) {
     if (!exists.exists) {
       await ref.set({
         automationId: auto.id, subscriberId: s.id, email: s.email, step: 0,
-        nextAt: toMs(s.createdAt) + delayMs(auto.steps[0]), done: false, createdAt: Date.now(),
+        nextAt: joinedAt(s) + delayMs(auto.steps[0]), done: false, createdAt: Date.now(),
       });
       enrolled++;
     }
-    cursor = Math.max(cursor, toMs(s.createdAt));
+    cursor = Math.max(cursor, joinedAt(s));
   }
   if (fresh.length) {
     await db.collection("automations").doc(auto.id).update({

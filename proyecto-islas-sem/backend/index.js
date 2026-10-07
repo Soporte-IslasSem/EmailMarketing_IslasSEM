@@ -17,18 +17,23 @@ const { submitForm, processFormSubmissions } = require("./lib/forms");
 const { recordOpen, recordClick } = require("./lib/reports");
 const { processAutomations } = require("./lib/automations");
 const { checkDomains } = require("./lib/domains");
+const { subscribe, confirm, unsubscribePage, doUnsubscribe } = require("./lib/subscriptions");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
 const api = express.Router();
 api.use(express.json({ limit: "100kb" }));
+api.use(express.urlencoded({ extended: false, limit: "20kb" })); // formulario de baja y one-click de Gmail
 
 // CORS solo para los orígenes de la app (formularios públicos llaman desde el navegador).
 const ORIGINS = (process.env.ALLOWED_ORIGINS || "https://email-marketing.islassem.com,http://localhost:5173")
   .split(",").map((s) => s.trim()).filter(Boolean);
 api.use("/forms", (req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && ORIGINS.includes(origin)) {
+  // El alta (/forms/subscribe) se llama desde formularios incrustados en cualquier web.
+  if (req.path === "/subscribe") {
+    res.set({ "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" });
+  } else if (origin && ORIGINS.includes(origin)) {
     res.set({ "Access-Control-Allow-Origin": origin, "Vary": "Origin",
       "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" });
   }
@@ -39,35 +44,21 @@ api.use("/forms", (req, res, next) => {
 // --- Listas: comprobar dominios de email (Depurar), solo con sesión de la app ---
 api.post("/lists/check-domains", checkDomains);
 
+// --- Email marketing: alta desde formularios incrustados + doble opt-in ---
+api.post("/forms/subscribe", subscribe);
+api.get("/forms/confirm/:sid", confirm);
+
 // --- Formularios públicos (SEPA / Datos Jurídicos) con reCAPTCHA v3 ---
 api.post("/forms/submit", submitForm);
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 // --- Email marketing: baja (unsubscribe) ---
-// GET = enlace del pie del correo; POST = baja en un clic (List-Unsubscribe-Post de Gmail/Yahoo).
-// Solo actualiza suscriptores que existen (antes un id inventado creaba un documento).
-async function unsubscribe(subscriberId) {
-  const ref = db.collection("subscribers").doc(String(subscriberId).slice(0, 64));
-  const snap = await ref.get();
-  if (!snap.exists) return;
-  if (snap.data().status !== "unsubscribed") {
-    await ref.update({ status: "unsubscribed", unsubscribedAt: Date.now() });
-  }
-}
-api.get("/u/:subscriberId", async (req, res) => {
-  try { await unsubscribe(req.params.subscriberId); } catch (e) { console.warn("[unsubscribe]", e.message); }
-  res.set("Content-Type", "text/html; charset=utf-8").send(
-    `<div style="font-family:Arial;max-width:480px;margin:60px auto;text-align:center;color:#2a3a3a">
-      <h2 style="color:#136B68">Baja confirmada</h2>
-      <p>Ya no recibirás más correos de ISLAS SEM. Gracias.</p>
-    </div>`
-  );
-});
-api.post("/u/:subscriberId", async (req, res) => {
-  try { await unsubscribe(req.params.subscriberId); } catch (e) { console.warn("[unsubscribe]", e.message); }
-  res.sendStatus(200);
-});
+// GET muestra la página de baja (configurable en Listas › Notificaciones); no da de baja,
+// porque antivirus y gestores de correo abren los enlaces. POST da de baja (botón de la
+// página o "List-Unsubscribe=One-Click" de Gmail/Yahoo).
+api.get("/u/:subscriberId", (req, res) => unsubscribePage(req, res, false).catch(() => res.sendStatus(500)));
+api.post("/u/:subscriberId", doUnsubscribe);
 
 async function subscriberEmail(sid) {
   if (!sid) return "";

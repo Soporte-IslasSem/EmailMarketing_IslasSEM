@@ -26,10 +26,5 @@ export default function useLists() {
     return unsubscribe;
   }, [user]);
 
-  const deleteList = (id) => {
-    // Aquí pondrás tu lógica real de eliminar
-    console.log("Eliminar lista:", id);
-  };
-
-  return { lists, deleteList };
+  return { lists };
 }

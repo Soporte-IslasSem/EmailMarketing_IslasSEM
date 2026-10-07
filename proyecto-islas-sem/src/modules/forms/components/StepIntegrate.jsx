@@ -109,7 +109,7 @@ export default function StepIntegrate({ formId, onBack }) {
     e.preventDefault();
     msg.textContent = "";
 
-    fetch("https://us-central1-email-marketing-islassem.cloudfunctions.net/submitForm", {
+    fetch("https://email-marketing.islassem.com/api/forms/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ formId: "${formId}", email: input.value.trim() })
@@ -119,8 +119,8 @@ export default function StepIntegrate({ formId, onBack }) {
         if (data.success) {
           form.reset();
           msg.style.color = "#1a7f37";
-          msg.textContent = successMessage;
-          if (redirectUrl) window.location.href = redirectUrl;
+          msg.textContent = data.pending ? (data.message || "Revisa tu correo y confirma la suscripción.") : successMessage;
+          if (redirectUrl && !data.pending) window.location.href = redirectUrl;
         } else {
           msg.style.color = "#c0392b";
           msg.textContent = data.error || "No se pudo completar la suscripción.";

@@ -128,8 +128,6 @@ export default function CampaignTable({ campaigns, onContinue }) {
                   campaignId={c.id}
                   status={c.status}
                   reportId={c.reportId}
-                  onDelete={(id) => console.log("Eliminar campaña:", id)}
-                  onDeactivate={(id) => console.log("Dar de baja campaña:", id)}
                 />
               </td>
             </tr>

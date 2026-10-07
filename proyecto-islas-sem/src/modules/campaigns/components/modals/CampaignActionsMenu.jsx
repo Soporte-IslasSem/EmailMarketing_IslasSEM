@@ -1,10 +1,26 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, deleteDoc, getDocs, query, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "../../../../config/firebaseConfig";
+import { useOrg } from "../../../crm/lib/useOrg";
+
+// Cancela los correos de la campaña que aún están en cola (pendientes o programados),
+// para que borrar o dar de baja una campaña detenga de verdad el envío.
+async function cancelQueued(orgId, campaignId) {
+  if (!orgId) return 0;
+  const snap = await getDocs(query(collection(db, "outbox"), where("orgId", "==", orgId), where("campaignId", "==", campaignId)));
+  const queued = snap.docs.filter((d) => ["pending", "scheduled"].includes(d.data().status));
+  for (let i = 0; i < queued.length; i += 400) {
+    const batch = writeBatch(db);
+    queued.slice(i, i + 400).forEach((d) => batch.update(d.ref, { status: "cancelled", cancelledAt: Date.now() }));
+    await batch.commit();
+  }
+  return queued.length;
+}
 import "./CampaignActionsMenu.styles.css";
 
 export default function CampaignActionsMenu({ campaignId, status, reportId }) {
+  const { orgId } = useOrg();
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const menuRef = useRef(null);
@@ -31,10 +47,12 @@ export default function CampaignActionsMenu({ campaignId, status, reportId }) {
 
   // 🟦 Función: eliminar campaña
   const handleDelete = async () => {
-    if (window.confirm("¿Seguro que deseas eliminar esta campaña?")) {
+    const queuedMsg = ["sending", "scheduled"].includes(status) ? " Los correos que aún no se han enviado se cancelarán." : "";
+    if (window.confirm(`¿Seguro que deseas eliminar esta campaña?${queuedMsg}`)) {
       try {
+        const cancelled = await cancelQueued(orgId, campaignId);
         await deleteDoc(doc(db, "campaigns", campaignId));
-        alert("Campaña eliminada correctamente.");
+        alert(`Campaña eliminada correctamente.${cancelled ? ` Se cancelaron ${cancelled} correo(s) pendientes.` : ""}`);
         setOpen(false);
       } catch (error) {
         console.error("Error al eliminar campaña:", error);
@@ -45,12 +63,13 @@ export default function CampaignActionsMenu({ campaignId, status, reportId }) {
 
   // 🟨 Función: dar de baja campaña
   const handleDeactivate = async () => {
-    if (window.confirm("¿Dar de baja esta campaña?")) {
+    if (window.confirm("¿Dar de baja esta campaña? Los correos que aún no se han enviado se cancelarán.")) {
       try {
+        const cancelled = await cancelQueued(orgId, campaignId);
         await updateDoc(doc(db, "campaigns", campaignId), {
           status: "inactive",
         });
-        alert("Campaña dada de baja.");
+        alert(`Campaña dada de baja.${cancelled ? ` Se cancelaron ${cancelled} correo(s) pendientes.` : ""}`);
         setOpen(false);
       } catch (error) {
         console.error("Error al dar de baja:", error);
@@ -84,9 +103,10 @@ export default function CampaignActionsMenu({ campaignId, status, reportId }) {
 
       {open && (
         <ul className={`menu ${openUpward ? "open-upward" : ""}`}>
-          {reportId && (
+          {(reportId || ["sent", "sending"].includes(status)) && (
             <li>
-              <Link to={`/dashboard/reports/${reportId}`}>Ver informe</Link>
+              {/* Los informes nuevos usan el id de la campaña (los genera el backend) */}
+              <Link to={`/dashboard/reports/${reportId || campaignId}`}>Ver informe</Link>
             </li>
           )}
           <li onClick={handleEdit}>Editar campaña</li>

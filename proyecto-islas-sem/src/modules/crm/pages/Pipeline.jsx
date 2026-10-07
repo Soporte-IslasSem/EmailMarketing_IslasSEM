@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
 import AssignImportedDeals from "../components/AssignImportedDeals";
+import PipelineSettingsModal from "../components/PipelineSettingsModal";
 import { useCrmCollection, crmCreate, crmUpdate, crmRemove, logActivity, money } from "../lib/crm";
 import {
   usePipelines,
@@ -15,7 +16,6 @@ import {
   CLIENT_TIERS,
   addStage as addStageDb,
   renameStage as renameStageDb,
-  deleteStage as deleteStageDb,
   moveStage as moveStageDb,
   createPipeline,
 } from "../lib/pipelines";
@@ -62,6 +62,7 @@ export default function Pipeline() {
   const dragId = useRef(null);
   const [overCol, setOverCol] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const unassigned = deals.filter((d) => !d.pipelineId);
 
   const pipeline = useMemo(
@@ -177,11 +178,6 @@ export default function Pipeline() {
   const renameStage = (sid, current) => {
     const name = window.prompt("Nuevo nombre de la etapa:", current);
     if (name && name.trim()) renameStageDb(pipeline, board, sid, name.trim());
-  };
-  const removeStage = (sid, name) => {
-    if (flattenStages(stages).length <= 1) return alert("El embudo debe tener al menos una etapa.");
-    if (window.confirm(`¿Eliminar la etapa "${name}"? Las negociaciones se quedarán sin columna.`))
-      deleteStageDb(pipeline, board, sid);
   };
   const addStage = () => {
     const name = window.prompt("Nombre de la nueva etapa:");
@@ -323,6 +319,7 @@ export default function Pipeline() {
           <button className="crm-btn sm" onClick={() => setAssignOpen(true)}>Asignar a embudos</button>
         </div>
       )}
+      {settingsOpen && <PipelineSettingsModal pipeline={pipeline} board={board} deals={deals} onClose={() => setSettingsOpen(false)} />}
       {assignOpen && <AssignImportedDeals deals={unassigned} pipelines={pipelines} onClose={() => setAssignOpen(false)} />}
       {/* Barra de herramientas */}
       <div className="dealbar">
@@ -344,7 +341,7 @@ export default function Pipeline() {
             <input placeholder="buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
-        <button className="iconbtn" title="Ajustes del embudo">⚙</button>
+        <button className="iconbtn" title="Ajustes del embudo" onClick={() => setSettingsOpen(true)}>⚙</button>
         {showPipeMenu && (
           <div className="pipemenu">
             {pipelines.map((p) => (
@@ -380,9 +377,7 @@ export default function Pipeline() {
           <span><b>{totalDeals}</b> Más ▾</span>
         </div>
         <div className="dealactions">
-          <button>↻ Ventas recurrentes</button>
           <button onClick={() => navigate("/dashboard/crm/automation")}>⚙ Reglas de automatización</button>
-          <button>Extensiones ▾</button>
         </div>
       </div>
 

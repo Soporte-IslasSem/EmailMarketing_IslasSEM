@@ -171,8 +171,8 @@ export default function Register() {
           </div>
 
           <p className="legal-text">
-            Al registrarte aceptas nuestros <a href="#">términos de uso</a> y{" "}
-            <a href="#">política de privacidad</a>.
+            Al registrarte aceptas nuestros <a href="https://islassem.com/terminos-y-condiciones-servicios-islas-sem" target="_blank" rel="noreferrer">términos de uso</a> y{" "}
+            <a href="https://islassem.com/politicas-de-privacidad" target="_blank" rel="noreferrer">política de privacidad</a>.
           </p>
 
           <p className="login-redirect">

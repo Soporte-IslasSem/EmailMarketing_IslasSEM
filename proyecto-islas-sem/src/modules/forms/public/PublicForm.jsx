@@ -212,7 +212,7 @@ function PrivacyModal({ onAccept, onReject }) {
           </p>
         ))}
         <p style={{ fontSize: 13.5, margin: "4px 0 22px" }}>
-          He leído y acepto <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#7db8ff" }}>Políticas de Privacidad</a>
+          He leído y acepto <a href="https://islassem.com/politicas-de-privacidad" target="_blank" rel="noreferrer" style={{ color: "#7db8ff" }}>Políticas de Privacidad</a>
         </p>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <button type="button" onClick={onAccept} style={{ flex: "1 1 220px", background: "#1A9190", color: "#fff", border: "none", borderRadius: 10, padding: "13px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>Acepto</button>

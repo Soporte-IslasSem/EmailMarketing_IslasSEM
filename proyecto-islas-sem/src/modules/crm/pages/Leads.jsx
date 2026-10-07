@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
+import LeadImportModal from "../components/LeadImportModal";
 import {
   useCrmCollection,
   crmCreate,
@@ -56,6 +57,8 @@ export default function Leads() {
   const [saving, setSaving] = useState(false);
   const [convertLead, setConvertLead] = useState(null);
   const [historyLead, setHistoryLead] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const { items: contacts } = useCrmCollection("contacts");
 
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
@@ -164,7 +167,7 @@ export default function Leads() {
           <p>Leads sin cualificar · conviértelos en contactos y negociaciones · {items.length} prospectos</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="crm-btn ghost" onClick={() => alert("Importar prospectos (CSV) — usa el catálogo/CSV")}>Importar</button>
+          <button className="crm-btn ghost" onClick={() => setShowImport(true)}>Importar</button>
           <button className="crm-btn" onClick={() => setShowNew(true)}>+ Crear prospecto</button>
         </div>
       </div>
@@ -270,6 +273,7 @@ export default function Leads() {
         </CrmModal>
       )}
 
+      {showImport && <LeadImportModal orgId={orgId} existingLeads={items} existingContacts={contacts} onClose={() => setShowImport(false)} />}
       {historyLead && <LeadHistoryModal lead={historyLead} onClose={() => setHistoryLead(null)} />}
       {convertLead && <ConvertModal lead={convertLead} onClose={() => setConvertLead(null)} onConfirm={runConvert} />}
     </div>

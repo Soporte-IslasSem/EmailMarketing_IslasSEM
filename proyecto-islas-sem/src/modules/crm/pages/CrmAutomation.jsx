@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePipelines, getStages, flattenStages, STAGE_COLORS } from "../lib/pipelines";
 import {
@@ -17,7 +17,6 @@ import "../pipeline.styles.css";
 export default function CrmAutomation() {
   const { pipelines } = usePipelines();
   const navigate = useNavigate();
-  const [tab, setTab] = useState("Reglas de automatización");
   const pipeline = pipelines[0];
   const stages = pipeline ? flattenStages(getStages(pipeline, "pos")) : [];
 
@@ -35,20 +34,10 @@ export default function CrmAutomation() {
           <button className="crm-btn ghost sm" onClick={() => navigate("/dashboard/crm/pipeline")}>← Volver</button>
           <h1 style={{ margin: 0, fontSize: 22 }}>Automatización de ventas</h1>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="crm-btn ghost sm">Extensiones ▾</button>
-          <button className="crear-split" style={{ background: "#39a852" }}>Modo de prueba</button>
-        </div>
+
       </div>
 
-      <div className="viewtabs" style={{ marginBottom: 16 }}>
-        {["Reglas de automatización", "Variables", "Constantes", "Registros de la prueba"].map((t) => (
-          <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t}</button>
-        ))}
-      </div>
-
-      {tab === "Reglas de automatización" ? (
-        <>
+      <>
           <div className="dealbar-l" style={{ marginBottom: 14 }}>
             <b style={{ fontSize: 15 }}>Reglas de automatización y disparadores</b>
             <div className="pipesel"><b>{pipeline?.name || "—"}</b></div>
@@ -85,10 +74,7 @@ export default function CrmAutomation() {
               );
             })}
           </div>
-        </>
-      ) : (
-        <div className="crm-panel"><p style={{ color: "var(--muted)", margin: 0 }}>Sección <b>{tab}</b> del diseñador de automatizaciones.</p></div>
-      )}
+      </>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../../../../config/firebaseConfig";
 import { useParams } from "react-router-dom";
+import { previewNotification } from "../../../../../utils/notificationHtml";
 import "../ListNotificaciones.styles.css";
 
 export default function ListNotificacionesUnsubscribe() {
@@ -86,7 +87,7 @@ export default function ListNotificacionesUnsubscribe() {
       </div>
 
       <div className="NotificacionesActions">
-        <button className="NotificacionesPreview">Previsualizar</button>
+        <button className="NotificacionesPreview" onClick={() => previewNotification(listId, "unsubscribePage", settings)}>Previsualizar</button>
         <button className="NotificacionesSave" onClick={save} disabled={saving}>
           {saving ? "Guardando..." : "Actualizar"}
         </button>

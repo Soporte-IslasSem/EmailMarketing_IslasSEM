@@ -14,6 +14,7 @@ const STATUS_LABEL = {
   unsubscribed: "Dado de baja",
   bounced: "Rebotado",
   invalid: "No válido",
+  pending: "Pendiente de confirmar",
 };
 export default function SubscribersTable({ listId }) {
   const [subscribers, setSubscribers] = useState([]);
