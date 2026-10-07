@@ -4,6 +4,7 @@
 const crypto = require("crypto");
 const { admin, db } = require("./firebase");
 const { confirmEmailHtml, confirmPageHtml, unsubscribePageHtml, page, esc } = require("./notificationHtml");
+const { fireWebhook } = require("./webhooks");
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
 const API = `${PUBLIC_URL}/api`;
@@ -86,6 +87,7 @@ async function subscribe(req, res) {
     }
     if (s.general.notifyOnSubscribe) await notifyOwner(list, `Nuevo suscriptor en "${list.name}"`, `${email} se ha suscrito a la lista "${list.name}".`);
     res.json({ success: true });
+    fireWebhook(form.listId, "subscribe", { email, subscriberId: subRef.id, source: "form", formId });
   } catch (e) {
     console.error("[forms/subscribe]", e);
     res.status(500).json({ error: "Error interno" });
@@ -105,6 +107,7 @@ async function confirm(req, res) {
     if (!valid) return html("Enlace no válido", "<p style='font-family:Arial;text-align:center;margin:60px'>El enlace no es válido o ha caducado.</p>");
     if (sub.status !== "subscribed") {
       await ref.update({ status: "subscribed", confirmedAt: Date.now(), confirmToken: FV.delete() });
+      fireWebhook(sub.listId, "subscribe", { email: sub.email, subscriberId: ref.id, source: "form", confirmed: true });
       if (s.general.notifyOnSubscribe) {
         const list = (await db.collection("lists").doc(sub.listId).get()).data();
         await notifyOwner(list, `Nuevo suscriptor en "${list?.name}"`, `${sub.email} ha confirmado su suscripción a "${list?.name}".`);
@@ -139,6 +142,7 @@ async function doUnsubscribe(req, res) {
       const oneClick = String(req.body?.["List-Unsubscribe"] || "") === "One-Click";
       await ref.update({ status: "unsubscribed", unsubscribedAt: Date.now(), ...(reason ? { unsubscribeReason: reason } : {}), ...(oneClick ? { unsubscribeVia: "one-click" } : {}) });
       const sub = snap.data();
+      fireWebhook(sub.listId, "unsubscribe", { email: sub.email, subscriberId: sid, reason: reason || null, oneClick });
       const s = await listSettings(sub.listId);
       if (s.general.notifyOnUnsubscribe) {
         const list = (await db.collection("lists").doc(sub.listId).get()).data();

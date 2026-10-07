@@ -18,6 +18,7 @@ const { recordOpen, recordClick } = require("./lib/reports");
 const { processAutomations } = require("./lib/automations");
 const { checkDomains } = require("./lib/domains");
 const { subscribe, confirm, unsubscribePage, doUnsubscribe } = require("./lib/subscriptions");
+const { testWebhook } = require("./lib/webhooks");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -43,6 +44,7 @@ api.use("/forms", (req, res, next) => {
 
 // --- Listas: comprobar dominios de email (Depurar), solo con sesión de la app ---
 api.post("/lists/check-domains", checkDomains);
+api.post("/lists/:id/webhook-test", testWebhook);
 
 // --- Email marketing: alta desde formularios incrustados + doble opt-in ---
 api.post("/forms/subscribe", subscribe);

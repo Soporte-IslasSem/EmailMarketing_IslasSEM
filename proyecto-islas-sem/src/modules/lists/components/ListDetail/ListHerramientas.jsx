@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { collection, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, updateDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "../../../../config/firebaseConfig";
 import CrmModal from "../../../crm/components/CrmModal";
 import "../../../crm/crm.styles.css";
@@ -18,6 +18,7 @@ const TYPOS = {
 };
 const BLOCKED = ["unsubscribed", "bounced", "invalid"];
 const norm = (e) => String(e || "").trim().toLowerCase();
+const randomSecret = () => [...crypto.getRandomValues(new Uint8Array(20))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const ms = (t) => (t?.toMillis ? t.toMillis() : t?.seconds ? t.seconds * 1000 : 0);
 
 async function loadSubscribers(listId) {
@@ -161,6 +162,56 @@ export default function ListHerramientas() {
     }
   };
 
+  // ---------- Webhooks ----------
+  const openWebhook = async () => {
+    setDone("");
+    const snap = await getDoc(doc(db, "lists", listId));
+    const w = snap.data()?.webhook || {};
+    setModal({
+      type: "webhook",
+      url: w.url || "",
+      secret: w.secret || randomSecret(),
+      active: !!w.active,
+      events: { subscribe: true, unsubscribe: true, bounce: true, ...(w.events || {}) },
+      last: w.lastAt ? { at: w.lastAt, status: w.lastStatus, error: w.lastError, event: w.lastEvent } : null,
+      testMsg: "",
+    });
+  };
+  const setHook = (patch) => setModal((m) => ({ ...m, ...patch }));
+  const saveWebhook = async () => {
+    if (modal.active && !/^https:\/\//i.test(modal.url)) return setHook({ testMsg: "La URL debe empezar por https://" });
+    setBusy("apply");
+    try {
+      await updateDoc(doc(db, "lists", listId), {
+        "webhook.url": modal.url.trim(), "webhook.secret": modal.secret, "webhook.active": modal.active, "webhook.events": modal.events,
+      });
+      setDone(modal.active ? "Webhook guardado y activo." : "Webhook guardado (desactivado).");
+      setModal(null);
+    } catch (e) {
+      setHook({ testMsg: "No se pudo guardar: " + (e.code || e.message) });
+    } finally {
+      setBusy("");
+    }
+  };
+  const testWebhook = async () => {
+    setBusy("test");
+    setHook({ testMsg: "" });
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const r = await fetch(`${API_BASE}/lists/${listId}/webhook-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ url: modal.url.trim(), secret: modal.secret }),
+      });
+      const out = await r.json().catch(() => ({}));
+      setHook({ testMsg: out.ok ? `✅ Recibido correctamente (HTTP ${out.status}).` : `❌ ${out.error || `El servidor respondió HTTP ${out.status}`}` });
+    } catch (e) {
+      setHook({ testMsg: "❌ " + e.message });
+    } finally {
+      setBusy("");
+    }
+  };
+
   const toggleIssue = (sid) =>
     setModal((m) => {
       const selected = new Set(m.selected);
@@ -198,13 +249,64 @@ export default function ListHerramientas() {
         <div className="tool-item">
           <div>
             <h3>Webhooks</h3>
-            <span className="tool-status">Próximamente</span>
+            <span className="tool-status">Avisa a otro sistema (CRM, Zapier, Make…) de altas, bajas y rebotes</span>
           </div>
-          <button className="tool-btn" disabled title="Disponible próximamente">Próximamente</button>
+          <button className="tool-btn" onClick={openWebhook} disabled={!!busy}>Configurar</button>
         </div>
       </div>
 
       {done && <p style={{ marginTop: 16, opacity: 1, color: "#136B68", fontWeight: 600 }}>{done}</p>}
+
+      {modal?.type === "webhook" && (
+        <CrmModal
+          title="Webhook de la lista"
+          onClose={() => setModal(null)}
+          maxWidth={620}
+          footer={
+            <>
+              <button className="crm-btn ghost" onClick={testWebhook} disabled={busy === "test" || !modal.url.trim()}>
+                {busy === "test" ? "Enviando…" : "Enviar prueba"}
+              </button>
+              <button className="crm-btn" onClick={saveWebhook} disabled={busy === "apply"}>{busy === "apply" ? "Guardando…" : "Guardar"}</button>
+            </>
+          }
+        >
+          <div className="crm-field">
+            <label>URL que recibirá los avisos (https)</label>
+            <input value={modal.url} onChange={(e) => setHook({ url: e.target.value })} placeholder="https://hooks.zapier.com/…" />
+          </div>
+          <div className="crm-field">
+            <label>Enviar aviso cuando…</label>
+            {[["subscribe", "alguien se suscribe por un formulario"], ["unsubscribe", "alguien se da de baja"], ["bounce", "un email rebota de forma definitiva"]].map(([k, t]) => (
+              <label key={k} style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400, margin: "4px 0" }}>
+                <input type="checkbox" style={{ width: "auto" }} checked={!!modal.events[k]} onChange={(e) => setHook({ events: { ...modal.events, [k]: e.target.checked } })} />
+                {t}
+              </label>
+            ))}
+          </div>
+          <div className="crm-field">
+            <label>Clave secreta para verificar la firma</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={modal.secret} readOnly style={{ fontFamily: "monospace", fontSize: 12.5 }} />
+              <button className="crm-btn ghost sm" onClick={() => setHook({ secret: randomSecret() })}>Regenerar</button>
+            </div>
+            <small style={{ color: "var(--crm-muted)" }}>
+              Cada aviso lleva la cabecera <code>X-IslasSEM-Signature: sha256=…</code> (HMAC del cuerpo con esta clave).
+            </small>
+          </div>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "6px 0" }}>
+            <input type="checkbox" style={{ width: "auto" }} checked={modal.active} onChange={(e) => setHook({ active: e.target.checked })} />
+            <b>Webhook activo</b>
+          </label>
+          {modal.last && (
+            <p style={{ fontSize: 12.5, color: "var(--crm-muted)" }}>
+              Último envío: {new Date(modal.last.at).toLocaleString("es-ES")} · {modal.last.event} ·{" "}
+              {modal.last.error ? `error: ${modal.last.error}` : `HTTP ${modal.last.status}`}
+            </p>
+          )}
+          {modal.testMsg && <p style={{ fontSize: 13.5, margin: "8px 0 0" }}>{modal.testMsg}</p>}
+        </CrmModal>
+      )}
 
       {modal?.type === "optimize" && (
         <CrmModal

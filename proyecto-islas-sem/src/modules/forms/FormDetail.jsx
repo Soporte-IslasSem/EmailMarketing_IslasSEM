@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../config/firebaseConfig";
 import "./styles/FormDetail.styles.css";
+import { buildEmbedCode, TYPE_LABEL } from "./lib/embedCode";
 
 
 export default function FormDetail() {
@@ -42,59 +43,8 @@ export default function FormDetail() {
   if (error) return <p className="FormDetail__error">{error}</p>;
   if (!formData) return null;
 
-  // Código embebible dinámico
-  const htmlCode = `
-<!-- Formulario generado con Islas SEM -->
-<div id="islassem-form-${formId}" style="max-width: 420px;">
-  <form>
-    <p style="
-      color: ${formData.design.textColor};
-      font-size: ${formData.design.fontSize}px;
-      font-weight: ${formData.design.fontWeight};
-      font-style: ${formData.design.fontStyle};
-      text-decoration: ${formData.design.textDecoration};
-      font-family: ${formData.design.fontFamily};
-    ">
-      ${formData.design.titleText}
-    </p>
-
-    <input
-      type="email"
-      placeholder="Tu correo electrónico"
-      style="
-        width: 100%;
-        padding: 10px;
-        border-radius: ${formData.design.borderRadius}px;
-        border: 1px solid #d1d5db;
-        margin-bottom: 10px;
-      "
-    />
-
-    <button
-      type="submit"
-      style="
-        width: 100%;
-        padding: 10px;
-        background: ${formData.design.buttonColor};
-        color: #ffffff;
-        border-radius: ${formData.design.borderRadius}px;
-        border: none;
-        font-weight: 600;
-      "
-    >
-      Suscribirme
-    </button>
-  </form>
-</div>
-  `.trim();
-
-  const scriptCode = `
-<script>
-  console.log("Formulario ${formId} cargado correctamente.");
-</script>
-  `.trim();
-
-  const fullCode = `${htmlCode}\n\n${scriptCode}`;
+  // Código para incrustar (clásico o popup/barra/exit intent): ver lib/embedCode.js
+  const fullCode = buildEmbedCode(formId, formData);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(fullCode);
@@ -173,7 +123,10 @@ export default function FormDetail() {
 
         {/* Código */}
         <div className="FormDetail__codeBox">
-          <h3>Código embebible</h3>
+          <h3>Código embebible · {TYPE_LABEL[formData.type] || TYPE_LABEL.classic}</h3>
+          {formData.type && formData.type !== "classic" && (
+            <p style={{ fontSize: 13, color: "#555", margin: "0 0 8px" }}>Pégalo una sola vez en tu web, justo antes de &lt;/body&gt;.</p>
+          )}
           <pre>{fullCode}</pre>
 
           <button className="FormDetail__copyButton" onClick={handleCopy}>

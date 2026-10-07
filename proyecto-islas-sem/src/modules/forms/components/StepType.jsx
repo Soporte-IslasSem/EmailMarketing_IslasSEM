@@ -14,22 +14,16 @@ const TYPE_OPTIONS = [
     id: "popup",
     title: "Popup",
     description: "Se muestra como ventana emergente en tu sitio.",
-    badge: "Próximamente",
-    disabled: true,
   },
   {
     id: "bar",
     title: "Barra inferior",
     description: "Una barra fija en la parte inferior de tu página.",
-    badge: "Próximamente",
-    disabled: true,
   },
   {
     id: "exit_intent",
     title: "Exit intent",
     description: "Aparece cuando el usuario intenta salir de la página.",
-    badge: "Próximamente",
-    disabled: true,
   },
 ];
 
@@ -37,6 +31,8 @@ export default function StepType({ formId, onNext }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedType, setSelectedType] = useState("classic");
+  // Opciones de visualización para popup / barra / exit intent
+  const [display, setDisplay] = useState({ delaySeconds: 5, hideDays: 7 });
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -54,6 +50,7 @@ export default function StepType({ formId, onNext }) {
 
         const data = snap.data();
         setSelectedType(data.type || "classic");
+        if (data.display) setDisplay((d) => ({ ...d, ...data.display }));
         setLoading(false);
       } catch (err) {
         console.error(err);
@@ -78,6 +75,10 @@ export default function StepType({ formId, onNext }) {
       const ref = doc(db, "forms", formId);
       await updateDoc(ref, {
         type: selectedType,
+        display: {
+          delaySeconds: Math.max(0, Number(display.delaySeconds) || 0),
+          hideDays: Math.max(0, Number(display.hideDays) || 0),
+        },
         step: 2,
         updatedAt: serverTimestamp(),
       });
@@ -135,6 +136,29 @@ export default function StepType({ formId, onNext }) {
           </button>
         ))}
       </div>
+
+      {selectedType !== "classic" && (
+        <div className="StepType__options">
+          <h4>Cuándo se muestra</h4>
+          {selectedType === "popup" && (
+            <label>
+              Aparece a los{" "}
+              <input type="number" min="0" value={display.delaySeconds} onChange={(e) => setDisplay({ ...display, delaySeconds: e.target.value })} />{" "}
+              segundos de entrar en la página
+            </label>
+          )}
+          {selectedType === "bar" && <p>La barra se muestra fija en la parte inferior desde que carga la página.</p>}
+          {selectedType === "exit_intent" && (
+            <p>Aparece cuando el visitante mueve el ratón para salir de la página (en móvil, a los 20 segundos de navegar).</p>
+          )}
+          <label>
+            Si lo cierra, no volver a mostrarlo durante{" "}
+            <input type="number" min="0" value={display.hideDays} onChange={(e) => setDisplay({ ...display, hideDays: e.target.value })} />{" "}
+            días
+          </label>
+          <p className="StepType__hint">Quien ya se ha suscrito no lo vuelve a ver.</p>
+        </div>
+      )}
 
       {error && <p className="StepType__error">{error}</p>}
 

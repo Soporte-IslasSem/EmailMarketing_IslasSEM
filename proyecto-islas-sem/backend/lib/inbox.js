@@ -6,6 +6,7 @@ const { db } = require("./firebase");
 const { nextPosStage } = require("./stages");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 const { recordBounce } = require("./reports");
+const { fireWebhook } = require("./webhooks");
 
 function imapConfigured() {
   return process.env.IMAP_HOST && process.env.IMAP_USER && process.env.IMAP_PASSWORD;
@@ -57,7 +58,10 @@ async function handleBounce(b) {
   if (last) await recordBounce(last.campaignId, b.email, b.hard);
   if (b.hard) {
     const subs = await db.collection("subscribers").where("email", "==", b.email).get().catch(() => null);
-    for (const d of subs?.docs || []) await d.ref.update({ status: "bounced", bouncedAt: Date.now() });
+    for (const d of subs?.docs || []) {
+      await d.ref.update({ status: "bounced", bouncedAt: Date.now() });
+      fireWebhook(d.data().listId, "bounce", { email: b.email, subscriberId: d.id, hard: true });
+    }
   }
   return { bounced: true };
 }

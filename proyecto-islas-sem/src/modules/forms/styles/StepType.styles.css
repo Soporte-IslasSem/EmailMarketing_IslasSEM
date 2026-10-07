@@ -142,3 +142,25 @@
   font-weight: 600;
   text-align: center;
 }
+
+/* 🔹 Opciones de visualización (popup / barra / exit intent) */
+.StepType__options {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: #333;
+}
+.StepType__options h4 { margin: 0; font-size: 15px; }
+.StepType__options p { margin: 0; }
+.StepType__options input[type="number"] {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+.StepType__hint { color: #6b7280; font-size: 13px; }
