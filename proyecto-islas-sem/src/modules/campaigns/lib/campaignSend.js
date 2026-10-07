@@ -3,7 +3,7 @@
 // con throttle (respetando el límite diario). Incluye baja (unsubscribe) y pixel de apertura.
 import { db } from "../../../config/firebaseConfig";
 import { collection, doc, writeBatch, updateDoc, serverTimestamp } from "firebase/firestore";
-import { absolutizeUrls } from "../../../utils/emailHtml";
+import { cleanEmailHtml } from "../../../utils/emailHtml";
 
 // Base pública del backend (para links de baja y pixel de tracking). Se configura por entorno.
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || "https://email-marketing.islassem.com/api";
@@ -27,7 +27,7 @@ function trackLinks(html, campaignId, sid) {
 
 // Personaliza + seguimiento de clics + pixel de apertura y pie de baja.
 function personalize(html, { campaignId, sub }) {
-  let out = absolutizeUrls(html || "");
+  let out = cleanEmailHtml(html || "");
   out = out
     .replace(/{{\s*(nombre|name)\s*}}/gi, sub.name || sub.firstName || "")
     .replace(/{{\s*email\s*}}/gi, sub.email || "");
@@ -99,7 +99,7 @@ export async function enqueueTest(orgId, campaign, toEmail) {
       to: toEmail,
       toName: "Prueba",
       subject: `[PRUEBA] ${campaign.config?.subject || ""}`,
-      html: absolutizeUrls(campaign.template?.html || ""),
+      html: cleanEmailHtml(campaign.template?.html || ""),
       kind: "campaign",
       status: "pending",
       isTest: true,

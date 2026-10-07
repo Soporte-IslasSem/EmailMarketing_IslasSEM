@@ -10,6 +10,17 @@ export function absolutizeUrls(html, origin = PUBLIC_ORIGIN) {
   return String(html || "").replace(/\b(src|href)=(["'])\/(?!\/)/gi, `$1=$2${origin}/`);
 }
 
+// Quita lo que solo sirve dentro del editor (el aviso "Arrastra aquí…" de las columnas
+// vacías) para que nunca llegue a la bandeja del cliente.
+export function stripEditorOnly(html) {
+  return String(html || "").replace(/<p\b[^>]*>\s*Arrastra aquí un bloque de contenido\s*<\/p>/gi, "");
+}
+
+// HTML final listo para enviar, previsualizar o descargar.
+export function cleanEmailHtml(html, origin = PUBLIC_ORIGIN) {
+  return absolutizeUrls(stripEditorOnly(html), origin);
+}
+
 // GrapesJS guarda los estilos aparte (reglas "#id{...}" en getCss()) y getHtml() sale sin
 // ellos: así se perdía el diseño al guardar. Aquí se meten como style="" en cada elemento
 // (lo que exigen Gmail/Outlook) y el resto de reglas se conserva en un <style>.
