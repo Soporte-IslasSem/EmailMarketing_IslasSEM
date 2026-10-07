@@ -82,7 +82,7 @@ export default function ListFormularios() {
   const handleBackToLists = () => navigate("/dashboard/lists");
   const handleCreate = () => navigate(`/dashboard/lists/${listId}/formularios/nuevo`);
   const handleEdit = (formId) => navigate(`/dashboard/lists/${listId}/formularios/${formId}`);
-  const handleAssociate = (formId) => navigate(`/dashboard/campaigns?associateForm=${formId}`);
+  const handleAssociate = (formId) => navigate(`/dashboard/forms/${formId}`);
   const handleDeleteLocal = (formId) => setForms((prev) => prev.filter((f) => f.id !== formId));
 
   return (

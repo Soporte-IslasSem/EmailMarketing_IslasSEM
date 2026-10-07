@@ -14,6 +14,7 @@ export default function FormDetail() {
   const [formData, setFormData] = useState(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     const loadForm = async () => {
@@ -52,11 +53,10 @@ export default function FormDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Primer clic pide confirmación en el propio botón; el segundo elimina.
   const handleDelete = async () => {
-    if (!confirm("¿Seguro que deseas eliminar este formulario?")) return;
-
+    if (!confirmDelete) { setConfirmDelete(true); return; }
     await deleteDoc(doc(db, "forms", formId));
-    alert("Formulario eliminado.");
     navigate("/dashboard/forms");
   };
 
@@ -144,8 +144,8 @@ export default function FormDetail() {
           Editar formulario
         </button>
 
-        <button className="FormDetail__deleteButton" onClick={handleDelete}>
-          Eliminar
+        <button className="FormDetail__deleteButton" onClick={handleDelete} onMouseLeave={() => setConfirmDelete(false)}>
+          {confirmDelete ? "¿Seguro? Pulsa otra vez para eliminar" : "Eliminar"}
         </button>
       </div>
     </div>

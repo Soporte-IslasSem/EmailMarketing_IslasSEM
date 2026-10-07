@@ -49,7 +49,7 @@ export default function FormActionsMenu({ formId, onEdit, onDelete, onAssociate 
             Eliminar formulario
           </li>
           <li onClick={() => { setOpen(false); onAssociate(formId); }}>
-            Asociar a campañas
+            Obtener código para tu web
           </li>
         </ul>
       )}

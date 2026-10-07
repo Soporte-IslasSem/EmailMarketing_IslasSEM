@@ -68,11 +68,11 @@ export default function StepIntegrate({ formId, onBack }) {
         status: "created",
         updatedAt: serverTimestamp(),
       });
-      alert("Formulario creado correctamente.");
-      window.location.href = "/dashboard/forms";
+      // Directo a la ficha del formulario, donde está su código listo para copiar.
+      window.location.href = `/dashboard/forms/${formId}`;
     } catch (err) {
       console.error(err);
-      alert("Error al crear el formulario.");
+      setError("No se pudo crear el formulario. Inténtalo de nuevo.");
     }
   };
 
