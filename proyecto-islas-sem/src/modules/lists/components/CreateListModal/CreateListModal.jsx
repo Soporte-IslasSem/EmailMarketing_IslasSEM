@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SENDER_EMAIL } from "../../../../config/sender";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "../../../../config/firebaseConfig";
 import { useAuth } from "../../../../shared/hooks/useAuth";
@@ -10,7 +11,7 @@ export default function CreateListModal({ onClose }) {
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
-  const [senderEmail, setSenderEmail] = useState(user?.email || "");
+  const senderEmail = SENDER_EMAIL;
   const [language, setLanguage] = useState("es");
 
   const handleSubmit = async (e) => {
@@ -62,8 +63,8 @@ export default function CreateListModal({ onClose }) {
               className="ModalInput"
               type="email"
               value={senderEmail}
-              onChange={(e) => setSenderEmail(e.target.value)}
-              required
+              readOnly
+              disabled
             />
           </div>
 

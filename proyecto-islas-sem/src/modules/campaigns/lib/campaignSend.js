@@ -46,6 +46,8 @@ export async function enqueueCampaign(orgId, campaignId, campaign, subscribers, 
   const recipients = subscribers.filter(emailable);
   const skipped = subscribers.length - recipients.length;
   const subject = campaign.config?.subject || "(sin asunto)";
+  // La dirección la fija el servidor (cuenta SMTP); el nombre visible sí es de cada campaña.
+  const fromName = String(campaign.config?.senderName || "").trim().slice(0, 80);
   const baseHtml = campaign.template?.html || "";
 
   let enqueued = 0;
@@ -58,6 +60,7 @@ export async function enqueueCampaign(orgId, campaignId, campaign, subscribers, 
         to: sub.email,
         toName: sub.name || "",
         subject,
+        fromName,
         html: personalize(baseHtml, { campaignId, sub }),
         kind: "campaign",
         status: scheduled ? "scheduled" : "pending",
@@ -99,6 +102,7 @@ export async function enqueueTest(orgId, campaign, toEmail) {
       to: toEmail,
       toName: "Prueba",
       subject: `[PRUEBA] ${campaign.config?.subject || ""}`,
+      fromName: String(campaign.config?.senderName || "").trim().slice(0, 80),
       html: cleanEmailHtml(campaign.template?.html || ""),
       kind: "campaign",
       status: "pending",

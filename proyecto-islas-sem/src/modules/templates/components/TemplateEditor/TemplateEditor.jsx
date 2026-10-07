@@ -14,6 +14,7 @@ import { CONTENT_BLOCKS, ROW_BLOCKS, BLANK_TEMPLATE } from "./editorBlocks";
 import SimpleSettings from "./SimpleSettings";
 import { closestRow, kindOf } from "./editorUtils";
 import es from "grapesjs/locale/es";
+import { SENDER_EMAIL } from "../../../../config/sender";
 
 const KIND_LABEL = { text: "Texto", button: "Botón", image: "Imagen", row: "Fila" };
 
@@ -397,7 +398,7 @@ export default function TemplateEditor() {
         config: {
           campaignName: templateName,
           subject: `Campaña basada en ${templateName}`,
-          senderEmail: "no-reply@islassem.com",
+          senderEmail: SENDER_EMAIL,
           design: { html },
         },
         template: { templateId: id, templateName, html },

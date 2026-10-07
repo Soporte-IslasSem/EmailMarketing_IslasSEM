@@ -70,7 +70,7 @@ export default function Integrations() {
           <p style={{ fontSize: 13, color: "var(--crm-muted)", marginBottom: 12 }}>Reduce gradualmente el uso de correos fuera del CRM.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span className="crm-chip info">comercio@islassem.com</span>
-            <span className="crm-chip info">marketing@islassem.com</span>
+            <span className="crm-chip info">grupo@islassem.com</span>
           </div>
         </div>
       </div>

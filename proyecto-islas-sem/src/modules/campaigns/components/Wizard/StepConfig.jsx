@@ -1,4 +1,5 @@
 import "./StepConfig.styles.css";
+import { SENDER_EMAIL } from "../../../../config/sender";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import WizardSteps from "./WizardSteps";
@@ -18,7 +19,7 @@ export default function StepConfig() {
   const [form, setForm] = useState({
     name: "",
     subject: "",
-    senderEmail: user?.email || "",
+    senderEmail: SENDER_EMAIL,
     senderName: "",
     preheader: "",
   });
@@ -32,7 +33,7 @@ export default function StepConfig() {
         setForm({
           name: data.config.campaignName || "",
           subject: data.config.subject || "",
-          senderEmail: data.config.senderEmail || user?.email || "",
+          senderEmail: SENDER_EMAIL,
           senderName: data.config.senderName || "",
           preheader: data.config.preheader || "",
         });
@@ -62,7 +63,7 @@ export default function StepConfig() {
       config: {
         campaignName: form.name,
         subject: form.subject,
-        senderEmail: form.senderEmail,
+        senderEmail: SENDER_EMAIL,
         senderName: form.senderName,
         preheader: form.preheader,
         createdAt: new Date(),
@@ -105,7 +106,7 @@ export default function StepConfig() {
       config: {
         campaignName: form.name,
         subject: form.subject,
-        senderEmail: form.senderEmail,
+        senderEmail: SENDER_EMAIL,
         senderName: form.senderName,
         preheader: form.preheader,
         createdAt: new Date(),
@@ -167,12 +168,8 @@ export default function StepConfig() {
 
         <label>
           Email del remitente
-          <input
-            type="email"
-            name="senderEmail"
-            value={form.senderEmail}
-            onChange={handleChange}
-          />
+          <input type="email" name="senderEmail" value={SENDER_EMAIL} readOnly disabled />
+          <small style={{ color: "#6c7a7f" }}>Todos los envíos salen desde esta cuenta; las respuestas llegan a su bandeja.</small>
         </label>
 
         <label>

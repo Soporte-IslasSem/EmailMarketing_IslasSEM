@@ -113,7 +113,7 @@ async function drainOutbox() {
       const attachments = await buildAttachments(item);
       // Message-ID determinista por envío: permite emparejar la respuesta por hilo.
       const messageId = `<obx-${d.id}@${mailDomain()}>`;
-      const { messageId: sentId } = await sendMail({ to: item.to, subject: item.subject, html: item.html, text: item.text, attachments, messageId, unsubscribeUrl: item.unsubscribeUrl });
+      const { messageId: sentId } = await sendMail({ to: item.to, fromName: item.fromName, subject: item.subject, html: item.html, text: item.text, attachments, messageId, unsubscribeUrl: item.unsubscribeUrl });
       await d.ref.update({ status: "sent", sentAt: Date.now(), attempts: (item.attempts || 0) + 1, error: "", messageId: sentId });
       today++;
       // En ofertas, guarda el messageId en la negociación (respaldo para emparejar respuestas).

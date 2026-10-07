@@ -24,9 +24,13 @@ function mailDomain() {
 }
 
 // Envía un correo. Devuelve { messageId } para poder emparejar respuestas por hilo.
-// opts: { to, subject, html, text, attachments, messageId, replyTo, references, unsubscribeUrl }
+// opts: { to, fromName, subject, html, text, attachments, messageId, replyTo, references, unsubscribeUrl }
 async function sendMail(opts) {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  // Nombre visible por correo (p. ej. el de la campaña); la dirección siempre es la de la cuenta.
+  const base = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const address = (String(base).match(/<([^>]+)>/) || [])[1] || String(base).trim();
+  const name = String(opts.fromName || "").replace(/["<>]/g, "").replace(/\s+/g, " ").trim();
+  const from = name ? { name, address } : base;
   const messageId = opts.messageId || `<${Date.now()}.${Math.random().toString(36).slice(2)}@${mailDomain()}>`;
   await getTransporter().sendMail({
     from,
