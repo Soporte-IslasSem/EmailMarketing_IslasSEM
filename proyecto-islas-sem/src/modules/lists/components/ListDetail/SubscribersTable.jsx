@@ -8,6 +8,13 @@ import {
 import { db, auth } from "../../../../config/firebaseConfig";
 import "./SubscribersTable.styles.css";
 
+
+const STATUS_LABEL = {
+  subscribed: "Suscrito",
+  unsubscribed: "Dado de baja",
+  bounced: "Rebotado",
+  invalid: "No válido",
+};
 export default function SubscribersTable({ listId }) {
   const [subscribers, setSubscribers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +89,7 @@ export default function SubscribersTable({ listId }) {
           {currentItems.map((sub) => (
             <tr key={sub.id}>
               <td>{sub.email}</td>
-              <td>{sub.status}</td>
+              <td>{STATUS_LABEL[sub.status] || sub.status}</td>
               <td>
                 {sub.createdAt?.toDate
                   ? sub.createdAt.toDate().toLocaleString()

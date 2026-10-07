@@ -12,7 +12,7 @@ const BATCH = 400; // Firestore admite 500 escrituras/lote; dejamos margen.
 // ¿Este suscriptor puede recibir? (no dado de baja, no rebotado, con email)
 const emailable = (s) => {
   const st = String(s.status || "").toLowerCase();
-  return !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked"].includes(st);
+  return !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid"].includes(st);
 };
 
 // Enlaces http(s) de la campaña → pasan por /api/c para contar el clic y luego redirigen.

@@ -35,7 +35,7 @@ async function stepHtml(step) {
   return step.html || "";
 }
 
-const emailable = (s) => !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked"].includes(String(s.status || "").toLowerCase());
+const emailable = (s) => !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid"].includes(String(s.status || "").toLowerCase());
 
 // 1) Inscribe a los suscriptores nuevos de la lista disparadora.
 async function enrollNew(auto) {
