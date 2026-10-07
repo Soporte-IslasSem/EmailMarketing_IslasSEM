@@ -3,6 +3,7 @@ import grapesjs from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
 import "grapesjs-preset-newsletter";
 
+import { inlineEditorHtml } from "../../../../utils/emailHtml";
 export default function Editor({ html, onChange }) {
   const editorRef = useRef(null);
   const containerRef = useRef(null);
@@ -28,7 +29,7 @@ export default function Editor({ html, onChange }) {
 
     // Detectar cambios
     editor.on("update", () => {
-      const newHtml = editor.getHtml();
+      const newHtml = inlineEditorHtml(editor);
       onChange(newHtml);
     });
 

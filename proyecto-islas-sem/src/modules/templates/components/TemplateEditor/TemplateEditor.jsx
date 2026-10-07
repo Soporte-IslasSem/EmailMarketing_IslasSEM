@@ -12,6 +12,7 @@ import "./TemplateEditor.styles.css";
 // 🔥 IMPORTANTE: Necesitamos el usuario autenticado
 import { useAuth } from "../../../../shared/hooks/useAuth";
 
+import { inlineEditorHtml } from "../../../../utils/emailHtml";
 export default function TemplateEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -161,7 +162,7 @@ export default function TemplateEditor() {
 
     // Guardar HTML en Firestore
     editor.on("update", async () => {
-      const html = editor.getHtml();
+      const html = inlineEditorHtml(editor);
       const refDoc = doc(db, "templates", id);
       await updateDoc(refDoc, { html });
     });
@@ -242,7 +243,7 @@ export default function TemplateEditor() {
     if (!editorInstance.current) return;
 
     try {
-      const html = editorInstance.current.getHtml();
+      const html = inlineEditorHtml(editorInstance.current);
       const refDoc = doc(db, "templates", id);
       const snap = await getDoc(refDoc);
 
