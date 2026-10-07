@@ -2,7 +2,8 @@ import { useState } from "react";
 import "./ModalBase.css";
 
 export default function CreateFromSystemTemplateModal({ template, onClose, onConfirm }) {
-  const [name, setName] = useState(""); // 🔹 empieza vacío
+  // Se propone el nombre del diseño: basta con pulsar Continuar (o Enter).
+  const [name, setName] = useState(template?.title || "");
 
   return (
     <div className="ModalBase">
@@ -24,6 +25,9 @@ export default function CreateFromSystemTemplateModal({ template, onClose, onCon
           placeholder="Escribe el nombre de tu plantilla"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onConfirm(name.trim()); }}
+          autoFocus
+          onFocus={(e) => e.target.select()}
         />
 
         {/* ACCIONES */}

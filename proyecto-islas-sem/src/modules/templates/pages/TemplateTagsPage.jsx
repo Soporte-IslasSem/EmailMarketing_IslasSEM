@@ -1,14 +1,13 @@
 import TemplateTagsList from "../components/Templates/TemplateTagsList";
+import TemplatesTabs from "../components/Templates/TemplatesTabs";
+import useTemplates from "../hooks/useTemplates";
 import "./TemplateTagsPage.styles.css";
 
 export default function TemplateTagsPage() {
+  const { templates } = useTemplates();
   return (
     <div className="TemplateTagsPage">
-      <h1>Etiquetas</h1>
-      <p className="TemplateTagsPage__subtitle">
-        Desde aquí podrás crear, editar, duplicar o eliminar tus etiquetas.
-      </p>
-
+      <TemplatesTabs active="etiquetas" mineCount={templates.length} />
       <TemplateTagsList />
     </div>
   );

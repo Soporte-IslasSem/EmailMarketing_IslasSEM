@@ -45,7 +45,7 @@ export default function useTemplates() {
   const createTemplate = async (data) => {
     if (!user) return;
 
-    await addDoc(collection(db, "templates"), {
+    const docRef = await addDoc(collection(db, "templates"), {
       ...data,
       userId: user.uid,
       createdAt: new Date(),
@@ -54,6 +54,7 @@ export default function useTemplates() {
       thumbnail: "/placeholder-template.png",
       type: "html",
     });
+    return docRef.id;
   };
 
   // ================================

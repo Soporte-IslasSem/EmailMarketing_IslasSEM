@@ -1,0 +1,32 @@
+.TemplateThumb {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #f4f6f7;
+  border-bottom: 1px solid #ececec;
+}
+
+.TemplateThumb iframe {
+  border: 0;
+  display: block;
+  transform-origin: 0 0;
+  pointer-events: none;
+  background: #fff;
+}
+
+.TemplateThumb--clickable { cursor: zoom-in; }
+
+.TemplateThumb__hover {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 38, 43, 0.45);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.TemplateThumb--clickable:hover .TemplateThumb__hover { opacity: 1; }

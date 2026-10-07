@@ -22,6 +22,12 @@ export default function TemplateActionsMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Cierra el menú al elegir una opción.
+  const act = (fn) => () => {
+    setOpen(false);
+    fn?.();
+  };
+
   const handleToggle = () => {
     setOpen((prev) => !prev);
   };
@@ -37,13 +43,13 @@ export default function TemplateActionsMenu({
 
       {open && (
         <div className="TemplateActionsMenu__dropdown TemplateActionsMenu__dropdown--top-right">
-          <button onClick={onUpdateThumbnail}>Actualizar miniatura</button>
-          <button onClick={onDuplicate}>Duplicar plantilla</button>
-          <button onClick={onRename}>Renombrar plantilla</button>
-          <button onClick={onDelete} className="danger">Eliminar plantilla</button>
+          <button onClick={act(onUpdateThumbnail)}>Actualizar miniatura</button>
+          <button onClick={act(onDuplicate)}>Duplicar plantilla</button>
+          <button onClick={act(onRename)}>Renombrar plantilla</button>
+          <button onClick={act(onDelete)} className="danger">Eliminar plantilla</button>
           <hr />
-          <button onClick={onAssignTags}>Asignar etiquetas</button>
-          <button onClick={onRemoveTags}>Eliminar etiquetas</button>
+          <button onClick={act(onAssignTags)}>Asignar etiquetas</button>
+          <button onClick={act(onRemoveTags)}>Eliminar etiquetas</button>
         </div>
       )}
     </div>
