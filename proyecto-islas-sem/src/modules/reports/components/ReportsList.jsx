@@ -1,4 +1,5 @@
 import "./ReportsList.styles.css";
+import { reportMetrics } from "../reportMetrics";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 
@@ -55,9 +56,9 @@ export default function ReportsList() {
     return () => unsubscribe();
   }, [user]);
 
-  const filtered = reports.filter((r) =>
-    r.campaignName?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = reports
+    .filter((r) => (r.campaignName || "").toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (b.sentAt?.seconds || b.lastSentAt?.seconds || 0) - (a.sentAt?.seconds || a.lastSentAt?.seconds || 0));
 
   const toggleSelect = (id) => {
     setSelected((prev) =>
@@ -76,9 +77,15 @@ export default function ReportsList() {
   // DESCARGAR INFORME GLOBAL
   // ----------------------------------------------------
   const handleDownloadGlobal = () => {
-    if (!filtered.length || !logoBase64) return;
+    // Si hay informes marcados, el global se hace solo con esos.
+    const pool = selected.length ? filtered.filter((r) => selected.includes(r.id)) : filtered;
+    if (!pool.length || !logoBase64) return;
 
-    const totalSent = filtered.reduce((acc, r) => acc + (r.totalRecipients || 0), 0);
+    const sum = pool.map(reportMetrics).reduce(
+      (a, m) => ({ sent: a.sent + m.sent, opened: a.opened + m.opened, clicked: a.clicked + m.clicked }),
+      { sent: 0, opened: 0, clicked: 0 }
+    );
+    const totalSent = sum.sent;
 
     const docDefinition = {
       footer: {
@@ -110,9 +117,23 @@ export default function ReportsList() {
         {
           columns: [
             { text: `Enviados: ${totalSent}`, style: "stat" },
-            { text: `Abiertos: 0`, style: "stat" },
-            { text: `Clics: 0`, style: "stat" },
+            { text: `Abiertos: ${sum.opened}`, style: "stat" },
+            { text: `Clics: ${sum.clicked}`, style: "stat" },
           ],
+        },
+        {
+          margin: [0, 20, 0, 0],
+          table: {
+            headerRows: 1,
+            widths: ["*", "auto", "auto", "auto"],
+            body: [
+              ["Campaña", "Enviados", "Abiertos", "Clics"],
+              ...pool.map((r) => {
+                const m = reportMetrics(r);
+                return [r.campaignName || "—", String(m.sent), `${m.opened} (${m.openRate}%)`, `${m.clicked} (${m.clickRate}%)`];
+              }),
+            ],
+          },
         },
       ],
       styles: {
@@ -129,6 +150,7 @@ export default function ReportsList() {
   // ----------------------------------------------------
   const handleDownloadIndividual = (report) => {
     if (!logoBase64) return;
+    const m = reportMetrics(report);
 
     const docDefinition = {
       footer: {
@@ -160,9 +182,9 @@ export default function ReportsList() {
         { text: `Fecha: ${formatDate(report.sentAt)}`, margin: [0, 0, 0, 20] },
         {
           columns: [
-            { text: `Enviados: ${report.totalRecipients || 0}`, style: "stat" },
-            { text: `Abiertos: 0`, style: "stat" },
-            { text: `Clics: 0`, style: "stat" },
+            { text: `Enviados: ${m.sent}`, style: "stat" },
+            { text: `Abiertos: ${m.opened} (${m.openRate}%)`, style: "stat" },
+            { text: `Clics: ${m.clicked} (${m.clickRate}%)`, style: "stat" },
           ],
         },
       ],
@@ -198,7 +220,7 @@ export default function ReportsList() {
           className="CampaignReports__download"
           onClick={handleDownloadGlobal}
         >
-          Descargar informe global
+          {selected.length ? `Descargar informe (${selected.length})` : "Descargar informe global"}
         </button>
       </div>
 
@@ -222,7 +244,9 @@ export default function ReportsList() {
           </thead>
 
           <tbody>
-            {filtered.map((r) => (
+            {filtered.map((r) => {
+              const m = reportMetrics(r);
+              return (
               <tr key={r.id}>
                 <td>
                   <input
@@ -240,9 +264,9 @@ export default function ReportsList() {
 
                 <td>{formatDate(r.sentAt)}</td>
 
-                <td>{r.totalRecipients || 0}</td>
-                <td>0</td>
-                <td>0</td>
+                <td>{m.sent}</td>
+                <td>{m.opened} <small className="CampaignReports__pct">{m.openRate}%</small></td>
+                <td>{m.clicked} <small className="CampaignReports__pct">{m.clickRate}%</small></td>
 
                 <td>
                   <button
@@ -253,7 +277,8 @@ export default function ReportsList() {
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       )}

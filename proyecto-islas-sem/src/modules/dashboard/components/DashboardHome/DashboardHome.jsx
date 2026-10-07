@@ -1,13 +1,34 @@
 import "./DashboardHome.styles.css";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "../../../../config/firebaseConfig";
+import { useAuth } from "../../../../shared/hooks/useAuth";
 import CallReservationModal from "../modals/CallReservationModal";
 import { useCrmCollection } from "../../../crm/lib/crm";
+import { reportMetrics } from "../../../reports/reportMetrics";
+
+// Suscriptores activos e informes de campañas del usuario, en tiempo real.
+function useEmailStats() {
+  const { user } = useAuth();
+  const [subs, setSubs] = useState([]);
+  const [reports, setReports] = useState([]);
+  useEffect(() => {
+    if (!user) return undefined;
+    const u1 = onSnapshot(query(collection(db, "subscribers"), where("userId", "==", user.uid)), (s) => setSubs(s.docs.map((d) => d.data())), () => setSubs([]));
+    const u2 = onSnapshot(query(collection(db, "reports"), where("ownerId", "==", user.uid)), (s) => setReports(s.docs.map((d) => d.data())), () => setReports([]));
+    return () => { u1(); u2(); };
+  }, [user]);
+  const active = subs.filter((s) => !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid", "pending"].includes(String(s.status || "").toLowerCase())).length;
+  const totals = reports.map(reportMetrics).reduce((a, m) => ({ sent: a.sent + m.sent, opened: a.opened + m.opened, clicked: a.clicked + m.clicked }), { sent: 0, opened: 0, clicked: 0 });
+  const rate = (n) => (totals.sent ? `${Math.round((n / totals.sent) * 1000) / 10}%` : "—");
+  return { subscribers: active, campaigns: reports.length, openRate: rate(totals.opened), clickRate: rate(totals.clicked) };
+}
 
 export default function DashboardHome() {
   const [showCallModal, setShowCallModal] = useState(false);
   const { items: contacts } = useCrmCollection("contacts");
-  const { items: leads } = useCrmCollection("leads");
+  const stats = useEmailStats();
 
   return (
     <div className="DashboardHome">
@@ -24,12 +45,20 @@ export default function DashboardHome() {
           <span className="DashboardHome__statValue">{contacts.length}</span>
         </div>
         <div className="DashboardHome__statTile">
-          <span className="DashboardHome__statLabel">Suscriptores</span>
-          <span className="DashboardHome__statValue">{leads.length}</span>
+          <span className="DashboardHome__statLabel">Suscriptores activos</span>
+          <span className="DashboardHome__statValue">{stats.subscribers}</span>
         </div>
         <div className="DashboardHome__statTile">
           <span className="DashboardHome__statLabel">Campañas enviadas</span>
-          <span className="DashboardHome__statValue">0</span>
+          <span className="DashboardHome__statValue">{stats.campaigns}</span>
+        </div>
+        <div className="DashboardHome__statTile">
+          <span className="DashboardHome__statLabel">Tasa de apertura</span>
+          <span className="DashboardHome__statValue">{stats.openRate}</span>
+        </div>
+        <div className="DashboardHome__statTile">
+          <span className="DashboardHome__statLabel">Tasa de clics</span>
+          <span className="DashboardHome__statValue">{stats.clickRate}</span>
         </div>
       </div>
 
