@@ -161,7 +161,7 @@ bxContacts.forEach((c) => {
     email: first(c.EMAIL).toLowerCase(), phone: first(c.PHONE), whatsapp: "",
     otherEmails: all((c.EMAIL || []).slice(1)), otherPhones: all((c.PHONE || []).slice(1)), website: first(c.WEB),
     company: companyName[String(c.COMPANY_ID)] || "", companyId: nz(c.COMPANY_ID) ? id("company", c.COMPANY_ID) : "",
-    role: c.POST || "", clientType: c.TYPE_ID === "CLIENT" ? "recurrente" : "nuevo", stage: "Cliente",
+    role: c.POST || "", clientType: c.TYPE_ID === "CLIENT" ? "recurrente" : "", stage: "Cliente",
     dni: req.RQ_IDENT_DOC_NUM || "", address: addr.txt || "", city: addr.city || "", province: addr.province || "",
     notes: htmlToText(c.COMMENTS), source: source(c.SOURCE_ID), responsable: "", tags: [], custom, bitrixExtra: extra,
     bitrixId: c.ID, createdAt: date(c.DATE_CREATE),
