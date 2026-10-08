@@ -1,37 +1,61 @@
-// Inicio › "Tus tareas de hoy": vencidas + las de hoy (incluidas las citas de Google
-// Calendar), según lo que ve cada persona (las suyas y las de sus equipos; todas si es
-// administrador).
-import { useMemo } from "react";
+// Inicio › "Tus tareas de hoy": aviso para conectar Google Calendar, agenda del día por
+// horas (tareas con hora y citas de Google) y lista de vencidas / sin hora. Cada persona
+// ve las suyas y las de sus equipos; el administrador también las sin asignar.
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCrmCollection, crmUpdate } from "../../../crm/lib/crm";
-import { useTaskScope, assigneeLabel, todayYMD, byWhen } from "../../../crm/lib/tasks";
+import { useTaskScope, useGoogleStatus, googleApi, assigneeLabel, todayYMD, byWhen } from "../../../crm/lib/tasks";
+
+const hourOf = (t) => Number(String(t || "").slice(0, 2));
 
 export default function TodayTasks() {
   const { items, loading } = useCrmCollection("activities");
   const scope = useTaskScope();
+  const [google] = useGoogleStatus();
+  const [connecting, setConnecting] = useState(false);
+  const [err, setErr] = useState("");
   const today = todayYMD();
 
-  const { overdue, todays } = useMemo(() => {
-    // En el Inicio el administrador ve las suyas + las sin asignar; el resto, las suyas.
+  const { overdue, timed, untimed } = useMemo(() => {
     const mine = items.filter((a) => !a.done && a.dueDate && (scope.isMine(a) || (scope.isAdmin && !a.assigneeType && !a.assignee)));
+    const todays = mine.filter((a) => a.dueDate === today).sort(byWhen);
     return {
       overdue: mine.filter((a) => a.dueDate < today).sort(byWhen),
-      todays: mine.filter((a) => a.dueDate === today).sort(byWhen),
+      timed: todays.filter((a) => /^\d{2}:\d{2}$/.test(a.dueTime || "")),
+      untimed: todays.filter((a) => !/^\d{2}:\d{2}$/.test(a.dueTime || "")),
     };
   }, [items, scope, today]);
 
-  const row = (a, late) => (
-    <li key={a.id} className="TodayTasks__item">
+  // Horas de la agenda: de 8 a 19 como mínimo, ampliando si hay citas antes o después.
+  const hours = useMemo(() => {
+    const hs = timed.map((a) => hourOf(a.dueTime));
+    const from = Math.min(8, ...hs);
+    const to = Math.max(19, ...hs);
+    return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  }, [timed]);
+  const nowH = new Date().getHours();
+
+  const connect = async () => {
+    setConnecting(true); setErr("");
+    try { const { url } = await googleApi("connect", { method: "POST" }); window.location.href = url; }
+    catch (e) { setErr(e.message); setConnecting(false); }
+  };
+
+  const Item = ({ a, late }) => (
+    <div className="TodayTasks__item">
       <input type="checkbox" checked={false} onChange={() => crmUpdate("activities", a.id, { done: true })} title="Marcar como hecha" />
-      <span className="TodayTasks__time">{late ? a.dueDate.slice(5).split("-").reverse().join("/") : a.dueTime || "Hoy"}</span>
+      {late && <span className="TodayTasks__time">{a.dueDate.slice(5).split("-").reverse().join("/")}</span>}
+      {!late && a.dueTime && <span className="TodayTasks__time">{a.dueTime}{a.endTime ? `–${a.endTime}` : ""}</span>}
       <span className="TodayTasks__title">
         {a.source === "google" ? "📅 " : ""}{a.title}
         {(a.attendees || []).length > 0 && <small> · {a.attendees.map((g) => g.name || g.email).join(", ")}</small>}
       </span>
       {a.meetLink && <a className="TodayTasks__meet" href={a.meetLink} target="_blank" rel="noreferrer">Meet</a>}
       {(a.assigneeType || a.assignee) && <span className="TodayTasks__who">{assigneeLabel(a)}</span>}
-    </li>
+    </div>
   );
+
+  const showConnect = google && !google.error && google.configured && !google.connected;
 
   return (
     <div className="TodayTasks">
@@ -39,26 +63,46 @@ export default function TodayTasks() {
         <h3>Tus tareas de hoy</h3>
         <Link to="/dashboard/tasks">Ver todas →</Link>
       </div>
+
+      {showConnect && (
+        <div className="TodayTasks__connect">
+          <span>📅 Conecta Google Calendar para ver aquí las citas que reserva la gente.</span>
+          {google.isAdmin
+            ? <button onClick={connect} disabled={connecting}>{connecting ? "Abriendo Google…" : "Conectar Google Calendar"}</button>
+            : <small>Pídeselo a un administrador.</small>}
+          {err && <small className="TodayTasks__err">{err}</small>}
+        </div>
+      )}
+
       {loading ? (
         <p className="TodayTasks__empty">Cargando…</p>
-      ) : !overdue.length && !todays.length ? (
-        <p className="TodayTasks__empty">No tienes tareas para hoy. 🎉</p>
       ) : (
-        <>
-          {overdue.length > 0 && (
-            <>
-              <div className="TodayTasks__label TodayTasks__label--late">Vencidas ({overdue.length})</div>
-              <ul>{overdue.slice(0, 5).map((a) => row(a, true))}</ul>
-              {overdue.length > 5 && <Link className="TodayTasks__more" to="/dashboard/tasks">y {overdue.length - 5} más…</Link>}
-            </>
-          )}
-          {todays.length > 0 && (
-            <>
-              <div className="TodayTasks__label">Hoy ({todays.length})</div>
-              <ul>{todays.map((a) => row(a, false))}</ul>
-            </>
-          )}
-        </>
+        <div className="TodayTasks__cols">
+          <div className="TodayTasks__agenda">
+            <div className="TodayTasks__label">Agenda de hoy</div>
+            {hours.map((h) => {
+              const at = timed.filter((a) => hourOf(a.dueTime) === h);
+              return (
+                <div key={h} className={`TodayTasks__hour ${h === nowH ? "now" : ""}`}>
+                  <span className="TodayTasks__hh">{String(h).padStart(2, "0")}:00</span>
+                  <div className="TodayTasks__slot">{at.map((a) => <Item key={a.id} a={a} />)}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="TodayTasks__side">
+            {overdue.length > 0 && (
+              <>
+                <div className="TodayTasks__label TodayTasks__label--late">Vencidas ({overdue.length})</div>
+                {overdue.slice(0, 6).map((a) => <Item key={a.id} a={a} late />)}
+                {overdue.length > 6 && <Link className="TodayTasks__more" to="/dashboard/tasks">y {overdue.length - 6} más…</Link>}
+              </>
+            )}
+            <div className="TodayTasks__label">Hoy sin hora ({untimed.length})</div>
+            {untimed.length ? untimed.map((a) => <Item key={a.id} a={a} />) : <p className="TodayTasks__empty">Nada pendiente sin hora.</p>}
+            {!overdue.length && !timed.length && !untimed.length && <p className="TodayTasks__empty">No tienes tareas para hoy. 🎉</p>}
+          </div>
+        </div>
       )}
     </div>
   );
