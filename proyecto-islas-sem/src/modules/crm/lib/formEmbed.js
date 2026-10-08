@@ -15,7 +15,10 @@ export const EMBED_MODES = [
 
 export function buildFormEmbed(base, formId, mode = "inline", { delaySeconds = 5, hideDays = 7 } = {}) {
   const src = `${base}/f/${formId}?embed=1`;
-  const id = `islassem-form-${formId}`;
+  // Identificadores distintos por modo: en una misma web pueden convivir el incrustado y
+  // el popup. La memoria ("ya enviado" / "cerrado") es común a todos los modos.
+  const id = `islassem-form-${formId}-${mode}`;
+  const store = `islassem-form-${formId}`;
   if (mode === "inline") {
     return `<!-- Formulario ISLAS SEM -->
 <iframe id="${id}" src="${src}" title="Formulario" loading="lazy" style="width:100%;max-width:520px;height:640px;border:0;display:block;margin:0 auto"></iframe>
@@ -31,13 +34,13 @@ window.addEventListener("message", function (e) {
   return `<!-- Formulario ISLAS SEM (${mode === "bar" ? "barra inferior" : mode === "popup" ? "popup" : "exit intent"}): pegar antes de </body> -->
 <script>
 (function () {
-  var KEY = ${JSON.stringify(id)}, MODE = ${JSON.stringify(mode)};
+  var KEY = ${JSON.stringify(id)}, STORE = ${JSON.stringify(store)}, MODE = ${JSON.stringify(mode)};
   try {
-    var st = JSON.parse(localStorage.getItem(KEY) || "{}");
+    var st = JSON.parse(localStorage.getItem(STORE) || "{}");
     if (st.done) return;
     if (st.closedAt && Date.now() - st.closedAt < ${days} * 86400000) return;
   } catch (e) {}
-  function save(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} }
+  function save(v) { try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) {} }
   function build() {
     if (document.getElementById(KEY)) return;
     var bar = MODE === "bar";

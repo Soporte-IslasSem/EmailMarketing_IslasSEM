@@ -82,9 +82,11 @@ export default function PublicForm() {
   // En modo incrustado, avisa a la web de su altura para que el <iframe> se ajuste.
   useEffect(() => {
     if (!EMBED || typeof ResizeObserver === "undefined") return undefined;
-    const post = () => toParent({ type: "form-height", h: Math.ceil(document.documentElement.scrollHeight) });
+    // Alto del contenido (no de la ventana del iframe, que nunca encogería).
+    const root = document.getElementById("root") || document.body;
+    const post = () => toParent({ type: "form-height", h: Math.ceil(root.getBoundingClientRect().height) + 4 });
     const ro = new ResizeObserver(post);
-    ro.observe(document.body);
+    ro.observe(root);
     post();
     return () => ro.disconnect();
   }, []);
@@ -243,7 +245,7 @@ function PrivacyModal({ onAccept, onReject }) {
 function Shell({ children, bg = "#fff" }) {
   return (
     <div style={EMBED ? { background: "transparent", padding: 0 } : { minHeight: "100vh", background: "#eef3f3", padding: "32px 16px", boxSizing: "border-box" }}>
-      <style>{`.pf-card input::placeholder,.pf-card select:invalid{color:#8fbfbf}`}</style>
+      <style>{`.pf-card input::placeholder,.pf-card select:invalid{color:#8fbfbf}${EMBED ? "html,body{background:transparent}.grecaptcha-badge{visibility:hidden}" : ""}`}</style>
       <div className="pf-card" style={{ maxWidth: 470, margin: "0 auto", background: bg, borderRadius: 14, padding: "28px 26px 24px", boxShadow: EMBED ? "none" : "0 6px 24px rgba(0,0,0,.08)" }}>
         {children}
       </div>
