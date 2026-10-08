@@ -6,6 +6,7 @@
 //
 //   node scripts/import-bitrix.js <carpeta_data>                → SIMULACRO (no escribe)
 //   node scripts/import-bitrix.js <carpeta_data> --apply        → escribe en Firestore
+//   --only=contacts,companies    → solo esas colecciones (y sus campos personalizados)
 //
 // Embudos: los decide ISLAS SEM. El simulacro genera `bitrix-pipeline-map.json` junto a
 // los datos con cada embudo/etapa de Bitrix; rellena `pipelineId` y `stage` con los del
@@ -20,6 +21,7 @@ const path = require("path");
 
 const DATA = process.argv[2];
 const APPLY = process.argv.includes("--apply");
+const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7).split(",").filter(Boolean);
 const ORG = "islas-sem";
 if (!DATA || !fs.existsSync(DATA)) {
   console.error("Uso: node scripts/import-bitrix.js <carpeta data de la exportación> [--apply]");
@@ -243,15 +245,20 @@ bxActivities.forEach((a) => {
 });
 
 out.customFields = customDefs;
+// --only: deja solo las colecciones pedidas (y los campos personalizados de esas entidades).
+if (ONLY.length) {
+  for (const k of Object.keys(out)) if (k !== "customFields" && !ONLY.includes(k)) delete out[k];
+  out.customFields = customDefs.filter((d) => ONLY.includes(d.entity));
+}
 
 /* ---------- informe ---------- */
 fs.writeFileSync(mapPath, JSON.stringify(stageTemplate, null, 2));
-const withoutPipe = out.deals.filter((d) => !d.pipelineId).length;
+const withoutPipe = (out.deals || []).filter((d) => !d.pipelineId).length;
 console.log(APPLY ? "== IMPORTACIÓN REAL ==" : "== SIMULACRO (no se escribe nada; usa --apply para importar) ==");
 for (const [k, v] of Object.entries(out)) console.log(`  ${k.padEnd(13)} ${v.length}`);
 console.log(`  campos personalizados por entidad: ${["contacts", "companies", "leads", "deals"].map((e) => `${e}=${customDefs.filter((d) => d.entity === e).length}`).join(" ")}`);
 console.log(`  negociaciones sin embudo asignado: ${withoutPipe} (edita ${mapPath})`);
-const orphanActs = out.activities.filter((a) => !a.contactId && !a.leadId && !a.entityId).length;
+const orphanActs = (out.activities || []).filter((a) => !a.contactId && !a.leadId && !a.entityId).length;
 console.log(`  actividades sin cliente: ${orphanActs}`);
 
 if (process.argv.includes("--sample")) {
@@ -259,8 +266,8 @@ if (process.argv.includes("--sample")) {
   console.log(JSON.stringify({
     contacto: pick(out.contacts, (c) => Object.keys(c.custom).length > 2),
     compania: pick(out.companies, (c) => c.cif),
-    negociacion: out.deals[0],
-    correo: pick(out.activities, (a) => a.type === "Email" && a.from),
+    negociacion: (out.deals || [])[0],
+    correo: out.activities ? pick(out.activities, (a) => a.type === "Email" && a.from) : null,
   }, null, 1).slice(0, 6000));
 }
 if (!APPLY) process.exit(0);
