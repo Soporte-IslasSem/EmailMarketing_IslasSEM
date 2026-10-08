@@ -93,6 +93,7 @@ import Pipeline from "../modules/crm/pages/Pipeline.jsx";
 import Activities from "../modules/crm/pages/Activities.jsx";
 import Outbox from "../modules/crm/pages/Outbox.jsx";
 import CrmForms from "../modules/crm/pages/CrmForms.jsx";
+import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
 import RecycleBin from "../modules/crm/pages/RecycleBin.jsx";
 import History from "../modules/crm/pages/History.jsx";
@@ -105,6 +106,7 @@ import HerramientasGratuitas from "../pages/HerramientasGratuitas.jsx";
 
 // FORMULARIOS PÚBLICOS (SEPA / Datos Jurídicos)
 import PublicForm from "../modules/forms/public/PublicForm.jsx";
+import ClientArea from "../modules/forms/public/ClientArea.jsx";
 
 // NUEVAS PÁGINAS PÚBLICAS
 import Servicios from "../pages/Servicios.jsx";
@@ -128,6 +130,8 @@ const router = createBrowserRouter([
   // FORMULARIOS PÚBLICOS RELLENABLES (sin login): /f/sepa/:dealId , /f/juridicos/:dealId
   { path: "/f/:formType", element: <PublicForm /> },
   { path: "/f/:formType/:dealId", element: <PublicForm /> },
+  // Página pública de clientela: un botón por cada formulario publicado.
+  { path: "/clientela", element: <ClientArea /> },
 
   // NUEVAS PÁGINAS PÚBLICAS
   { path: "/servicios", element: <Servicios /> },
@@ -185,6 +189,8 @@ const router = createBrowserRouter([
       { path: "crm/analytics", element: <Analytics /> },
       { path: "crm/outbox", element: <Outbox /> },
       { path: "crm/forms", element: <CrmForms /> },
+      { path: "crm/forms/new", element: <CrmFormBuilder /> },
+      { path: "crm/forms/edit/:id", element: <CrmFormBuilder /> },
       { path: "crm/quotes", element: <SalesDocs type="quotes" /> },
       { path: "crm/invoices", element: <SalesDocs type="invoices" /> },
       { path: "crm/products", element: <Products /> },

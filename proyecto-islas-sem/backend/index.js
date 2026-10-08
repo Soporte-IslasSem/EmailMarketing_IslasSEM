@@ -13,7 +13,7 @@ const { admin, db } = require("./lib/firebase");
 const { drainOutbox } = require("./lib/outbox");
 const { runSLA } = require("./lib/sla");
 const { processReplies } = require("./lib/inbox");
-const { submitForm, formDefinition, processFormSubmissions } = require("./lib/forms");
+const { submitForm, formDefinition, publicForms, processFormSubmissions } = require("./lib/forms");
 const { recordOpen, recordClick } = require("./lib/reports");
 const { processAutomations } = require("./lib/automations");
 const { checkDomains } = require("./lib/domains");
@@ -53,6 +53,7 @@ api.get("/forms/confirm/:sid", confirm);
 
 // --- Formularios públicos (SEPA / Datos Jurídicos / creados en CRM) con reCAPTCHA v3 ---
 api.get("/forms/def/:id", formDefinition);
+api.get("/forms/public", publicForms);
 api.post("/forms/submit", submitForm);
 
 // --- Google Calendar (grupo@) ⇄ Tareas ---

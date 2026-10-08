@@ -43,40 +43,58 @@ const RGPD = [
   ["Derechos del interesado:", "tienen derecho al acceso, supresión, limitación, eliminación, portabilidad de sus datos ejerciéndolos en la dirección, teléfono o correo electrónico de la empresa, en caso de no ser atendida su petición puede ejercer sus derechos ante la Agencia Española de Protección de Datos"],
 ];
 
+// Forma común para pintar cualquier formulario: fijo original, fijo editado o creado.
+function normalize(def, builtin) {
+  if (!def) {
+    return {
+      title: builtin.title, desc: builtin.desc, btn: "ENVIAR", color: "#1A9190", bg: "#FFFFFF",
+      consentTitle: builtin.consentTitle, successMessage: "",
+      fields: builtin.fields, checks: [{ k: builtin.consentCheck, req: true }],
+    };
+  }
+  const all = def.fields || [];
+  return {
+    title: def.title, desc: def.desc ?? def.description ?? "", btn: def.btn || "ENVIAR",
+    color: def.color || "#1A9190", bg: def.bg || "#FFFFFF",
+    consentTitle: def.consentTitle || "", successMessage: def.successMessage || "",
+    fields: all.filter((f) => f.type !== "check"), checks: all.filter((f) => f.type === "check"),
+  };
+}
+
 export default function PublicForm() {
   const params = useParams();
   const formType = params.formType === "legal" ? "juridicos" : params.formType;
   const dealId = params.dealId;
   const builtin = BUILTIN_FORMS[formType];
-  // Formulario creado: { status: "loading" | "ok" | "missing", cfg }
-  const [custom, setCustom] = useState({ status: builtin ? "ok" : "loading", cfg: null });
-  const cfg = builtin || custom.cfg;
+  // Definición del servidor (formularios creados y versiones editadas de SEPA/Jurídicos).
+  const [remote, setRemote] = useState({ type: null, status: "loading", def: null });
   const [values, setValues] = useState({});
-  const [consent, setConsent] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [accepted, setAccepted] = useState({}); // casillas de consentimiento aceptadas
+  const [privacyFor, setPrivacyFor] = useState(null); // casilla cuyo modal RGPD está abierto
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(loadRecaptcha, []);
   useEffect(() => {
-    if (builtin) return;
     let alive = true;
     fetch(`${API_BASE}/forms/def/${encodeURIComponent(formType || "")}`)
       .then((r) => r.json())
-      .then((out) => alive && setCustom(out.ok ? { status: "ok", cfg: out.form } : { status: "missing", cfg: null }))
-      .catch(() => alive && setCustom({ status: "missing", cfg: null }));
+      .then((out) => alive && setRemote({ type: formType, status: out.ok ? "ok" : "missing", def: out.ok ? out.form : null }))
+      .catch(() => alive && setRemote({ type: formType, status: "missing", def: null }));
     return () => { alive = false; };
-  }, [builtin, formType]);
+  }, [formType]);
 
-  if (!cfg && custom.status === "loading") return <Shell><p style={{ textAlign: "center", color: "#8a9a9a" }}>Cargando formulario…</p></Shell>;
+  const status = remote.type === formType ? remote.status : "loading";
+  if (status === "loading") return <Shell><p style={{ textAlign: "center", color: "#8a9a9a" }}>Cargando formulario…</p></Shell>;
+  const cfg = status === "ok" ? normalize(remote.def, builtin) : builtin ? normalize(null, builtin) : null;
   if (!cfg) return <Shell><p style={{ textAlign: "center" }}>Formulario no encontrado.</p></Shell>;
   if (done) {
     return (
-      <Shell>
+      <Shell bg={cfg.bg}>
         <div style={{ textAlign: "center", padding: "20px 0" }}>
           <div style={{ fontSize: 46 }}>✅</div>
-          <h2 style={{ color: "#1A9190" }}>¡Recibido, gracias!</h2>
+          <h2 style={{ color: cfg.color }}>¡Recibido, gracias!</h2>
           <p style={{ color: "#5b6b6a", whiteSpace: "pre-line" }}>{cfg.successMessage || "Hemos registrado tu formulario. Nuestro equipo continuará con el proceso."}</p>
         </div>
       </Shell>
@@ -91,7 +109,10 @@ export default function PublicForm() {
     setError("");
     const missing = cfg.fields.filter((f) => f.req && !String(values[f.k] || "").trim());
     if (missing.length) { setError(`Falta rellenar: ${missing.map((m) => m.k).join(", ")}`); return; }
-    if (!consent) { setError("Debes aceptar el consentimiento."); return; }
+    if (cfg.checks.some((c) => c.req && !accepted[c.k])) { setError("Debes aceptar el consentimiento."); return; }
+    // Las casillas viajan como "Sí" (los formularios fijos originales no las guardan como campo).
+    const data = { ...values };
+    if (status === "ok") cfg.checks.forEach((c) => { data[c.k] = accepted[c.k] ? "Sí" : ""; });
     setSending(true);
     try {
       if (RECAPTCHA_KEY) {
@@ -99,14 +120,14 @@ export default function PublicForm() {
         const r = await fetch(`${API_BASE}/forms/submit`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ formType, dealId: dealId || "", data: values, recaptchaToken: token }),
+          body: JSON.stringify({ formType, dealId: dealId || "", data, recaptchaToken: token }),
         });
         const out = await r.json().catch(() => ({}));
         if (!r.ok || !out.ok) throw new Error(out.error || `HTTP ${r.status}`);
       } else {
         await addDoc(collection(db, "formSubmissions"), {
           orgId: DEFAULT_ORG_ID, formType, dealId: dealId || "",
-          data: values, status: "recibido", createdAt: serverTimestamp(),
+          data, status: "recibido", createdAt: serverTimestamp(),
         });
       }
       setDone(true);
@@ -116,9 +137,9 @@ export default function PublicForm() {
   };
 
   return (
-    <Shell>
-      <h1 style={{ color: "#1A9190", fontSize: 19, margin: "0 0 4px", textAlign: "center", lineHeight: 1.3 }}>{cfg.title}</h1>
-      <p style={{ color: "#8a9a9a", fontSize: 13, textAlign: "center", margin: "0 0 20px" }}>{cfg.desc}</p>
+    <Shell bg={cfg.bg}>
+      <h1 style={{ color: cfg.color, fontSize: 19, margin: "0 0 4px", textAlign: "center", lineHeight: 1.3 }}>{cfg.title}</h1>
+      {cfg.desc && <p style={{ color: "#8a9a9a", fontSize: 13, textAlign: "center", margin: "0 0 20px" }}>{cfg.desc}</p>}
       <form onSubmit={submit}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {cfg.fields.map((f) =>
@@ -141,27 +162,33 @@ export default function PublicForm() {
           )}
         </div>
 
-        <h3 style={{ color: "#1A9190", fontSize: 15, margin: "22px 0 10px" }}>{cfg.consentTitle || "Aceptación del Tratamiento y la Protección de Datos"}</h3>
-        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "#3a4a4a", cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={consent}
-            readOnly
-            onClick={(e) => { e.preventDefault(); if (consent) setConsent(false); else setShowPrivacy(true); }}
-            style={{ marginTop: 3 }}
-          />
-          <span>{cfg.consentCheck || "Al hacer clic en un botón de envío, acepto el consentimiento"} <span style={{ color: "#e05a5a" }}>*</span></span>
-        </label>
+        {cfg.checks.length > 0 && (
+          <>
+            {cfg.consentTitle && <h3 style={{ color: cfg.color, fontSize: 15, margin: "22px 0 10px" }}>{cfg.consentTitle}</h3>}
+            {cfg.checks.map((c) => (
+              <label key={c.k} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "#3a4a4a", cursor: "pointer", marginTop: cfg.consentTitle ? 0 : 16, marginBottom: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={!!accepted[c.k]}
+                  readOnly
+                  onClick={(e) => { e.preventDefault(); if (accepted[c.k]) setAccepted((a) => ({ ...a, [c.k]: false })); else setPrivacyFor(c.k); }}
+                  style={{ marginTop: 3 }}
+                />
+                <span>{c.k}{c.req && <span style={{ color: "#e05a5a" }}> *</span>}</span>
+              </label>
+            ))}
+          </>
+        )}
 
-        {showPrivacy && (
+        {privacyFor && (
           <PrivacyModal
-            onAccept={() => { setConsent(true); setShowPrivacy(false); }}
-            onReject={() => { setConsent(false); setShowPrivacy(false); }}
+            onAccept={() => { setAccepted((a) => ({ ...a, [privacyFor]: true })); setPrivacyFor(null); }}
+            onReject={() => { setAccepted((a) => ({ ...a, [privacyFor]: false })); setPrivacyFor(null); }}
           />
         )}
 
         {error && <div style={{ background: "#fdeef1", color: "#b0304c", padding: "9px 12px", borderRadius: 8, fontSize: 13, margin: "14px 0" }}>{error}</div>}
-        <button type="submit" disabled={sending} style={btn}>{sending ? "Enviando…" : "ENVIAR"}</button>
+        <button type="submit" disabled={sending} style={{ ...btn, background: cfg.color, marginTop: 16 }}>{sending ? "Enviando…" : cfg.btn}</button>
         <p style={{ fontSize: 11, color: "#9aa8a8", marginTop: 16, textAlign: "center" }}>
           Tus datos se tratan conforme al RGPD para la gestión de tu relación con ISLAS SEM SLU.
           {RECAPTCHA_KEY && (
@@ -200,11 +227,11 @@ function PrivacyModal({ onAccept, onReject }) {
   );
 }
 
-function Shell({ children }) {
+function Shell({ children, bg = "#fff" }) {
   return (
     <div style={{ minHeight: "100vh", background: "#eef3f3", padding: "32px 16px", boxSizing: "border-box" }}>
       <style>{`.pf-card input::placeholder,.pf-card select:invalid{color:#8fbfbf}`}</style>
-      <div className="pf-card" style={{ maxWidth: 470, margin: "0 auto", background: "#fff", borderRadius: 14, padding: "28px 26px 24px", boxShadow: "0 6px 24px rgba(0,0,0,.08)" }}>
+      <div className="pf-card" style={{ maxWidth: 470, margin: "0 auto", background: bg, borderRadius: 14, padding: "28px 26px 24px", boxShadow: "0 6px 24px rgba(0,0,0,.08)" }}>
         {children}
       </div>
     </div>

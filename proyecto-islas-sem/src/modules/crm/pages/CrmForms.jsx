@@ -1,89 +1,94 @@
 import { useMemo, useState } from "react";
-import { useCrmCollection, crmRemove, crmUpdate } from "../lib/crm";
+import { useNavigate } from "react-router-dom";
+import { useCrmCollection, crmRemove } from "../lib/crm";
 import { BUILTIN_FORMS, BUILTIN_LIST } from "../../forms/public/builtinForms";
-import FormBuilderModal from "../components/FormBuilderModal";
-import { formDraftFrom } from "../lib/formDraft";
+import { TEMPLATES } from "../lib/formBuilder";
+import ShareFormModal from "../components/ShareFormModal";
 import "../crm.styles.css";
+import "./crmforms.styles.css";
 
-// Formularios públicos rellenables: los dos fijos replicados del Bitrix de ISLAS SEM
-// (SEPA / Datos Jurídicos) y los creados aquí (colección crmForms). Todos funcionan igual.
+// Formularios del CRM (como el prototipo): plantillas para empezar, tus formularios
+// (SEPA y Datos Jurídicos incluidos, editables) y la página pública de clientela.
 export default function CrmForms() {
+  const navigate = useNavigate();
   const { items: subs } = useCrmCollection("formSubmissions");
-  const { items: custom, orgId } = useCrmCollection("crmForms");
-  const [copied, setCopied] = useState("");
-  const [editing, setEditing] = useState(null); // null | {} (nuevo) | borrador (duplicado) | form (con id)
+  const { items: saved } = useCrmCollection("crmForms");
+  const [share, setShare] = useState(null); // { id, name }
 
-  const base = typeof window !== "undefined" ? window.location.origin : "";
   const counts = useMemo(() => {
     const c = {};
     subs.forEach((s) => { c[s.formType] = (c[s.formType] || 0) + 1; });
     return c;
   }, [subs]);
-  const sorted = useMemo(
-    () => [...custom].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)),
-    [custom]
-  );
 
-  const linkFor = (type) => `${base}/f/${type}`;
-  const copy = async (type) => {
-    try { await navigator.clipboard.writeText(linkFor(type)); setCopied(type); setTimeout(() => setCopied(""), 1500); }
-    catch { window.prompt("Copia el enlace:", linkFor(type)); }
-  };
-  const duplicate = (src, name) => setEditing(formDraftFrom(src, `${name} (copia)`));
-  const remove = async (f) => {
-    if (!window.confirm(`¿Eliminar el formulario "${f.name}"? El enlace dejará de funcionar. Las respuestas recibidas se conservan y puedes restaurarlo desde la Papelera.`)) return;
-    await crmRemove("crmForms", f.id);
-  };
+  // Fijos primero (con su versión editada si existe) y luego los creados, más nuevos antes.
+  const rows = useMemo(() => {
+    const byId = Object.fromEntries(saved.map((f) => [f.id, f]));
+    const fixed = BUILTIN_LIST.map((b) => {
+      const o = byId[b.type];
+      return {
+        id: b.type, builtin: true, name: b.name, edited: !!o,
+        fields: o ? (o.fields || []).filter((f) => f.type !== "check").length : BUILTIN_FORMS[b.type].fields.length,
+        list: o?.listName || "", active: o ? o.active !== false : true,
+      };
+    });
+    const created = saved
+      .filter((f) => !BUILTIN_FORMS[f.id])
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+      .map((f) => ({ id: f.id, name: f.name || f.title, fields: (f.fields || []).filter((x) => x.type !== "check").length, list: f.listName || "", active: f.active !== false }));
+    return [...fixed, ...created];
+  }, [saved]);
 
-  const actions = (type, extra) => (
-    <td style={{ whiteSpace: "nowrap" }}>
-      <a className="crm-btn ghost sm" href={linkFor(type)} target="_blank" rel="noreferrer">Ver / Rellenar</a>{" "}
-      <button className="crm-btn sm" onClick={() => copy(type)}>{copied === type ? "¡Copiado!" : "Copiar enlace"}</button>{" "}
-      {extra}
-    </td>
-  );
+  const remove = async (r) => {
+    if (!window.confirm(`¿Eliminar el formulario "${r.name}"? El enlace dejará de funcionar. Las respuestas recibidas se conservan y puedes restaurarlo desde la Papelera.`)) return;
+    await crmRemove("crmForms", r.id);
+  };
 
   return (
     <div className="crm">
       <div className="crm__top">
         <div>
           <h1>Formularios</h1>
-          <p>Formularios públicos rellenables · se envían al cliente y vuelven a su ficha.</p>
+          <p>Crea formularios editables. Cada envío entra directo en tu CRM.</p>
         </div>
-        <button className="crm-btn" onClick={() => setEditing({})}>+ Crear formulario</button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a className="crm-btn ghost" href="/clientela" target="_blank" rel="noreferrer">🏢 Página de clientela</a>
+          <button className="crm-btn" onClick={() => navigate("/dashboard/crm/forms/new")}>+ Crear formulario</button>
+        </div>
       </div>
 
+      <h4 className="cf-h4">Empieza con una plantilla</h4>
+      <div className="cf-gallery">
+        {TEMPLATES.map(([t, d]) => (
+          <button key={t} className="cf-tpl" onClick={() => navigate(`/dashboard/crm/forms/new?tpl=${encodeURIComponent(t)}`)}>
+            <div className="pv">📝</div>
+            <div className="meta"><h4>{t}</h4><p>{d}</p></div>
+          </button>
+        ))}
+      </div>
+
+      <h4 className="cf-h4" style={{ marginTop: 28 }}>Tus formularios</h4>
       <table className="crm-table">
         <thead>
-          <tr><th>Nombre</th><th>Estado</th><th>Respuestas</th><th>Campos</th><th>Enlace</th></tr>
+          <tr><th>Formulario</th><th>Campos</th><th>Envíos</th><th>Lista destino</th><th>Estado</th><th></th></tr>
         </thead>
         <tbody>
-          {BUILTIN_LIST.map((f) => (
-            <tr key={f.type}>
-              <td><b>{f.name}</b><div style={{ fontSize: 12, color: "var(--crm-muted)" }}>Formulario fijo · {f.list}</div></td>
-              <td><span className="crm-chip ok">Publicado</span></td>
-              <td style={{ fontVariant: "tabular-nums" }}>{counts[f.type] || 0}</td>
-              <td>{BUILTIN_FORMS[f.type].fields.length}</td>
-              {actions(f.type, <button className="crm-btn ghost sm" onClick={() => duplicate(BUILTIN_FORMS[f.type], f.short)}>Duplicar</button>)}
-            </tr>
-          ))}
-          {sorted.map((f) => (
-            <tr key={f.id}>
-              <td><b>{f.name}</b><div style={{ fontSize: 12, color: "var(--crm-muted)" }}>Creado por ti</div></td>
-              <td>
-                {f.active === false
-                  ? <button className="crm-chip warn" style={{ border: 0, cursor: "pointer" }} title="Pulsa para publicar" onClick={() => crmUpdate("crmForms", f.id, { active: true })}>Desactivado</button>
-                  : <span className="crm-chip ok">Publicado</span>}
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td style={{ fontWeight: 600 }}>
+                {r.name}
+                {r.builtin && <span className="cf-ready">Listo</span>}
+                {r.edited && <span style={{ fontSize: 11.5, color: "var(--crm-muted)", fontWeight: 400 }}> · editado</span>}
               </td>
-              <td style={{ fontVariant: "tabular-nums" }}>{counts[f.id] || 0}</td>
-              <td>{(f.fields || []).length}</td>
-              {actions(f.id, (
-                <>
-                  <button className="crm-btn ghost sm" onClick={() => setEditing(f)}>Editar</button>{" "}
-                  <button className="crm-btn ghost sm" onClick={() => duplicate(f, f.name)}>Duplicar</button>{" "}
-                  <button className="crm-btn ghost sm" onClick={() => remove(f)} title="Eliminar">🗑</button>
-                </>
-              ))}
+              <td>{r.fields}</td>
+              <td style={{ fontWeight: 700, fontVariant: "tabular-nums" }}>{counts[r.id] || 0}</td>
+              <td>{r.list || "—"}</td>
+              <td>{r.active ? <span className="crm-chip ok">Publicado</span> : <span className="crm-chip warn">Desactivado</span>}</td>
+              <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                <button className="crm-btn sm" onClick={() => setShare(r)}>Mostrar</button>{" "}
+                <button className="crm-btn ghost sm" onClick={() => navigate(`/dashboard/crm/forms/edit/${r.id}`)}>Editar</button>
+                {!r.builtin && <> <button className="crm-btn ghost sm" title="Eliminar" onClick={() => remove(r)}>🗑</button></>}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -92,19 +97,12 @@ export default function CrmForms() {
       <div className="crm-panel" style={{ marginTop: 16 }}>
         <p style={{ margin: 0, fontSize: 13.5, color: "var(--crm-muted)" }}>
           💡 Para que un formulario se envíe <b>solo</b> cuando una negociación entra en una etapa, añade en
-          <b> Automatización de ventas</b> una regla "Enviar formulario/documento" y elige el formulario. También puedes
-          copiar el enlace y enviarlo a mano. Las respuestas quedan registradas en la <b>ficha del contacto y de la negociación</b>
-          {" "}(o crean un prospecto si el email no existe).
+          <b> Automatización de ventas</b> una regla "Enviar formulario/documento" y elige el formulario. Las respuestas quedan
+          en la <b>ficha del contacto y de la negociación</b> (o crean un prospecto si el email no existe).
         </p>
       </div>
 
-      {editing && (
-        <FormBuilderModal
-          orgId={orgId}
-          form={Object.keys(editing).length ? editing : null}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      {share && <ShareFormModal formId={share.id} title={`Compartir · ${share.name}`} listName={share.list} onClose={() => setShare(null)} />}
     </div>
   );
 }
