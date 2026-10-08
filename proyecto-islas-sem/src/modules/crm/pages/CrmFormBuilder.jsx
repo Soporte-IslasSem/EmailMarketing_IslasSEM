@@ -2,7 +2,7 @@
 // izquierda "Añadir campo", centro el formulario en vivo (clic en un campo para editarlo),
 // derecha los ajustes del formulario o del campo seleccionado. Vista previa y Publicar.
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
 import CrmModal from "../components/CrmModal";
@@ -18,6 +18,8 @@ export default function CrmFormBuilder() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  // Mismo módulo en CRM › Formularios y en Email Marketing › Formularios.
+  const base = useLocation().pathname.startsWith("/dashboard/forms") ? "/dashboard/forms" : "/dashboard/crm/forms";
   const { user, orgId } = useOrg();
   const { items: forms, loading } = useCrmCollection("crmForms");
   const isBuiltin = !!(id && BUILTIN_FORMS[id]);
@@ -34,13 +36,14 @@ export default function CrmFormBuilder() {
   // Borrador inicial: plantilla, formulario guardado o SEPA/Jurídicos (null = cargando,
   // false = no existe). Los cambios del usuario viven en "edited".
   const tpl = params.get("tpl") || "Desde cero";
+  const presetList = params.get("list") || ""; // al crear desde una lista de Email Marketing
   const initial = useMemo(() => {
-    if (!id) return draftFromTemplate(tpl);
+    if (!id) return { ...draftFromTemplate(tpl), listId: presetList };
     if (loading) return null;
     if (saved) return draftFromDoc(saved);
     if (isBuiltin) return draftFromBuiltin(id);
     return false;
-  }, [id, tpl, loading, saved, isBuiltin]);
+  }, [id, tpl, presetList, loading, saved, isBuiltin]);
   const fb = edited || initial;
 
   // Listas de Email Marketing del usuario (Lista destino).
@@ -68,7 +71,8 @@ export default function CrmFormBuilder() {
   const publish = async () => {
     setError("");
     const meta = BUILTIN_LIST.find((b) => b.type === id);
-    const { error: err, data } = toDoc({ ...fb, name: isBuiltin ? meta?.name : fb.title });
+    const listName = lists.find((l) => l.id === fb.listId)?.name || fb.listName || "";
+    const { error: err, data } = toDoc({ ...fb, listName, name: isBuiltin ? meta?.name : fb.title });
     if (err) return setError(err);
     setSaving(true);
     try {
@@ -93,7 +97,7 @@ export default function CrmFormBuilder() {
   const restore = async () => {
     if (!window.confirm("¿Volver al formulario original? Se perderán los cambios que hiciste en él.")) return;
     await deleteDoc(doc(db, "crmForms", id));
-    navigate("/dashboard/crm/forms");
+    navigate(base);
   };
 
   if (fb === null) return <div className="crm"><div className="crm-loading">Cargando formulario…</div></div>;
@@ -101,7 +105,7 @@ export default function CrmFormBuilder() {
     return (
       <div className="crm">
         <p className="crm-empty">Este formulario no existe o se eliminó.</p>
-        <button className="crm-btn" onClick={() => navigate("/dashboard/crm/forms")}>← Volver a Formularios</button>
+        <button className="crm-btn" onClick={() => navigate(base)}>← Volver a Formularios</button>
       </div>
     );
   }
@@ -112,7 +116,7 @@ export default function CrmFormBuilder() {
     <div className="crm">
       <div className="cf-top">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button className="crm-btn ghost sm" onClick={() => navigate("/dashboard/crm/forms")}>← Volver</button>
+          <button className="crm-btn ghost sm" onClick={() => navigate(base)}>← Volver</button>
           <h1>Constructor de formulario</h1>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -201,7 +205,7 @@ export default function CrmFormBuilder() {
               </div>
               <div className="cf-note">
                 Cada envío entra <b>solo</b> en el CRM: crea el <b>prospecto</b> (o se guarda en la ficha si el email ya existe)
-                {fb.listId ? <> y suscribe el email a la lista <b>{fb.listName}</b>.</> : "."}
+                {fb.listId ? <> y suscribe el email a la lista <b>{lists.find((l) => l.id === fb.listId)?.name || fb.listName}</b> (con doble confirmación si la lista la tiene activada).</> : "."}
               </div>
               <label className="cf-switch"><input type="checkbox" checked={fb.active !== false} onChange={(e) => setForm({ active: e.target.checked })} /> Publicado (si lo desactivas, el enlace deja de funcionar)</label>
             </>
@@ -226,8 +230,9 @@ export default function CrmFormBuilder() {
         <ShareFormModal
           formId={published}
           title={`${fb.title} · publicado ✓`}
-          listName={fb.listId ? fb.listName : ""}
-          onClose={() => navigate("/dashboard/crm/forms")}
+          listName={fb.listId ? lists.find((l) => l.id === fb.listId)?.name || fb.listName : ""}
+          closeLabel="Ir a formularios"
+          onClose={() => navigate(base)}
         />
       )}
     </div>

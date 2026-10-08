@@ -14,6 +14,9 @@ import { BUILTIN_FORMS } from "./builtinForms";
 const DEFAULT_ORG_ID = "islas-sem";
 const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 const API_BASE = import.meta.env.VITE_API_BASE || "https://email-marketing.islassem.com/api";
+// ?embed=1: dentro de un <iframe> en otra web (incrustado, popup, barra, exit intent).
+const EMBED = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embed") === "1";
+const toParent = (msg) => { try { if (EMBED && window.parent !== window) window.parent.postMessage({ islassem: msg.type, ...msg }, "*"); } catch { /* sin acceso al padre */ } };
 
 function loadRecaptcha() {
   if (!RECAPTCHA_KEY || document.getElementById("recaptcha-v3")) return;
@@ -76,6 +79,15 @@ export default function PublicForm() {
   const [error, setError] = useState("");
 
   useEffect(loadRecaptcha, []);
+  // En modo incrustado, avisa a la web de su altura para que el <iframe> se ajuste.
+  useEffect(() => {
+    if (!EMBED || typeof ResizeObserver === "undefined") return undefined;
+    const post = () => toParent({ type: "form-height", h: Math.ceil(document.documentElement.scrollHeight) });
+    const ro = new ResizeObserver(post);
+    ro.observe(document.body);
+    post();
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => {
     let alive = true;
     fetch(`${API_BASE}/forms/def/${encodeURIComponent(formType || "")}`)
@@ -131,6 +143,7 @@ export default function PublicForm() {
         });
       }
       setDone(true);
+      toParent({ type: "form-done" });
     } catch (err) {
       setError("No se pudo enviar. Inténtalo de nuevo. (" + (err.code || err.message) + ")");
     } finally { setSending(false); }
@@ -229,9 +242,9 @@ function PrivacyModal({ onAccept, onReject }) {
 
 function Shell({ children, bg = "#fff" }) {
   return (
-    <div style={{ minHeight: "100vh", background: "#eef3f3", padding: "32px 16px", boxSizing: "border-box" }}>
+    <div style={EMBED ? { background: "transparent", padding: 0 } : { minHeight: "100vh", background: "#eef3f3", padding: "32px 16px", boxSizing: "border-box" }}>
       <style>{`.pf-card input::placeholder,.pf-card select:invalid{color:#8fbfbf}`}</style>
-      <div className="pf-card" style={{ maxWidth: 470, margin: "0 auto", background: bg, borderRadius: 14, padding: "28px 26px 24px", boxShadow: "0 6px 24px rgba(0,0,0,.08)" }}>
+      <div className="pf-card" style={{ maxWidth: 470, margin: "0 auto", background: bg, borderRadius: 14, padding: "28px 26px 24px", boxShadow: EMBED ? "none" : "0 6px 24px rgba(0,0,0,.08)" }}>
         {children}
       </div>
     </div>

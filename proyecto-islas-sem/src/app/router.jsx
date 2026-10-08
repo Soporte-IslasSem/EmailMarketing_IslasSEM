@@ -61,11 +61,8 @@ import TemplateTagsPage from "../modules/templates/pages/TemplateTagsPage.jsx";
 import AddSubscriber from "../modules/subscribers/components/AddSubscriber/AddSubscriber.jsx";
 
 // FORMS WIZARD
-import FormWizardWrapper from "../modules/forms/FormWizardWrapper.jsx";
 
 // NUEVO: listado y detalle de formularios
-import FormsList from "../modules/forms/FormsList.jsx";
-import FormDetail from "../modules/forms/FormDetail.jsx";
 
 // REPORTES (NUEVOS)
 import ReportsList from "../modules/reports/components/ReportsList.jsx";
@@ -226,10 +223,6 @@ const router = createBrowserRouter([
           { path: "campos", element: <ListCampos /> },
           { path: "formularios", element: <ListFormularios /> },
 
-          // 🔥 FORM WIZARD CORREGIDO
-          { path: "formularios/nuevo", element: <FormWizardWrapper isNew={true} /> },
-          { path: "formularios/:formId", element: <FormWizardWrapper isNew={false} /> },
-
           { path: "segmentos", element: <ListSegmentos /> },
           { path: "ajustes", element: <ListAjustes /> },
 
@@ -258,9 +251,10 @@ const router = createBrowserRouter([
       // SUBSCRIBERS
       { path: "subscribers/add", element: <AddSubscriber /> },
 
-      // FORMS (nuevo módulo global)
-      { path: "forms", element: <FormsList /> },
-      { path: "forms/:id", element: <FormDetail /> },
+      // FORMULARIOS: el mismo módulo que CRM › Formularios (constructor unificado)
+      { path: "forms", element: <CrmForms /> },
+      { path: "forms/new", element: <CrmFormBuilder /> },
+      { path: "forms/edit/:id", element: <CrmFormBuilder /> },
     ],
   },
 ]);

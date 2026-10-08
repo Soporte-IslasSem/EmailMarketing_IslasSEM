@@ -42,7 +42,52 @@ function rateLimited(ip) {
   return arr.length > 10;
 }
 
-// POST /api/forms/subscribe  { formId, email }   (CORS abierto: se usa en webs externas)
+// Alta de un email en una lista (formularios incrustados antiguos y formularios del
+// constructor con "lista destino"). Respeta la doble confirmación de la lista
+// (Notificaciones › Email de confirmación), avisa al dueño y dispara el webhook.
+// Devuelve { status: "already" | "pending" | "subscribed", subscriberId } o { error }.
+async function addSubscriber({ listId, email, name = "", userId, source = "form", formId = "" }) {
+  email = String(email || "").trim().toLowerCase().slice(0, 200);
+  if (!EMAIL_RE.test(email)) return { error: "Email no válido" };
+  const listRef = db.collection("lists").doc(String(listId || "x"));
+  const list = (await listRef.get()).data();
+  if (!list) return { error: "Lista no encontrada" };
+  const s = await listSettings(listRef.id);
+  const doubleOptIn = !!s.confirmEmail.enabled;
+
+  const existing = await db.collection("subscribers").where("email", "==", email).where("listId", "==", listRef.id).limit(1).get();
+  let subRef = existing.empty ? null : existing.docs[0].ref;
+  const prev = existing.empty ? null : existing.docs[0].data();
+  if (prev?.status === "subscribed") return { status: "already", subscriberId: subRef.id };
+
+  const token = crypto.randomBytes(16).toString("hex");
+  const status = doubleOptIn ? "pending" : "subscribed";
+  if (subRef) {
+    await subRef.update({ status, confirmToken: doubleOptIn ? token : FV.delete(), resubscribedAt: Date.now(), ...(doubleOptIn ? {} : { confirmedAt: Date.now() }) });
+  } else {
+    subRef = await db.collection("subscribers").add({
+      email, ...(name ? { name: String(name).slice(0, 120) } : {}), listId: listRef.id, userId: userId || list.userId, status, source, formId,
+      createdAt: new Date(), ...(doubleOptIn ? { confirmToken: token } : { confirmedAt: Date.now() }),
+    });
+    await listRef.update({ subscribersCount: FV.increment(1) });
+  }
+
+  if (doubleOptIn) {
+    const url = `${API}/forms/confirm/${subRef.id}?t=${token}`;
+    await db.collection("outbox").add({
+      orgId: "islas-sem", to: email, subject: s.confirmEmail.subject || "Confirma tu suscripción",
+      html: confirmEmailHtml(s.general, s.confirmEmail, url), kind: "confirm", subscriberId: subRef.id,
+      status: "pending", attempts: 0, error: "", sentAt: null, createdAt: new Date(),
+    });
+    return { status: "pending", subscriberId: subRef.id };
+  }
+  if (s.general.notifyOnSubscribe) await notifyOwner(list, `Nuevo suscriptor en "${list.name}"`, `${email} se ha suscrito a la lista "${list.name}".`);
+  fireWebhook(listRef.id, "subscribe", { email, subscriberId: subRef.id, source, formId });
+  return { status: "subscribed", subscriberId: subRef.id };
+}
+
+// POST /api/forms/subscribe  { formId, email }   (CORS abierto: se usa en webs externas;
+// formularios incrustados creados antes del constructor unificado)
 async function subscribe(req, res) {
   try {
     if (rateLimited(req.ip)) return res.status(429).json({ error: "Demasiados intentos, espera un minuto." });
@@ -53,41 +98,10 @@ async function subscribe(req, res) {
     const formSnap = await db.collection("forms").doc(formId).get();
     if (!formSnap.exists) return res.status(404).json({ error: "Formulario no encontrado" });
     const form = formSnap.data();
-    const listRef = db.collection("lists").doc(form.listId);
-    const list = (await listRef.get()).data();
-    if (!list) return res.status(404).json({ error: "Lista no encontrada" });
-    const s = await listSettings(form.listId);
-    const doubleOptIn = !!s.confirmEmail.enabled;
-
-    const existing = await db.collection("subscribers").where("email", "==", email).where("listId", "==", form.listId).limit(1).get();
-    let subRef = existing.empty ? null : existing.docs[0].ref;
-    const prev = existing.empty ? null : existing.docs[0].data();
-    if (prev?.status === "subscribed") return res.json({ success: true });
-
-    const token = crypto.randomBytes(16).toString("hex");
-    const status = doubleOptIn ? "pending" : "subscribed";
-    if (subRef) {
-      await subRef.update({ status, confirmToken: doubleOptIn ? token : FV.delete(), resubscribedAt: Date.now(), ...(doubleOptIn ? {} : { confirmedAt: Date.now() }) });
-    } else {
-      subRef = await db.collection("subscribers").add({
-        email, listId: form.listId, userId: form.userId || list.userId, status, source: "form", formId,
-        createdAt: new Date(), ...(doubleOptIn ? { confirmToken: token } : { confirmedAt: Date.now() }),
-      });
-      await listRef.update({ subscribersCount: FV.increment(1) });
-    }
-
-    if (doubleOptIn) {
-      const url = `${API}/forms/confirm/${subRef.id}?t=${token}`;
-      await db.collection("outbox").add({
-        orgId: "islas-sem", to: email, subject: s.confirmEmail.subject || "Confirma tu suscripción",
-        html: confirmEmailHtml(s.general, s.confirmEmail, url), kind: "confirm", subscriberId: subRef.id,
-        status: "pending", attempts: 0, error: "", sentAt: null, createdAt: new Date(),
-      });
-      return res.json({ success: true, pending: true, message: "Revisa tu correo y confirma la suscripción." });
-    }
-    if (s.general.notifyOnSubscribe) await notifyOwner(list, `Nuevo suscriptor en "${list.name}"`, `${email} se ha suscrito a la lista "${list.name}".`);
+    const r = await addSubscriber({ listId: form.listId, email, userId: form.userId, source: "form", formId });
+    if (r.error) return res.status(r.error === "Lista no encontrada" ? 404 : 400).json({ error: r.error });
+    if (r.status === "pending") return res.json({ success: true, pending: true, message: "Revisa tu correo y confirma la suscripción." });
     res.json({ success: true });
-    fireWebhook(form.listId, "subscribe", { email, subscriberId: subRef.id, source: "form", formId });
   } catch (e) {
     console.error("[forms/subscribe]", e);
     res.status(500).json({ error: "Error interno" });
@@ -154,4 +168,4 @@ async function doUnsubscribe(req, res) {
   return unsubscribePage(req, res, true);
 }
 
-module.exports = { subscribe, confirm, unsubscribePage, doUnsubscribe };
+module.exports = { subscribe, addSubscriber, confirm, unsubscribePage, doUnsubscribe };

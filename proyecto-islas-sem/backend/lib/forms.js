@@ -14,9 +14,9 @@
 //    su negociación/contacto (o crea un prospecto), deja una actividad en el timeline y,
 //    si el formulario tiene "lista destino", suscribe el email a esa lista.
 //    Cubre también envíos antiguos escritos directamente desde el navegador.
-const { admin, db } = require("./firebase");
+const { db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
-const { fireWebhook } = require("./webhooks");
+const { addSubscriber } = require("./subscriptions");
 
 const FORM_LABEL = { sepa: "Orden de Domiciliación SEPA", juridicos: "Datos Jurídicos del Representante" };
 const MIN_SCORE = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
@@ -155,22 +155,12 @@ async function submitForm(req, res) {
   }
 }
 
-// "Lista destino": suscribe el email del formulario a esa lista de Email Marketing.
-// No vuelve a suscribir a quien se dio de baja (hay que respetarlo).
+// "Lista destino": suscribe el email del formulario a esa lista de Email Marketing, con la
+// misma lógica que el resto de altas (doble confirmación de la lista, aviso y webhook).
 async function subscribeToList(listId, email, name, formId) {
   if (!listId || !EMAIL_RE.test(email || "")) return false;
-  const listRef = db.collection("lists").doc(listId);
-  const list = (await listRef.get()).data();
-  if (!list) return false;
-  const existing = await db.collection("subscribers").where("email", "==", email).where("listId", "==", listId).limit(1).get();
-  if (!existing.empty) return false;
-  const ref = await db.collection("subscribers").add({
-    email, name: name || "", listId, userId: list.userId, status: "subscribed", source: "crm-form", formId,
-    createdAt: new Date(), confirmedAt: Date.now(),
-  });
-  await listRef.update({ subscribersCount: admin.firestore.FieldValue.increment(1) });
-  fireWebhook(listId, "subscribe", { email, subscriberId: ref.id, source: "crm-form", formId });
-  return true;
+  const r = await addSubscriber({ listId, email, name, source: "crm-form", formId });
+  return r.status === "subscribed" || r.status === "pending" ? r.status : false;
 }
 
 // Extrae email/nombre/teléfono/empresa de los campos (los nombres vienen del formulario).
@@ -214,7 +204,7 @@ async function processFormSubmissions() {
       contactId, leadId, formSubmissionId: doc.id, formType: s.formType,
     });
     const subscribed = s.listId ? await subscribeToList(s.listId, person.email, [person.firstName, person.lastName].filter(Boolean).join(" "), s.formType).catch((e) => { console.warn("[forms] lista:", e.message); return false; }) : false;
-    await doc.ref.update({ contactId, leadId, dealId, status: "vinculado", linkedAt: new Date(), ...(subscribed ? { subscribedToList: true } : {}) });
+    await doc.ref.update({ contactId, leadId, dealId, status: "vinculado", linkedAt: new Date(), ...(subscribed ? { subscribedToList: subscribed } : {}) });
     linked++;
   }
   return { linked };

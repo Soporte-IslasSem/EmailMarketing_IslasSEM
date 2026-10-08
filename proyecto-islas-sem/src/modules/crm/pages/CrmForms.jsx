@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useCrmCollection, crmRemove } from "../lib/crm";
 import { BUILTIN_FORMS, BUILTIN_LIST } from "../../forms/public/builtinForms";
-import { TEMPLATES } from "../lib/formBuilder";
+import { TEMPLATES, draftFromTemplate } from "../lib/formBuilder";
+import FormThumb from "../components/FormThumb";
 import ShareFormModal from "../components/ShareFormModal";
 import "../crm.styles.css";
 import "./crmforms.styles.css";
@@ -11,6 +12,8 @@ import "./crmforms.styles.css";
 // (SEPA y Datos Jurídicos incluidos, editables) y la página pública de clientela.
 export default function CrmForms() {
   const navigate = useNavigate();
+  // Mismo módulo en CRM › Formularios y en Email Marketing › Formularios.
+  const base = useLocation().pathname.startsWith("/dashboard/forms") ? "/dashboard/forms" : "/dashboard/crm/forms";
   const { items: subs } = useCrmCollection("formSubmissions");
   const { items: saved } = useCrmCollection("crmForms");
   const [share, setShare] = useState(null); // { id, name }
@@ -53,15 +56,15 @@ export default function CrmForms() {
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <a className="crm-btn ghost" href="/clientela" target="_blank" rel="noreferrer">🏢 Página de clientela</a>
-          <button className="crm-btn" onClick={() => navigate("/dashboard/crm/forms/new")}>+ Crear formulario</button>
+          <button className="crm-btn" onClick={() => navigate(`${base}/new`)}>+ Crear formulario</button>
         </div>
       </div>
 
       <h4 className="cf-h4">Empieza con una plantilla</h4>
       <div className="cf-gallery">
         {TEMPLATES.map(([t, d]) => (
-          <button key={t} className="cf-tpl" onClick={() => navigate(`/dashboard/crm/forms/new?tpl=${encodeURIComponent(t)}`)}>
-            <div className="pv">📝</div>
+          <button key={t} className="cf-tpl" onClick={() => navigate(`${base}/new?tpl=${encodeURIComponent(t)}`)}>
+            <FormThumb form={draftFromTemplate(t)} />
             <div className="meta"><h4>{t}</h4><p>{d}</p></div>
           </button>
         ))}
@@ -86,7 +89,7 @@ export default function CrmForms() {
               <td>{r.active ? <span className="crm-chip ok">Publicado</span> : <span className="crm-chip warn">Desactivado</span>}</td>
               <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                 <button className="crm-btn sm" onClick={() => setShare(r)}>Mostrar</button>{" "}
-                <button className="crm-btn ghost sm" onClick={() => navigate(`/dashboard/crm/forms/edit/${r.id}`)}>Editar</button>
+                <button className="crm-btn ghost sm" onClick={() => navigate(`${base}/edit/${r.id}`)}>Editar</button>
                 {!r.builtin && <> <button className="crm-btn ghost sm" title="Eliminar" onClick={() => remove(r)}>🗑</button></>}
               </td>
             </tr>
