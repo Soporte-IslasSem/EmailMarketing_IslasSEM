@@ -6,6 +6,10 @@ export function reportMetrics(r) {
   const sent = r.stats?.sent ?? (results.filter((x) => x.status === "sent").length || r.totalRecipients || 0);
   const opened = subs.filter((s) => s.opened).length;
   const clicked = subs.filter((s) => s.clicked).length;
+  const replied = subs.filter((s) => s.replied).length;
   const pct = (n) => (sent ? Math.round((n / sent) * 1000) / 10 : 0);
-  return { sent, opened, clicked, openRate: pct(opened), clickRate: pct(clicked), bounces: r.stats?.bounces || 0 };
+  return {
+    sent, opened, clicked, replied, openRate: pct(opened), clickRate: pct(clicked), replyRate: pct(replied),
+    bounces: r.stats?.bounces || 0,
+  };
 }

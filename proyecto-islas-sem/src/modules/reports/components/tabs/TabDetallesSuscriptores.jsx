@@ -20,6 +20,7 @@ export default function TabDetallesSuscriptores({ report }) {
       status: s.bounced ? `rebotado (${s.bounceType === "hard" ? "definitivo" : "temporal"})` : r.status || "desconocido",
       opened: s.opened ? `Abierto${s.openCount > 1 ? ` (${s.openCount})` : ""}` : "Sin abrir",
       clicked: s.clicked ? `Clic${s.clickCount > 1 ? ` (${s.clickCount})` : ""}` : "Sin clic",
+      replied: s.replied ? `Respondió${s.replyCount > 1 ? ` (${s.replyCount})` : ""}` : "—",
       lastAction: last ? ms(last) : formatDate(report.sentAt),
       sentAt: s.sentAt ? ms(s.sentAt) : formatDate(report.sentAt),
       openedAt: ms(s.openedAt),
@@ -49,6 +50,7 @@ export default function TabDetallesSuscriptores({ report }) {
                 <th>Estado</th>
                 <th>Apertura</th>
                 <th>Clic</th>
+                <th>Respuesta</th>
                 <th>Última acción</th>
                 <th>Enviado</th>
                 <th>Fecha apertura</th>
@@ -62,6 +64,7 @@ export default function TabDetallesSuscriptores({ report }) {
                   <td>{s.status}</td>
                   <td>{s.opened}</td>
                   <td>{s.clicked}</td>
+                  <td>{s.replied}</td>
                   <td>{s.lastAction}</td>
                   <td>{s.sentAt}</td>
                   <td>{s.openedAt}</td>

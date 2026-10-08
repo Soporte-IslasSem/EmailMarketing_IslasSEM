@@ -5,7 +5,7 @@
 const { db } = require("./firebase");
 const { nextPosStage } = require("./stages");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
-const { recordBounce } = require("./reports");
+const { recordBounce, recordReply } = require("./reports");
 const { fireWebhook } = require("./webhooks");
 
 function imapConfigured() {
@@ -74,17 +74,24 @@ function isBulk(parsed, fromEmail) {
   return /^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifica(tions?|ciones)|news(letter)?|marketing|info@.*(mailchimp|sendgrid|hubspot))/i.test(fromEmail || "");
 }
 
-// Busca la negociación a la que corresponde la respuesta.
-async function matchDeal(refIds, fromEmail) {
-  // 1) Por hilo: outbox cuyo messageId esté en las referencias del correo.
-  for (let i = 0; i < refIds.length; i += 10) {
-    const chunk = refIds.slice(i, i + 10).map((x) => `<${x}>`).concat(refIds.slice(i, i + 10));
-    const snap = await db.collection("outbox").where("messageId", "in", chunk.slice(0, 10)).get().catch(() => null);
-    if (snap && !snap.empty) {
-      const dealId = snap.docs.map((d) => d.data().dealId).find(Boolean);
-      if (dealId) { const ds = await db.collection("deals").doc(dealId).get(); if (ds.exists) return { ref: ds.ref, data: ds.data() }; }
-    }
+// Correos nuestros (outbox) a los que responde este mensaje, por su Message-ID.
+async function threadOutbox(refIds) {
+  const ids = [...new Set(refIds.flatMap((x) => [x, `<${x}>`]))];
+  const items = [];
+  for (let i = 0; i < ids.length; i += 10) {
+    const snap = await db.collection("outbox").where("messageId", "in", ids.slice(i, i + 10)).get().catch(() => null);
+    snap?.docs.forEach((d) => items.push({ id: d.id, ...d.data() }));
   }
+  return items;
+}
+
+// Busca la negociación a la que corresponde la respuesta.
+async function matchDeal(thread, fromEmail) {
+  // 1) Por hilo: oferta enviada desde una negociación.
+  const dealId = thread.map((o) => o.dealId).find(Boolean);
+  if (dealId) { const ds = await db.collection("deals").doc(dealId).get(); if (ds.exists) return { ref: ds.ref, data: ds.data() }; }
+  // Respuesta a una campaña/automatización: no se asigna a una negociación por email.
+  if (thread.some((o) => o.kind === "campaign" || o.kind === "automation")) return null;
   // 2) Respaldo: por email del remitente, negociación esperando respuesta.
   if (fromEmail) {
     const snap = await db.collection("deals").where("contactEmail", "==", fromEmail).get().catch(() => null);
@@ -98,10 +105,13 @@ async function matchDeal(refIds, fromEmail) {
 
 async function handleReply(parsed, pipelines) {
   const fromEmail = (parsed.from?.value?.[0]?.address || "").toLowerCase();
-  const refIds = collectRefIds(parsed);
-  const match = await matchDeal(refIds, fromEmail);
+  const thread = await threadOutbox(collectRefIds(parsed));
+  const match = await matchDeal(thread, fromEmail);
   const snippet = (parsed.text || "").replace(/\s+/g, " ").trim().slice(0, 240);
-  if (!match) return handleNewEmail(parsed, fromEmail, snippet);
+  if (!match) {
+    const sent = thread.find((o) => (o.kind === "campaign" || o.kind === "automation") && !o.isTest);
+    return sent ? handleCampaignReply(parsed, fromEmail, sent) : handleNewEmail(parsed, fromEmail, snippet);
+  }
   const deal = { id: match.ref.id, ...match.data };
 
   // Registro de auditoría del correo entrante (queda en la ficha del contacto).
@@ -131,6 +141,44 @@ async function handleReply(parsed, pipelines) {
     });
   }
   return { matched: true, dealId: deal.id };
+}
+
+// Respuesta a una campaña o automatización nuestra: es un interesado, así que se registra
+// aunque no esté en el CRM (crea un prospecto "Respuesta a campaña") y cuenta en el informe.
+async function handleCampaignReply(parsed, fromEmail, sent) {
+  if (!fromEmail || fromEmail === norm(process.env.IMAP_USER)) return { matched: false };
+  const orgId = sent.orgId || DEFAULT_ORG_ID;
+  let name = "";
+  if (sent.kind === "campaign" && sent.campaignId) {
+    const c = await db.collection("campaigns").doc(sent.campaignId).get().catch(() => null);
+    name = c?.exists ? c.data().config?.campaignName || c.data().name || "" : "";
+  } else if (sent.automationId) {
+    const a = await db.collection("automations").doc(sent.automationId).get().catch(() => null);
+    name = a?.exists ? a.data().name || "" : "";
+  }
+  const origin = `${sent.kind === "automation" ? "la automatización" : "la campaña"}${name ? ` "${name.slice(0, 80)}"` : ""}`;
+  const fromName = parsed.from?.value?.[0]?.name || sent.toName || "";
+  const [firstName, ...rest] = fromName.split(" ");
+  const person = await resolvePerson(orgId, {
+    create: true, email: fromEmail, firstName, lastName: rest.join(" "),
+    source: sent.kind === "automation" ? "Respuesta a automatización" : "Respuesta a campaña",
+    notes: `Respondió a ${origin}: "${(parsed.subject || "").slice(0, 120)}"`,
+  });
+  const text = (parsed.text || "").slice(0, 20000);
+  await db.collection("inbound").add({
+    orgId, dealId: "", contactId: person.contactId, leadId: person.leadId,
+    campaignId: sent.campaignId || "", automationId: sent.automationId || "",
+    from: fromEmail, subject: parsed.subject || "", snippet: text.replace(/\s+/g, " ").trim().slice(0, 240), createdAt: new Date(),
+  });
+  await addActivity(orgId, {
+    type: "Email",
+    title: `📥 Respuesta a ${origin}: "${(parsed.subject || "(sin asunto)").slice(0, 90)}"`,
+    body: text, from: fromEmail, subject: parsed.subject || "",
+    entity: person.leadId ? "lead" : "contact", entityId: person.leadId || person.contactId,
+    contactId: person.contactId, leadId: person.leadId,
+  });
+  if (sent.campaignId) await recordReply(sent.campaignId, sent.to);
+  return { matched: true, newLead: person.created };
 }
 
 // Correo que no responde a ninguna negociación: se guarda en la ficha del contacto
@@ -220,4 +268,4 @@ async function processReplies() {
   return { scanned, matched, newLeads, bounces };
 }
 
-module.exports = { processReplies, isBulk, parseBounce };
+module.exports = { processReplies, isBulk, parseBounce, __test: { handleReply } };

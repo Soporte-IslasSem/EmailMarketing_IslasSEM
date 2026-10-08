@@ -14,6 +14,10 @@ export default function TabAvanzado({ report }) {
         </thead>
         <tbody>
           <tr>
+            <td>Respuestas (destinatarios que contestaron)</td>
+            <td>{report.stats?.replies || 0}</td>
+          </tr>
+          <tr>
             <td>Rebotes suaves</td>
             <td>{report.stats?.softBounces || 0}</td>
           </tr>

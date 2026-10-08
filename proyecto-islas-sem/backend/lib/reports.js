@@ -22,7 +22,7 @@ async function ensureReport(campaignId) {
     totalRecipients: data.recipientsCount || 0,
     status: "sending",
     createdAt: new Date(),
-    stats: { sent: 0, failed: 0, opens: 0, clicks: 0, bounces: 0, hardBounces: 0, softBounces: 0, complaints: 0, unsubscribes: 0 },
+    stats: { sent: 0, failed: 0, opens: 0, clicks: 0, bounces: 0, hardBounces: 0, softBounces: 0, complaints: 0, unsubscribes: 0, replies: 0 },
   }, { merge: true });
   return r;
 }
@@ -74,9 +74,20 @@ async function recordBounce(campaignId, email, hard) {
   }, { merge: true });
 }
 
+// Respuesta de un destinatario (detectada por hilo en el buzón). Cuenta una por destinatario.
+async function recordReply(campaignId, email) {
+  if (!email) return;
+  const r = await ensureReport(campaignId);
+  const prev = (await r.get()).data()?.subscribers?.[email] || {};
+  await r.set({
+    ...(prev.replied ? {} : { stats: { replies: FV.increment(1) } }),
+    subscribers: { [email]: { replied: true, repliedAt: prev.repliedAt || Date.now(), replyCount: (prev.replyCount || 0) + 1 } },
+  }, { merge: true });
+}
+
 async function closeReport(campaignId) {
   const r = await ensureReport(campaignId);
   await r.set({ status: "sent", sentAt: new Date() }, { merge: true });
 }
 
-module.exports = { recordSend, recordOpen, recordClick, recordBounce, closeReport };
+module.exports = { recordSend, recordOpen, recordClick, recordBounce, recordReply, closeReport };
