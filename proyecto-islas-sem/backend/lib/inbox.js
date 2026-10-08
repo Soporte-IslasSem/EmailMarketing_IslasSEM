@@ -185,10 +185,12 @@ async function processReplies() {
   try {
     const box = client.mailbox;
     const uidValidity = String(box.uidValidity);
+    const account = String(process.env.IMAP_USER).trim().toLowerCase();
     const cur = (await cursorRef.get()).data();
-    // Primera ejecución (o buzón recreado): arrancar desde "ahora", sin procesar historial.
-    if (!cur || cur.uidValidity !== uidValidity) {
-      await cursorRef.set({ uidValidity, lastUid: box.uidNext - 1, startedAt: new Date() });
+    // Primera ejecución, buzón recreado o cambio de cuenta (los UID son por buzón y Gmail
+    // repite uidValidity entre cuentas): arrancar desde "ahora", sin procesar historial.
+    if (!cur || cur.uidValidity !== uidValidity || cur.account !== account) {
+      await cursorRef.set({ uidValidity, account, lastUid: box.uidNext - 1, startedAt: new Date() });
       return { initialized: true, from: box.uidNext };
     }
     let lastUid = cur.lastUid;
@@ -209,7 +211,7 @@ async function processReplies() {
         lastUid = Math.max(lastUid, msg.uid);
         if (scanned >= 100) break; // tope por pasada; el resto en la siguiente
       }
-      await cursorRef.set({ uidValidity, lastUid, updatedAt: new Date() }, { merge: true });
+      await cursorRef.set({ uidValidity, account, lastUid, updatedAt: new Date() }, { merge: true });
     }
   } finally {
     lock.release();
