@@ -19,6 +19,7 @@ const { processAutomations } = require("./lib/automations");
 const { checkDomains } = require("./lib/domains");
 const { subscribe, confirm, unsubscribePage, doUnsubscribe } = require("./lib/subscriptions");
 const { testWebhook } = require("./lib/webhooks");
+const gcal = require("./lib/gcal");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -53,6 +54,14 @@ api.get("/forms/confirm/:sid", confirm);
 // --- Formularios públicos (SEPA / Datos Jurídicos / creados en CRM) con reCAPTCHA v3 ---
 api.get("/forms/def/:id", formDefinition);
 api.post("/forms/submit", submitForm);
+
+// --- Google Calendar (grupo@) ⇄ Tareas ---
+api.post("/google/connect", gcal.connect);
+api.get("/google/callback", gcal.callback);
+api.get("/google/status", gcal.status);
+api.post("/google/settings", gcal.settings);
+api.post("/google/disconnect", gcal.disconnect);
+api.post("/google/events", gcal.pushEvent);
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
@@ -120,7 +129,9 @@ async function runAll() {
   const forms = await processFormSubmissions();
   const automations = await processAutomations();
   const sla = await runSLA();
-  return { mail, replies, forms, automations, sla };
+  // Un fallo de Google Calendar no debe frenar el resto de tareas del cron.
+  const calendar = await gcal.syncCalendar().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
+  return { mail, replies, forms, automations, sla, calendar };
 }
 
 // Endpoint protegido por CRON_SECRET (para el cron de Plesk o un cron externo).

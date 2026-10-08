@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useCrmCollection } from "../lib/crm";
+import { useTaskScope, todayYMD, byWhen } from "../lib/tasks";
 import "../crm.styles.css";
 import "./calendar.styles.css";
 
@@ -8,13 +9,15 @@ const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", 
 
 export default function Calendar() {
   const { items } = useCrmCollection("activities");
+  const scope = useTaskScope();
   const [cursor, setCursor] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
 
   const byDay = useMemo(() => {
     const map = {};
-    items.forEach((a) => { if (a.dueDate) (map[a.dueDate] || (map[a.dueDate] = [])).push(a); });
+    items.filter(scope.canSee).forEach((a) => { if (a.dueDate) (map[a.dueDate] || (map[a.dueDate] = [])).push(a); });
+    Object.values(map).forEach((list) => list.sort(byWhen));
     return map;
-  }, [items]);
+  }, [items, scope]);
 
   const cells = useMemo(() => {
     const first = new Date(cursor.y, cursor.m, 1);
@@ -28,7 +31,7 @@ export default function Calendar() {
     return arr;
   }, [cursor]);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayYMD();
   const ymd = (d) => `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   const move = (delta) => setCursor((c) => { const m = c.m + delta; return { y: c.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 }; });
 
@@ -54,7 +57,9 @@ export default function Calendar() {
           <div key={i} className={`cal-cell ${d ? "" : "empty"} ${d && ymd(d) === todayStr ? "today" : ""}`}>
             {d && <div className="cal-num">{d}</div>}
             {d && (byDay[ymd(d)] || []).map((a) => (
-              <div key={a.id} className={`cal-ev ${a.done ? "done" : ""}`} title={a.title}>{a.type}: {a.title}</div>
+              <div key={a.id} className={`cal-ev ${a.done ? "done" : ""} ${a.source === "google" ? "google" : ""}`} title={`${a.title}${a.assigneeName ? ` · ${a.assigneeName}` : ""}`}>
+                {a.dueTime ? `${a.dueTime} ` : ""}{a.source === "google" ? "📅 " : `${a.type}: `}{a.title}
+              </div>
             ))}
           </div>
         ))}

@@ -8,3 +8,4 @@
 .cal-ev { font-size: 11px; background: #e6f4f1; color: #136b68; border-radius: 5px; padding: 2px 5px; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-ev.done { background: #eef1f1; color: #8a9a9a; text-decoration: line-through; }
 @media (max-width: 640px) { .cal-cell { min-height: 64px; } .cal-ev { font-size: 10px; } }
+.cal-ev.google { background: #e8f0fe; color: #1d4f91; }

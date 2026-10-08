@@ -7,6 +7,7 @@ import { useAuth } from "../../../../shared/hooks/useAuth";
 import CallReservationModal from "../modals/CallReservationModal";
 import { useCrmCollection } from "../../../crm/lib/crm";
 import { reportMetrics } from "../../../reports/reportMetrics";
+import TodayTasks from "./TodayTasks";
 
 // Suscriptores activos e informes de campañas del usuario, en tiempo real.
 function useEmailStats() {
@@ -37,6 +38,9 @@ export default function DashboardHome() {
       <p className="DashboardHome__subtitle">
         Este es el estado de tu cuenta hoy.
       </p>
+
+      {/* TAREAS DEL DÍA (incluye citas de Google Calendar) */}
+      <TodayTasks />
 
       {/* FILA DE ESTADÍSTICAS RÁPIDAS */}
       <div className="DashboardHome__stats">
