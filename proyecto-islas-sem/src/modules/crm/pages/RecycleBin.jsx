@@ -8,6 +8,7 @@ const LABEL = {
   contacts: "Contacto", companies: "Compañía", leads: "Prospecto", deals: "Negociación",
   products: "Producto", quotes: "Cotización", invoices: "Factura", employees: "Empleado",
   departments: "Departamento", salesteams: "Equipo", roles: "Rol", pipelines: "Embudo",
+  crmForms: "Formulario",
 };
 
 export default function RecycleBin() {

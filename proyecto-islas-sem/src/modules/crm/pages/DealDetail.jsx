@@ -9,6 +9,7 @@ import { queueEmail, basicEmail } from "../lib/outbox";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
+import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
 
 const TABS = ["General", "Productos", "Cotizaciones", "Facturas", "Automatización", "Historial"];
 const OFFER_STATE = { enviada: { t: "Esperando respuesta", c: "info" }, respondio: { t: "Cliente respondió", c: "ok" }, aceptada: { t: "Oferta aceptada", c: "ok" }, perdida: { t: "Oferta perdida", c: "bad" }, seguimiento: { t: "Seguimiento activo", c: "warn" } };
@@ -348,11 +349,11 @@ export default function DealDetail() {
                 {dealSubmissions.map((s) => (
                   <details key={s.id} style={{ borderBottom: "1px solid var(--crm-line,#eef3f3)", padding: "8px 0" }}>
                     <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
-                      {s.formType === "sepa" ? "Orden SEPA" : s.formType === "juridicos" ? "Datos Jurídicos" : s.formType}
+                      {submissionLabel(s)}
                       <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}> · {fmtDate(s.createdAt)}</span>
                     </summary>
                     <dl className="crm-dl" style={{ marginTop: 8 }}>
-                      {Object.entries(s.data || {}).map(([k, v]) => (
+                      {submissionEntries(s).map(([k, v]) => (
                         <div className="row" key={k}><dt style={{ textTransform: "capitalize" }}>{k}</dt><dd>{String(v) || "—"}</dd></div>
                       ))}
                     </dl>

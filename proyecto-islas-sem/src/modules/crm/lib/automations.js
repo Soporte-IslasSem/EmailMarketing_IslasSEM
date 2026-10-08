@@ -226,9 +226,12 @@ export async function runStageAutomations(pipeline, deal, stageId, orgId) {
       // Si la acción es un envío (formulario/correo), lo ENCOLA para el backend de Loading.
       if (isSend) {
         const t = (r.title || "").toLowerCase();
-        const mkind = /sepa/.test(t) ? "sepa" : /contrato/.test(t) ? "contract" : /jur[íi]dic/.test(t) ? "juridicos" : r.action === "form" ? "form" : "email";
-        // Enlace al formulario público rellenable (SEPA / Datos Jurídicos).
-        const formPath = mkind === "sepa" ? "sepa" : mkind === "juridicos" ? "juridicos" : "";
+        // Formulario elegido en la regla (fijo o creado en CRM › Formularios); si no, por el título.
+        const formId = r.action === "form" && /^[A-Za-z0-9_-]{1,64}$/.test(r.formId || "") ? r.formId : "";
+        const mkind = formId ? (formId === "sepa" || formId === "juridicos" ? formId : "form")
+          : /sepa/.test(t) ? "sepa" : /contrato/.test(t) ? "contract" : /jur[íi]dic/.test(t) ? "juridicos" : r.action === "form" ? "form" : "email";
+        // Enlace al formulario público rellenable.
+        const formPath = formId || (mkind === "sepa" ? "sepa" : mkind === "juridicos" ? "juridicos" : "");
         const base = (typeof window !== "undefined" && window.location?.origin) || "";
         const ctaUrl = formPath ? `${base}/f/${formPath}/${deal.id}` : "";
         await queueEmail(orgId, {

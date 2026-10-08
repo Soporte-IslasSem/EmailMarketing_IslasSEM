@@ -1,6 +1,6 @@
-// Formularios PÚBLICOS rellenables (sin login), IDÉNTICOS a los del prototipo
-// (replicados del Bitrix real de ISLAS SEM): Orden de Domiciliación SEPA y
-// Solicitud Datos Jurídicos del Representante. Diseño clavado al prototipo:
+// Formularios PÚBLICOS rellenables (sin login): los fijos replicados del Bitrix real de
+// ISLAS SEM (Orden de Domiciliación SEPA y Solicitud Datos Jurídicos, en builtinForms.js)
+// y los creados en CRM › Formularios (se cargan de /api/forms/def/:id). Diseño clavado al prototipo:
 // título centrado, nombre del campo DENTRO del input (placeholder), consentimiento
 // con subtítulo teal + checkbox.
 // Envío: con VITE_RECAPTCHA_SITE_KEY configurada, pasa por reCAPTCHA v3 y el backend
@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
+import { BUILTIN_FORMS } from "./builtinForms";
 
 const DEFAULT_ORG_ID = "islas-sem";
 const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
@@ -42,56 +43,14 @@ const RGPD = [
   ["Derechos del interesado:", "tienen derecho al acceso, supresión, limitación, eliminación, portabilidad de sus datos ejerciéndolos en la dirección, teléfono o correo electrónico de la empresa, en caso de no ser atendida su petición puede ejercer sus derechos ante la Agencia Española de Protección de Datos"],
 ];
 
-const FORMS = {
-  sepa: {
-    title: "ORDEN DE DOMICILIACIÓN DE ADEUDO SEPA",
-    desc: "Aceptación del adeudo sepa",
-    consentTitle: "Aceptación Domiciliación Bancaria",
-    consentCheck: "Al hacer clic en un botón de envío, acepto el consentimiento",
-    fields: [
-      { k: "Nombre Completo del titular de la cuenta o titulares", req: false },
-      { k: "Apellidos Representante Legal del titular de la cuenta", req: false },
-      { k: "Denominación de la Sociedad y/o autónomo", req: true },
-      { k: "IBAN", req: true },
-      { k: "SWIFT BIC", req: false },
-      { k: "Dirección de la Sucursal Bancaria", req: false },
-      { k: "Teléfono de la Sucursal Bancaria", req: false, type: "tel" },
-      { k: "Signatario de autorizaciones de la cuenta (la persona que firma)", req: false },
-      { k: "Aceptado por (Nombre y Apellidos de la persona que está firmando)", req: false },
-    ],
-  },
-  juridicos: {
-    title: "SOLICITUD DATOS JURÍDICOS DEL REPRESENTANTE / CONTRATOS LEGALES",
-    desc: "Tratamiento de datos en cumplimiento de la protección de datos",
-    consentTitle: "Aceptación del Tratamiento y la Protección de Datos",
-    consentCheck: "Al hacer clic en un botón de envío, acepta el consentimiento",
-    fields: [
-      { k: "Nombre Representante Legal", req: true },
-      { k: "Apellidos Representante Legal", req: true },
-      { k: "DNI Representante Legal", req: true },
-      { k: "Teléfono directo del Representante Legal", req: true, type: "tel" },
-      { k: "E-mail directo del Representante Legal", req: true, type: "email" },
-      { k: "Denominación de la Sociedad y/o Autónoma", req: true },
-      { k: "CIF/NIF", req: true },
-      { k: "Dirección Fiscal completa", req: true },
-      { k: "Provincia", req: true },
-      { k: "Teléfono de facturación", req: true, type: "tel" },
-      { k: "Correo electrónico de facturación", req: true, type: "email" },
-      { k: "Correo electrónico Protección de datos", req: true, type: "email" },
-      { k: "N° empleados-as Jornada Completa", req: true },
-      { k: "Actividad Empresarial", req: true },
-      { k: "¿Qué producto está interesado/a?", req: false, type: "select", options: ["PÁGINA WEB", "TIENDA ONLINE", "CRM - CENTRO RELACIÓN DE CLIENTES", "REDES SOCIALES", "SEO Y POSICIONAMIENTO WEB", "FACTURACIÓN", "INTELIGENCIA ECONÓMICA NEGOCIOS", "OFICINA VIRTUAL"] },
-      { k: "Programación Personalizada", req: false, type: "select", options: ["Programación por horas", "Aplicación Web", "Aplicación Móvil", "Solución Incidencia Técnica"] },
-      { k: "Consultoría y Asesoramiento", req: false, type: "select", options: ["Ventas Digitales", "Inteligencia Artificial"] },
-    ],
-  },
-};
-
 export default function PublicForm() {
   const params = useParams();
   const formType = params.formType === "legal" ? "juridicos" : params.formType;
   const dealId = params.dealId;
-  const cfg = FORMS[formType];
+  const builtin = BUILTIN_FORMS[formType];
+  // Formulario creado: { status: "loading" | "ok" | "missing", cfg }
+  const [custom, setCustom] = useState({ status: builtin ? "ok" : "loading", cfg: null });
+  const cfg = builtin || custom.cfg;
   const [values, setValues] = useState({});
   const [consent, setConsent] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -100,7 +59,17 @@ export default function PublicForm() {
   const [error, setError] = useState("");
 
   useEffect(loadRecaptcha, []);
+  useEffect(() => {
+    if (builtin) return;
+    let alive = true;
+    fetch(`${API_BASE}/forms/def/${encodeURIComponent(formType || "")}`)
+      .then((r) => r.json())
+      .then((out) => alive && setCustom(out.ok ? { status: "ok", cfg: out.form } : { status: "missing", cfg: null }))
+      .catch(() => alive && setCustom({ status: "missing", cfg: null }));
+    return () => { alive = false; };
+  }, [builtin, formType]);
 
+  if (!cfg && custom.status === "loading") return <Shell><p style={{ textAlign: "center", color: "#8a9a9a" }}>Cargando formulario…</p></Shell>;
   if (!cfg) return <Shell><p style={{ textAlign: "center" }}>Formulario no encontrado.</p></Shell>;
   if (done) {
     return (
@@ -108,7 +77,7 @@ export default function PublicForm() {
         <div style={{ textAlign: "center", padding: "20px 0" }}>
           <div style={{ fontSize: 46 }}>✅</div>
           <h2 style={{ color: "#1A9190" }}>¡Recibido, gracias!</h2>
-          <p style={{ color: "#5b6b6a" }}>Hemos registrado tu formulario. Nuestro equipo continuará con el proceso.</p>
+          <p style={{ color: "#5b6b6a", whiteSpace: "pre-line" }}>{cfg.successMessage || "Hemos registrado tu formulario. Nuestro equipo continuará con el proceso."}</p>
         </div>
       </Shell>
     );
@@ -155,16 +124,24 @@ export default function PublicForm() {
           {cfg.fields.map((f) =>
             f.type === "select" ? (
               <select key={f.k} value={values[f.k] || ""} onChange={set(f.k)} style={{ ...inp, color: values[f.k] ? "#2a3a3a" : "#8fbfbf" }}>
-                <option value="">{f.k}</option>
-                {f.options.map((o) => <option key={o} value={o} style={{ color: "#2a3a3a" }}>{o}</option>)}
+                <option value="">{ph(f)}</option>
+                {(f.options || []).map((o) => <option key={o} value={o} style={{ color: "#2a3a3a" }}>{o}</option>)}
               </select>
+            ) : f.type === "textarea" ? (
+              <textarea key={f.k} value={values[f.k] || ""} onChange={set(f.k)} placeholder={ph(f)} rows={4} style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
+            ) : f.type === "date" ? (
+              // El input de fecha no muestra placeholder: el nombre del campo va encima.
+              <label key={f.k} style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12.5, color: "#5b8f8f" }}>
+                {ph(f)}
+                <input type="date" value={values[f.k] || ""} onChange={set(f.k)} style={inp} />
+              </label>
             ) : (
               <input key={f.k} type={f.type || "text"} value={values[f.k] || ""} onChange={set(f.k)} placeholder={ph(f)} style={inp} />
             )
           )}
         </div>
 
-        <h3 style={{ color: "#1A9190", fontSize: 15, margin: "22px 0 10px" }}>{cfg.consentTitle}</h3>
+        <h3 style={{ color: "#1A9190", fontSize: 15, margin: "22px 0 10px" }}>{cfg.consentTitle || "Aceptación del Tratamiento y la Protección de Datos"}</h3>
         <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "#3a4a4a", cursor: "pointer" }}>
           <input
             type="checkbox"
@@ -173,7 +150,7 @@ export default function PublicForm() {
             onClick={(e) => { e.preventDefault(); if (consent) setConsent(false); else setShowPrivacy(true); }}
             style={{ marginTop: 3 }}
           />
-          <span>{cfg.consentCheck} <span style={{ color: "#e05a5a" }}>*</span></span>
+          <span>{cfg.consentCheck || "Al hacer clic en un botón de envío, acepto el consentimiento"} <span style={{ color: "#e05a5a" }}>*</span></span>
         </label>
 
         {showPrivacy && (

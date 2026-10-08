@@ -83,6 +83,12 @@ service cloud.firestore {
                     && request.resource.data.status == "recibido";
       allow read, update, delete: if ownDocOrg();
     }
+    // Formularios creados en CRM › Formularios. La página pública los lee a través del
+    // backend (/api/forms/def/:id), así que aquí no hay lectura pública.
+    match /crmForms/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
     match /employees/{docId} {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();

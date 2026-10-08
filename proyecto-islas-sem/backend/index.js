@@ -13,7 +13,7 @@ const { admin, db } = require("./lib/firebase");
 const { drainOutbox } = require("./lib/outbox");
 const { runSLA } = require("./lib/sla");
 const { processReplies } = require("./lib/inbox");
-const { submitForm, processFormSubmissions } = require("./lib/forms");
+const { submitForm, formDefinition, processFormSubmissions } = require("./lib/forms");
 const { recordOpen, recordClick } = require("./lib/reports");
 const { processAutomations } = require("./lib/automations");
 const { checkDomains } = require("./lib/domains");
@@ -50,7 +50,8 @@ api.post("/lists/:id/webhook-test", testWebhook);
 api.post("/forms/subscribe", subscribe);
 api.get("/forms/confirm/:sid", confirm);
 
-// --- Formularios públicos (SEPA / Datos Jurídicos) con reCAPTCHA v3 ---
+// --- Formularios públicos (SEPA / Datos Jurídicos / creados en CRM) con reCAPTCHA v3 ---
+api.get("/forms/def/:id", formDefinition);
 api.post("/forms/submit", submitForm);
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));

@@ -122,3 +122,67 @@
 .StepTemplates__buttons .secondary:hover {
   background: #111827;
 }
+
+.StepTemplates__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.StepTemplates__tabs button {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+
+.StepTemplates__tabs button.active {
+  background: #0097A7;
+  border-color: #0097A7;
+  color: #fff;
+}
+
+.StepTemplates__filter {
+  margin-left: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.StepTemplates__link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #0097A7;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.StepTemplates__card .TemplateThumb {
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+.StepTemplates__empty {
+  grid-column: 1 / -1;
+}
+
+.StepTemplates__buttons .primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .StepTemplates { padding: 24px 16px; }
+  .StepTemplates__filter { margin-left: 0; width: 100%; }
+}

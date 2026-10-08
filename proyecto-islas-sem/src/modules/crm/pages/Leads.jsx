@@ -18,6 +18,7 @@ import { usePipelines, getStages, flattenStages } from "../lib/pipelines";
 import { runStageAutomations } from "../lib/automations";
 import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
+import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
 
 const empty = {
   firstName: "",
@@ -340,10 +341,10 @@ function LeadHistoryModal({ lead, onClose }) {
       {forms.map((f) => (
         <details key={f.id} style={{ borderBottom: "1px solid #eef3f3", padding: "6px 0" }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
-            📋 {f.formType === "sepa" ? "Orden SEPA" : f.formType === "juridicos" ? "Datos Jurídicos" : f.formType} · {fmtDate(f.createdAt)}
+            📋 {submissionLabel(f)} · {fmtDate(f.createdAt)}
           </summary>
           <dl className="crm-dl" style={{ marginTop: 6 }}>
-            {Object.entries(f.data || {}).map(([k, v]) => <div className="row" key={k}><dt>{k}</dt><dd>{String(v) || "—"}</dd></div>)}
+            {submissionEntries(f).map(([k, v]) => <div className="row" key={k}><dt>{k}</dt><dd>{String(v) || "—"}</dd></div>)}
           </dl>
         </details>
       ))}

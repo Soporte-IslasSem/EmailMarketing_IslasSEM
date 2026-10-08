@@ -11,6 +11,8 @@ import {
   ACTION_OPTS,
   TO_OPTS,
 } from "../lib/automations";
+import { useCrmCollection } from "../lib/crm";
+import { BUILTIN_LIST } from "../../forms/public/builtinForms";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -19,6 +21,17 @@ export default function CrmAutomation() {
   const navigate = useNavigate();
   const pipeline = pipelines[0];
   const stages = pipeline ? flattenStages(getStages(pipeline, "pos")) : [];
+  const { items: customForms } = useCrmCollection("crmForms");
+  const formOpts = [
+    ...BUILTIN_LIST.map((f) => [f.type, f.name]),
+    ...customForms.filter((f) => f.active !== false).map((f) => [f.id, f.name]),
+  ];
+  // Al elegir formulario, el título por defecto pasa a ser su nombre (es el asunto del correo).
+  const pickForm = (stageId, r, formId) => {
+    const name = (formOpts.find((o) => o[0] === formId) || [])[1] || "";
+    const generic = !r.title || r.title === "Nueva regla" || formOpts.some((o) => o[1] === r.title);
+    updateStageRule(pipeline, stageId, r.id, { formId, ...(generic && name ? { title: name } : {}) });
+  };
 
   useEffect(() => {
     if (pipeline && !pipeline.automations) seedDefaultAutomations(pipeline);
@@ -63,6 +76,12 @@ export default function CrmAutomation() {
                       <select value={r.action} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { action: e.target.value })} style={ruleSel}>
                         {ACTION_OPTS.map((a) => <option key={a[0]} value={a[0]}>{a[1]}</option>)}
                       </select>
+                      {r.action === "form" && (
+                        <select value={r.formId || ""} onChange={(e) => pickForm(s.id, r, e.target.value)} style={ruleSel}>
+                          <option value="">Formulario: según el título (SEPA / Jurídicos)</option>
+                          {formOpts.map((o) => <option key={o[0]} value={o[0]}>📄 {o[1]}</option>)}
+                        </select>
+                      )}
                       <select value={r.to} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { to: e.target.value })} style={ruleSel}>
                         {TO_OPTS.map((t) => <option key={t[0]} value={t[0]}>→ {t[1]}</option>)}
                       </select>
