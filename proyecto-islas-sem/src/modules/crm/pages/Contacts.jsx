@@ -121,7 +121,7 @@ export default function Contacts() {
                       </div>
                     </td>
                     <td>
-                      {c.company ? <div><span className="crm-link" onClick={() => navigate("/dashboard/crm/companies")}>{c.company}</span>{c.area && <div style={{ fontSize: 12.5, color: "var(--crm-muted)" }}>{c.area}</div>}</div> : "—"}
+                      {c.company ? <div><span className="crm-link" onClick={() => navigate(c.companyId ? `/dashboard/crm/companies/${c.companyId}` : "/dashboard/crm/companies")}>{c.company}</span>{c.area && <div style={{ fontSize: 12.5, color: "var(--crm-muted)" }}>{c.area}</div>}</div> : "—"}
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>

@@ -163,6 +163,44 @@ async function subscribeToList(listId, email, name, formId) {
   return r.status === "subscribed" || r.status === "pending" ? r.status : false;
 }
 
+// Datos Jurídicos lleva la aceptación del tratamiento de datos: la empresa del cliente
+// queda con RGPD "Firmado" (se busca por CIF, por la empresa del contacto o por el nombre;
+// si no existe, se crea con los datos del formulario). Devuelve el id de la empresa.
+const normCif = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+async function markRgpdSigned(orgId, data, contactId, submissionId) {
+  const entries = Object.entries(data || {});
+  const get = (re) => String((entries.find(([k, v]) => re.test(k) && String(v).trim()) || [])[1] || "").trim();
+  const cif = get(/cif|nif/i);
+  const name = get(/denominaci[oó]n/i);
+  const companies = (await db.collection("companies").where("orgId", "==", orgId).get()).docs;
+  let ref = null;
+  if (cif) ref = companies.find((d) => normCif(d.data().cif) && normCif(d.data().cif) === normCif(cif))?.ref || null;
+  let contact = null;
+  if (contactId) {
+    const c = await db.collection("contacts").doc(contactId).get();
+    contact = c.exists ? c.data() : null;
+    if (!ref && contact?.companyId) ref = companies.find((d) => d.id === contact.companyId)?.ref || null;
+  }
+  if (!ref && name) ref = companies.find((d) => String(d.data().name || "").trim().toLowerCase() === name.toLowerCase())?.ref || null;
+  const signed = { rgpd: "Firmado", rgpdAt: new Date(), rgpdSource: "Formulario Datos Jurídicos", rgpdSubmissionId: submissionId, updatedAt: new Date() };
+  if (ref) {
+    const cur = companies.find((d) => d.id === ref.id).data();
+    await ref.update({ ...signed, ...(cif && !cur.cif ? { cif } : {}) });
+  } else {
+    if (!name && !cif) return "";
+    ref = await db.collection("companies").add({
+      orgId, name: name || cif, cif, address: get(/direcci[oó]n fiscal/i), province: get(/provincia/i),
+      email: get(/correo electr[oó]nico de facturaci/i), phone: get(/tel[eé]fono de facturaci/i),
+      employees: get(/empleados/i), industry: get(/actividad/i), source: "Formulario web", notes: "", custom: {},
+      createdAt: new Date(), ...signed,
+    });
+  }
+  if (contactId && contact && !contact.companyId) {
+    await db.collection("contacts").doc(contactId).update({ companyId: ref.id, ...(contact.company ? {} : { company: name }) });
+  }
+  return ref.id;
+}
+
 // Extrae email/nombre/teléfono/empresa de los campos (los nombres vienen del formulario).
 function pickPerson(data) {
   const entries = Object.entries(data || {});
@@ -203,6 +241,10 @@ async function processFormSubmissions() {
       entityId: dealId || leadId || contactId || null,
       contactId, leadId, formSubmissionId: doc.id, formType: s.formType,
     });
+    // Datos Jurídicos (original o editado): RGPD firmado en la empresa.
+    if (s.formType === "juridicos") {
+      await markRgpdSigned(orgId, s.data, contactId, doc.id).catch((e) => console.warn("[forms] rgpd:", e.message));
+    }
     const subscribed = s.listId ? await subscribeToList(s.listId, person.email, [person.firstName, person.lastName].filter(Boolean).join(" "), s.formType).catch((e) => { console.warn("[forms] lista:", e.message); return false; }) : false;
     await doc.ref.update({ contactId, leadId, dealId, status: "vinculado", linkedAt: new Date(), ...(subscribed ? { subscribedToList: subscribed } : {}) });
     linked++;
@@ -210,4 +252,4 @@ async function processFormSubmissions() {
   return { linked };
 }
 
-module.exports = { submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm };
+module.exports = { submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };

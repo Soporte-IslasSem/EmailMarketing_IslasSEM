@@ -85,6 +85,7 @@ import Audit from "../modules/crm/pages/Audit.jsx";
 import Calendar from "../modules/crm/pages/Calendar.jsx";
 import NewDeal from "../modules/crm/pages/NewDeal.jsx";
 import Companies from "../modules/crm/pages/Companies.jsx";
+import CompanyDetail from "../modules/crm/pages/CompanyDetail.jsx";
 import Leads from "../modules/crm/pages/Leads.jsx";
 import Pipeline from "../modules/crm/pages/Pipeline.jsx";
 import Activities from "../modules/crm/pages/Activities.jsx";
@@ -175,6 +176,7 @@ const router = createBrowserRouter([
       { path: "crm/contacts", element: <Contacts /> },
       { path: "crm/contacts/:id", element: <ContactDetail /> },
       { path: "crm/companies", element: <Companies /> },
+      { path: "crm/companies/:id", element: <CompanyDetail /> },
       { path: "crm/leads", element: <Leads /> },
       { path: "crm/pipeline", element: <Pipeline /> },
       { path: "crm/newdeal", element: <NewDeal /> },

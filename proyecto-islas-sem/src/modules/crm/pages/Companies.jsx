@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
-import { useCrmCollection, crmCreate, crmRemove, fmtDate } from "../lib/crm";
+import { useCrmCollection, crmCreate, crmRemove } from "../lib/crm";
 import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
@@ -9,6 +10,7 @@ const RGPD = ["Pendiente", "Firmado", "No aplica"];
 
 export default function Companies() {
   const { items, loading, orgId } = useCrmCollection("companies");
+  const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState(empty);
@@ -72,13 +74,14 @@ export default function Companies() {
             {filtered.length ? (
               filtered.map((c) => (
                 <tr key={c.id}>
-                  <td><b>{c.name}</b></td>
+                  <td><span className="crm-link" onClick={() => navigate(`/dashboard/crm/companies/${c.id}`)}><b>{c.name || "(sin nombre)"}</b></span></td>
                   <td>{c.cif || "—"}</td>
                   <td>{c.iban || "—"}</td>
                   <td>{c.community || c.city || "—"}</td>
                   <td><span className={`crm-chip ${c.rgpd === "Firmado" ? "ok" : c.rgpd === "No aplica" ? "info" : "warn"}`}>{c.rgpd || "Pendiente"}</span></td>
                   <td>{c.email || "—"}</td>
-                  <td style={{ textAlign: "right" }}>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <button className="crm-btn ghost sm" onClick={() => navigate(`/dashboard/crm/companies/${c.id}`)}>Ver ficha</button>{" "}
                     <button
                       className="crm-btn ghost sm"
                       onClick={() => window.confirm(`¿Eliminar "${c.name}"?`) && crmRemove("companies", c.id)}

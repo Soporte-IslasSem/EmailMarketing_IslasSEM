@@ -120,7 +120,7 @@ export default function ContactDetail() {
               <div className="row"><dt>Email</dt><dd>{contact.email || "—"}</dd></div>
               <div className="row"><dt>Teléfono</dt><dd>{contact.phone || "—"}</dd></div>
               <div className="row"><dt>DNI/NIF</dt><dd>{contact.dni || "—"}</dd></div>
-              <div className="row"><dt>Empresa</dt><dd>{contact.company || "—"}</dd></div>
+              <div className="row"><dt>Empresa</dt><dd>{contact.companyId ? <span className="crm-link" onClick={() => navigate(`/dashboard/crm/companies/${contact.companyId}`)}>{contact.company || "Ver empresa"}</span> : contact.company || "—"}</dd></div>
               <div className="row"><dt>Dirección</dt><dd>{contact.address || "—"}</dd></div>
               <div className="row"><dt>Ciudad</dt><dd>{contact.city || "—"}{contact.province ? ` · ${contact.province}` : ""}</dd></div>
               <div className="row"><dt>Tipo</dt><dd>{tier ? `${tier.icon} ${tier.label}` : "—"}</dd></div>
