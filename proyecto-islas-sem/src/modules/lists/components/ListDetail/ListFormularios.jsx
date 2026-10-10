@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCrmCollection, crmUpdate } from "../../../crm/lib/crm";
 import { useList } from "../../hooks/useList.js";
+import { BUILTIN_LIST } from "../../../forms/public/builtinForms";
 import ShareFormModal from "../../../crm/components/ShareFormModal";
 import "./ListFormularios.styles.css";
 
@@ -16,10 +17,12 @@ export default function ListFormularios() {
   const { list } = useList(listId);
   const [busy, setBusy] = useState("");
   // El resto de formularios del CRM: se pueden conectar a esta lista con un clic.
-  const others = useMemo(
-    () => items.filter((f) => f.listId !== listId).sort((a, b) => String(a.name || a.title || "").localeCompare(String(b.name || b.title || ""))),
-    [items, listId]
-  );
+  // SEPA y Datos Jurídicos (fijos) aparecen aunque nunca se hayan editado.
+  const others = useMemo(() => {
+    const saved = items.filter((f) => f.listId !== listId);
+    const builtins = BUILTIN_LIST.filter((b) => !items.some((f) => f.id === b.type)).map((b) => ({ id: b.type, name: b.name, builtin: true }));
+    return [...saved, ...builtins].sort((a, b) => String(a.name || a.title || "").localeCompare(String(b.name || b.title || "")));
+  }, [items, listId]);
   const connect = async (f) => {
     if (f.listId && !window.confirm(`"${f.name || f.title}" ahora suscribe a la lista "${f.listName || "otra lista"}". Un formulario solo tiene una lista destino: ¿cambiarla a "${list?.name || "esta lista"}"?`)) return;
     setBusy(f.id);
@@ -114,7 +117,11 @@ export default function ListFormularios() {
                   <td>{counts[f.id] || 0}</td>
                   <td>{f.active === false ? "Desactivado" : "Publicado"}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="ListFormularios__createBtn" disabled={busy === f.id} onClick={() => connect(f)}>{busy === f.id ? "Conectando…" : "Conectar a esta lista"}</button>{" "}
+                    {f.builtin ? (
+                      <button className="ListFormularios__createBtn" onClick={() => navigate(`/dashboard/forms/edit/${f.id}`)} title="Ábrelo, elige esta lista en «Lista destino» y pulsa Publicar">Abrir para conectar</button>
+                    ) : (
+                      <button className="ListFormularios__createBtn" disabled={busy === f.id} onClick={() => connect(f)}>{busy === f.id ? "Conectando…" : "Conectar a esta lista"}</button>
+                    )}{" "}
                     <button className="ListFormularios__backBtn" onClick={() => setShare(f)}>Mostrar</button>
                   </td>
                 </tr>
