@@ -4,8 +4,9 @@ import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
 import CrmModal from "../components/CrmModal";
 import ClientTypesModal from "../components/ClientTypesModal";
+import ContactImportModal from "../components/ContactImportModal";
 import TypeChip from "../components/TypeChip";
-import { useCrmCollection, crmCreate, logActivity, fmtDate, tsToDate } from "../lib/crm";
+import { useCrmCollection, crmCreate, crmRemove, logActivity, fmtDate, tsToDate } from "../lib/crm";
 import { useClientTypes, typeOf, RELATIONS } from "../lib/clientTypes";
 import { useTaskScope } from "../lib/tasks";
 import { ownerKey, ownerLabel, ownerFields } from "../lib/owners";
@@ -59,6 +60,7 @@ export default function Contacts() {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkType, setBulkType] = useState("");
   const [bulkOwner, setBulkOwner] = useState("");
+  const [showImport, setShowImport] = useState(false);
   const [ownerFilter, setOwnerFilter] = useState(""); // "" todos · "__none" sin responsable · "person:id" / "team:id"
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showTypes, setShowTypes] = useState(false);
@@ -155,6 +157,34 @@ export default function Contacts() {
     }
   };
 
+  // Borrado en bloque: van a la Papelera de reciclaje (se pueden restaurar). Solo los que
+  // el rol permite eliminar.
+  const deletable = [...selected].map((id) => items.find((c) => c.id === id)).filter((c) => c && perms.can("contacts", "delete", c));
+  const bulkDelete = async () => {
+    if (!deletable.length) return;
+    const skipped = selected.size - deletable.length;
+    if (!window.confirm(`¿Eliminar ${deletable.length} contacto(s)?${skipped ? ` (${skipped} no se pueden eliminar con tu rol)` : ""}
+
+Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar.`)) return;
+    setBulkBusy(true);
+    let fail = 0;
+    try {
+      for (let i = 0; i < deletable.length; i += 20) {
+        const r = await Promise.allSettled(deletable.slice(i, i + 20).map((c) => crmRemove("contacts", c.id)));
+        fail += r.filter((x) => x.status === "rejected").length;
+      }
+      setSelected(new Set());
+      if (fail) alert(`${fail} contacto(s) no se pudieron eliminar.`);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const nextNumber = useMemo(() => {
+    let max = 0;
+    all.forEach((c) => { const m = /^CLI-(\d+)$/.exec(c.clientId || ""); if (m) max = Math.max(max, parseInt(m[1])); });
+    return max + 1;
+  }, [all]);
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const save = async () => {
@@ -197,6 +227,7 @@ export default function Contacts() {
               ["Ciudad", (c) => c.city], ["Provincia", (c) => c.province], ["DNI/NIF", (c) => c.dni], ["Alta", (c) => fmtDate(c.createdAt)],
             ])}>⬇ Exportar ({filtered.length})</button>
           )}
+          {perms.can("contacts", "import") && perms.can("contacts", "add") && <button className="crm-btn ghost" onClick={() => setShowImport(true)}>⬆ Importar</button>}
           {perms.can("contacts", "add") && <button className="crm-btn" onClick={() => setShowNew(true)}>+ Añadir contacto</button>}
         </div>
       </div>
@@ -241,6 +272,9 @@ export default function Contacts() {
               </select>
               <button className="crm-btn sm" onClick={applyBulkOwner} disabled={bulkOwner === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Asignar"}</button>
             </>
+          )}
+          {deletable.length > 0 && (
+            <button className="crm-btn ghost sm" style={{ color: "#b0304c", borderColor: "#f0c9d2" }} onClick={bulkDelete} disabled={bulkBusy}>🗑 Eliminar ({deletable.length})</button>
           )}
           <button className="crm-btn ghost sm" onClick={() => setSelected(new Set())}>Quitar selección</button>
         </div>
@@ -311,6 +345,9 @@ export default function Contacts() {
         </>
       )}
 
+      {showImport && (
+        <ContactImportModal orgId={orgId} existing={all} types={types} canSetType={isAdmin} nextNumber={nextNumber} onClose={() => setShowImport(false)} />
+      )}
       {showTypes && <ClientTypesModal orgId={orgId} types={types} counts={counts} onClose={() => setShowTypes(false)} />}
 
       {showNew && (
