@@ -1,6 +1,7 @@
 import CSVUploader from "./ListDetail/CSVUploader.jsx";
 import TextPasteImporter from "./ListDetail/TextPasteImporter.jsx";
 import ManualAddSubscriber from "./ListDetail/ManualAddSubscriber.jsx";
+import CrmPicker from "./ListDetail/CrmPicker.jsx";
 
 export default function ImportMethods({
   method,
@@ -55,6 +56,21 @@ export default function ImportMethods({
         </div>
       </div>
 
+      <div
+        className={`method-card ${method === "crm" ? "active" : ""}`}
+        onClick={() => {
+          setMethod("crm");
+          setError("");
+          setRawEmails([]);
+        }}
+      >
+        <input type="checkbox" checked={method === "crm"} readOnly />
+        <div>
+          <h3>Desde el CRM</h3>
+          <p>Elige contactos o empresas que ya tienes, por tipo de cliente.</p>
+        </div>
+      </div>
+
       {/* 🔵 CARD DINÁMICO — ahora dentro del grid */}
       {method === "csv" && (
         <div className="ListDetail__content">
@@ -76,6 +92,12 @@ export default function ImportMethods({
               setError("");
             }}
           />
+        </div>
+      )}
+
+      {method === "crm" && (
+        <div className="ListDetail__content">
+          <CrmPicker onDataParsed={(emails) => setRawEmails(emails)} />
         </div>
       )}
 
