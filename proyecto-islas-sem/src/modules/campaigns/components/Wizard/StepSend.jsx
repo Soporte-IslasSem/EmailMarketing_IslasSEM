@@ -15,7 +15,7 @@ import {
   getDocs
 } from "firebase/firestore";
 import { useOrg } from "../../../crm/lib/useOrg";
-import { enqueueCampaign, enqueueTest } from "../../lib/campaignSend";
+import { enqueueCampaign, enqueueTest, finalRecipients } from "../../lib/campaignSend";
 
 // Modal
 import CampaignSendModal from "./modals/CampaignSendModal";
@@ -176,7 +176,11 @@ export default function StepSend() {
               </ul>
 
               <h3>Destinatarios reales</h3>
-              <p><strong>Total:</strong> {subscribers.length}</p>
+              <p><strong>Total:</strong> {finalRecipients(subscribers, campaign).length}
+                {subscribers.length > finalRecipients(subscribers, campaign).length && (
+                  <span style={{ color: "#6b7d7d", fontSize: 13 }}> (de {subscribers.length} en las listas: sin repetidos, sin bajas y sin los que quitaste)</span>
+                )}
+              </p>
 
               <h3>¿Cuándo se envía?</h3>
               <div className="StepSend__schedule">

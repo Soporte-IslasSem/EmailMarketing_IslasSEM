@@ -1,5 +1,6 @@
-// Listas automáticas del CRM (Email Marketing › Listas): "CRM · Todos los contactos" y una
-// por cada tipo de cliente ("CRM · RGPD", …), listas para usarlas en campañas.
+// Listas automáticas del CRM (Email Marketing › Listas): "CRM · Todos los contactos", una
+// por cada tipo de cliente ("CRM · RGPD", …) y "CRM · Empresas" (email de cada empresa),
+// listas para usarlas en campañas.
 // Se sincronizan al abrir Listas (como mucho cada 10 min, o al pulsar "Actualizar"):
 // - altas: contactos con email válido que deberían estar y no están;
 // - bajas: suscriptores que vinieron del CRM (source "crm") y ya no corresponden;
@@ -35,11 +36,14 @@ export default function useCrmListsSync() {
     if (!uid || !orgId || !perms.ready) return;
     setState((s) => ({ ...s, busy: true, error: "" }));
     try {
-      const contacts = perms.visible("contacts", (await getDocs(query(collection(db, "contacts"), where("orgId", "==", orgId)))).docs.map((d) => ({ id: d.id, ...d.data() })))
+      const load = async (col) => perms.visible(col, (await getDocs(query(collection(db, col), where("orgId", "==", orgId)))).docs.map((d) => ({ id: d.id, ...d.data() })))
         .map((c) => ({ ...c, email: String(c.email || "").trim().toLowerCase() }))
         .filter((c) => EMAIL_RE.test(c.email));
-      const wanted = [{ key: "all", name: "CRM · Todos los contactos", match: () => true }]
-        .concat(types.map((t) => ({ key: `type:${t.id}`, name: `CRM · ${t.label}`, match: (c) => c.clientType === t.id })));
+      const contacts = await load("contacts");
+      const companies = await load("companies");
+      const wanted = [{ key: "all", name: "CRM · Todos los contactos", pool: contacts, match: () => true }]
+        .concat(types.map((t) => ({ key: `type:${t.id}`, name: `CRM · ${t.label}`, pool: contacts, match: (c) => c.clientType === t.id })))
+        .concat([{ key: "companies", name: "CRM · Empresas", pool: companies, match: () => true }]);
 
       const mine = (await getDocs(query(collection(db, "lists"), where("userId", "==", uid)))).docs;
       const crmLists = new Map(mine.filter((d) => d.data().crm).map((d) => [d.data().crmKey, d]));
@@ -58,13 +62,13 @@ export default function useCrmListsSync() {
           ? (await getDocs(query(collection(db, "subscribers"), where("listId", "==", ref.id), where("userId", "==", uid)))).docs
           : [];
         const have = new Map(subs.map((s) => [String(s.data().email || "").toLowerCase(), s]));
-        const should = new Map(contacts.filter(w.match).map((c) => [c.email, c]));
+        const should = new Map(w.pool.filter(w.match).map((c) => [c.email, c]));
         let count = subs.length;
         for (const [email, c] of should) {
           if (have.has(email)) continue;
-          const name = `${c.firstName || ""} ${c.lastName || ""}`.trim();
+          const name = (w.key === "companies" ? c.name : `${c.firstName || ""} ${c.lastName || ""}`).trim();
           ops.push((b) => b.set(doc(collection(db, "subscribers")), {
-            email, ...(name ? { name } : {}), listId: ref.id, userId: uid, status: "subscribed", source: "crm", contactId: c.id, createdAt: new Date(),
+            email, ...(name ? { name } : {}), listId: ref.id, userId: uid, status: "subscribed", source: "crm", ...(w.key === "companies" ? { companyId: c.id } : { contactId: c.id }), createdAt: new Date(),
           }));
           count++;
         }

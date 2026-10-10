@@ -15,6 +15,20 @@ const emailable = (s) => {
   return !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid", "pending"].includes(st);
 };
 
+// Destinatarios finales de una campaña: solo los que pueden recibir, UNA vez por email
+// aunque estén en varias listas elegidas, y sin los que se quitaron a mano en el paso
+// "Listas" (campaign.lists.excludedEmails).
+export function finalRecipients(subscribers, campaign) {
+  const excluded = new Set((campaign?.lists?.excludedEmails || []).map((e) => String(e).toLowerCase()));
+  const seen = new Set();
+  return subscribers.filter((s) => {
+    const e = String(s.email || "").trim().toLowerCase();
+    if (!emailable(s) || excluded.has(e) || seen.has(e)) return false;
+    seen.add(e);
+    return true;
+  });
+}
+
 // Enlaces http(s) de la campaña → pasan por /api/c para contar el clic y luego redirigen.
 // No se tocan mailto:, tel:, anclas (#) ni el enlace de baja.
 function trackLinks(html, campaignId, sid) {
@@ -43,7 +57,7 @@ function personalize(html, { campaignId, sub }) {
 // backend los libera cuando llega la hora. Devuelve { enqueued, skipped, scheduled }.
 export async function enqueueCampaign(orgId, campaignId, campaign, subscribers, { sendAt } = {}) {
   const scheduled = sendAt instanceof Date && sendAt.getTime() > Date.now() + 60e3;
-  const recipients = subscribers.filter(emailable);
+  const recipients = finalRecipients(subscribers, campaign);
   const skipped = subscribers.length - recipients.length;
   const subject = campaign.config?.subject || "(sin asunto)";
   // La dirección la fija el servidor (cuenta SMTP); el nombre visible sí es de cada campaña.
