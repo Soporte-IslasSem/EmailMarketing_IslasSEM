@@ -20,6 +20,9 @@ import {
   createPipeline,
 } from "../lib/pipelines";
 import TaskModal from "../components/TaskModal";
+import DealEditModal from "../components/DealEditModal";
+import { CustomFieldsForm } from "../components/CustomFields";
+import { CreateFieldModal, ExtraFieldsEditor } from "../components/DealFields";
 import { useTaskScope, useGoogleStatus } from "../lib/tasks";
 import { usePerms } from "../lib/permissions";
 import { exportCsv } from "../lib/exportCsv";
@@ -71,6 +74,7 @@ export default function Pipeline() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activityFor, setActivityFor] = useState(null); // { deal, type }
+  const [editing, setEditing] = useState(null); // negociación en edición (✎)
   const scope = useTaskScope();
   const [google] = useGoogleStatus();
   const unassigned = deals.filter((d) => !d.pipelineId);
@@ -152,19 +156,26 @@ export default function Pipeline() {
     setNewDeal(null);
   };
 
-  const quickSave = async (stageId, title, amount) => {
-    if (!title.trim()) return;
+  const quickSave = async (stageId, q) => {
+    if (!q.title.trim()) return false;
+    const match = contacts.find((c) => `${c.firstName || ""} ${c.lastName || ""}`.trim().toLowerCase() === q.contact.trim().toLowerCase());
     await crmCreate("deals", orgId, {
       pipelineId: pipeline.id,
       board,
       stage: stageId,
-      title: title.trim(),
-      amount: Number(amount) || 0,
-      contact: "",
-      company: "",
+      title: q.title.trim(),
+      amount: Number(q.amount) || 0,
+      contact: q.contact.trim(),
+      contactId: match?.id || null,
+      contactEmail: match?.email || "",
+      company: q.company.trim(),
       clientType: "nuevo",
       priceType: "producto",
+      source: "Manual",
+      custom: q.custom || {},
+      extraFields: q.extraFields || [],
     });
+    return true;
   };
 
   const onDrop = async (stageId) => {
@@ -241,7 +252,7 @@ export default function Pipeline() {
         {colHead(s, color, sub)}
         <div className="deal-total">{money(total)}</div>
         {!canAdd ? null : quickCol === s.id ? (
-          <QuickAdd stageId={s.id} onSave={quickSave} onClose={() => setQuickCol(null)} onFull={() => openNewDeal(s.id)} />
+          <QuickAdd stageId={s.id} orgId={orgId} contacts={contacts} onSave={quickSave} onClose={() => setQuickCol(null)} onFull={() => openNewDeal(s.id)} />
         ) : (
           <button className="deal-quick" onClick={() => setQuickCol(s.id)}>+ Negociación rápida</button>
         )}
@@ -322,12 +333,7 @@ export default function Pipeline() {
     );
   };
 
-  const editDeal = (d) => {
-    const title = window.prompt("Título de la negociación:", d.title);
-    if (title === null) return;
-    const amount = window.prompt("Importe (€):", d.amount || 0);
-    crmUpdate("deals", d.id, { title: title.trim() || d.title, amount: Number(amount) || 0 });
-  };
+  const editDeal = (d) => setEditing(d);
 
   return (
     <div className="crmpipe">
@@ -460,6 +466,8 @@ export default function Pipeline() {
         />
       )}
 
+      {editing && <DealEditModal deal={editing} orgId={orgId} onClose={() => setEditing(null)} />}
+
       {activityFor && (
         <TaskModal
           orgId={orgId}
@@ -522,41 +530,46 @@ function ListView({ deals, pipeline, board, q, navigate }) {
   );
 }
 
-/* ---------- alta rápida inline ---------- */
-function QuickAdd({ stageId, onSave, onClose, onFull }) {
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
+/* ---------- alta rápida inline (con más campos opcionales) ---------- */
+const EMPTY_QUICK = { title: "", amount: "", contact: "", company: "", custom: {}, extraFields: [] };
+function QuickAdd({ stageId, orgId, contacts, onSave, onClose, onFull }) {
+  const [q, setQ] = useState(EMPTY_QUICK);
+  const [more, setMore] = useState(false);
+  const [newField, setNewField] = useState(false);
+  const set = (k) => (e) => setQ((x) => ({ ...x, [k]: e.target.value }));
   const submit = async () => {
-    await onSave(stageId, title, amount);
-    setTitle("");
-    setAmount("");
+    if (await onSave(stageId, q)) setQ(EMPTY_QUICK); // queda abierto para seguir añadiendo
+  };
+  const keys = (e) => {
+    if (e.target.closest(".crm-modal")) return; // teclas dentro del modal "Crear campo"
+    if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") submit();
+    if (e.key === "Escape") onClose();
   };
   return (
-    <div className="quick-add">
-      <input
-        className="qa-in"
-        autoFocus
-        placeholder="Nombre de la negociación"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
-          if (e.key === "Escape") onClose();
-        }}
-      />
-      <input
-        className="qa-in qa-amt"
-        type="number"
-        placeholder="Importe €"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && submit()}
-      />
+    <div className="quick-add" onKeyDown={keys}>
+      <input className="qa-in" autoFocus placeholder="Nombre de la negociación" value={q.title} onChange={set("title")} />
+      <input className="qa-in qa-amt" type="number" placeholder="Importe €" value={q.amount} onChange={set("amount")} />
+      <input className="qa-in" placeholder="Contacto" value={q.contact} onChange={set("contact")} list={`qa-c-${stageId}`} />
+      <datalist id={`qa-c-${stageId}`}>{contacts.map((c) => <option key={c.id} value={`${c.firstName || ""} ${c.lastName || ""}`.trim()} />)}</datalist>
+      <input className="qa-in" placeholder="Empresa" value={q.company} onChange={set("company")} />
+      {more && (
+        <div style={{ fontSize: 12 }}>
+          <CustomFieldsForm entity="deals" values={q.custom} onChange={(custom) => setQ((x) => ({ ...x, custom }))} />
+          <ExtraFieldsEditor value={q.extraFields} onChange={(extraFields) => setQ((x) => ({ ...x, extraFields }))} />
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, margin: "2px 0 6px" }}>
+        <span className="crm-link" onClick={() => setMore((m) => !m)}>{more ? "− Menos campos" : "+ Más campos"}</span>
+        <span className="crm-link" onClick={() => { setMore(true); setNewField(true); }}>+ Crear campo</span>
+      </div>
       <div className="qa-row">
         <button className="qa-save" onClick={submit}>Añadir</button>
         <button className="qa-cancel" onClick={onClose}>Cancelar</button>
       </div>
       <button className="qa-cancel" style={{ width: "100%", marginTop: 6 }} onClick={onFull}>Con todos los campos →</button>
+      {newField && (
+        <CreateFieldModal orgId={orgId} onClose={() => setNewField(false)} onAddExtra={(f) => setQ((x) => ({ ...x, extraFields: [...x.extraFields, f] }))} />
+      )}
     </div>
   );
 }
