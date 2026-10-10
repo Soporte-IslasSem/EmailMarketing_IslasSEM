@@ -1,15 +1,25 @@
-// Tipos de cliente definidos por la empresa (CRM › Contactos › "Tipos de cliente").
-// Se guardan en organizations/{orgId}.clientTypes; si no hay, se usan los de siempre.
-// Cada contacto guarda el id en `clientType` (los antiguos: nuevo / recurrente / vip).
+// Tipo de cliente = el servicio del que es cliente (el campo "Tipo Cliente" de Bitrix:
+// RGPD, Subvención Kit Digital, Asesoría…). La empresa define la lista en
+// CRM › Contactos › "Tipos de cliente" (organizations/{orgId}.clientTypes) y solo los
+// administradores la editan o cambian el tipo de un contacto. Cada contacto guarda el id
+// en `clientType`.
+// Aparte, `relation` es la relación con la empresa (nuevo / recurrente / VIP).
 import { useEffect, useState } from "react";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
 import { useOrg } from "./useOrg";
 
 export const DEFAULT_CLIENT_TYPES = [
-  { id: "nuevo", label: "Cliente nuevo", icon: "🆕", color: "#2f80ed" },
-  { id: "recurrente", label: "Cliente recurrente", icon: "🔁", color: "#1a9190" },
-  { id: "vip", label: "Cliente VIP", icon: "⭐", color: "#d4a017" },
+  { id: "asesoria", label: "ASESORIA", icon: "", color: "#2f80ed" },
+  { id: "rgpd", label: "RGPD", icon: "", color: "#1a9190" },
+  { id: "subvencion-kit-digital", label: "SUBVENCIÓN KIT DIGITAL", icon: "", color: "#e08a2b" },
+  { id: "bitrix24", label: "BITRIX24", icon: "", color: "#8b5cf6" },
+];
+
+export const RELATIONS = [
+  { id: "nuevo", label: "Nuevo", icon: "🆕" },
+  { id: "recurrente", label: "Recurrente", icon: "🔁" },
+  { id: "vip", label: "VIP", icon: "⭐" },
 ];
 
 export function useClientTypes() {

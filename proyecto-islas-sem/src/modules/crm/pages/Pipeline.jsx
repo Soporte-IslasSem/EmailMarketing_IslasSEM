@@ -574,7 +574,7 @@ function NewDealModal({ stages, preStage, contacts, onClose, onSave }) {
       </div>
       <div className="crm-field"><label>Empresa</label><input value={form.company} onChange={set("company")} /></div>
       <div className="crm-two">
-        <div className="crm-field"><label>Tipología</label>
+        <div className="crm-field"><label>Relación con el cliente</label>
           <select value={form.clientType} onChange={set("clientType")}>
             {Object.entries(CLIENT_TIERS).map(([k, t]) => <option key={k} value={k}>{t.icon} {t.label}</option>)}
           </select>

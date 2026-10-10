@@ -117,7 +117,7 @@ export default function NewDeal() {
               <div className="crm-field"><label>Etapa</label>
                 <select value={stage} onChange={set("stage")}>{stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
               </div>
-              <div className="crm-field"><label>Tipología</label>
+              <div className="crm-field"><label>Relación con el cliente</label>
                 <select value={form.clientType} onChange={set("clientType")}>{Object.entries(CLIENT_TIERS).map(([k, t]) => <option key={k} value={k}>{t.icon} {t.label}</option>)}</select>
               </div>
             </div>

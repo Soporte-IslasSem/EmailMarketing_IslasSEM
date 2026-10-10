@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCrmCollection, crmGet, crmCreate, crmUpdate, logActivity, money, fmtDate, ACTIVITY_TYPES } from "../lib/crm";
-import { useClientTypes, typeOf } from "../lib/clientTypes";
+import { useClientTypes, typeOf, RELATIONS } from "../lib/clientTypes";
+import { useTaskScope } from "../lib/tasks";
 import TypeChip from "../components/TypeChip";
 import { useOrg } from "../lib/useOrg";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
@@ -17,6 +18,7 @@ export default function ContactDetail() {
 
   const { items: activities } = useCrmCollection("activities");
   const { types } = useClientTypes();
+  const { isAdmin } = useTaskScope();
   const { items: deals } = useCrmCollection("deals");
   const { items: formSubs } = useCrmCollection("formSubmissions");
 
@@ -98,9 +100,9 @@ export default function ContactDetail() {
 
   const name = `${contact.firstName || ""} ${contact.lastName || ""}`.trim() || "(sin nombre)";
   const tier = typeOf(types, contact.clientType);
-  const setType = async (clientType) => {
-    await crmUpdate("contacts", id, { clientType });
-    setContact((c) => ({ ...c, clientType }));
+  const setField = async (patch) => {
+    await crmUpdate("contacts", id, patch);
+    setContact((c) => ({ ...c, ...patch }));
   };
 
   return (
@@ -131,10 +133,18 @@ export default function ContactDetail() {
               <div className="row"><dt>Ciudad</dt><dd>{contact.city || "—"}{contact.province ? ` · ${contact.province}` : ""}</dd></div>
               <div className="row"><dt>Tipo de cliente</dt><dd style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <TypeChip t={tier} />
-                <select value={contact.clientType || ""} onChange={(e) => setType(e.target.value)} style={{ fontSize: 12.5, padding: "3px 6px", border: "1px solid #dfe7e7", borderRadius: 6 }} title="Cambiar tipo">
-                  <option value="">— Sin tipo —</option>
-                  {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
-                  {contact.clientType && !types.some((t) => t.id === contact.clientType) && <option value={contact.clientType}>{contact.clientType}</option>}
+                {isAdmin && (
+                  <select value={contact.clientType || ""} onChange={(e) => setField({ clientType: e.target.value })} style={{ fontSize: 12.5, padding: "3px 6px", border: "1px solid #dfe7e7", borderRadius: 6 }} title="Cambiar tipo (solo administradores)">
+                    <option value="">— Sin tipo —</option>
+                    {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+                    {contact.clientType && !types.some((t) => t.id === contact.clientType) && <option value={contact.clientType}>{contact.clientType}</option>}
+                  </select>
+                )}
+              </dd></div>
+              <div className="row"><dt>Relación</dt><dd>
+                <select value={contact.relation || ""} onChange={(e) => setField({ relation: e.target.value })} style={{ fontSize: 12.5, padding: "3px 6px", border: "1px solid #dfe7e7", borderRadius: 6 }}>
+                  <option value="">—</option>
+                  {RELATIONS.map((r) => <option key={r.id} value={r.id}>{r.icon} {r.label}</option>)}
                 </select>
               </dd></div>
               <div className="row"><dt>Alta</dt><dd>{fmtDate(contact.createdAt)}</dd></div>

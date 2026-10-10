@@ -62,8 +62,11 @@ const source = (code) => SOURCE[code] || (code ? "Importado" : "Importado");
 
 /* ---------- campos personalizados (UF_*) ---------- */
 // UF que van a campos estándar del CRM nuevo en vez de a campos personalizados.
-const STD_UF_LABELS = { companies: { "CIF/NIF": "cif", IBAN: "iban", "Comunidad Autónoma": "community", Localidad: "city", Sector: "industry" } };
+// "Tipo Cliente" de los contactos es el tipo de cliente de la app (clientType), no un campo extra.
+const STD_UF_LABELS = { contacts: { "Tipo Cliente": "clientTypeLabel" }, companies: { "CIF/NIF": "cif", IBAN: "iban", "Comunidad Autónoma": "community", Localidad: "city", Sector: "industry" } };
 const UF_TYPE = { string: "text", double: "number", integer: "number", date: "date", datetime: "date", enumeration: "select", boolean: "checkbox", url: "url" };
+// Campos de ejemplo de Bitrix ("Tipo de cliente 1/2/3"): se guardan en bitrixExtra, sin campo visible.
+const SAMPLE_UF_LABELS = { contacts: ["Tipo de cliente"] };
 const customDefs = []; // definiciones a crear
 
 function buildCustomMap(entity, bxEntity, rows) {
@@ -80,6 +83,7 @@ function buildCustomMap(entity, bxEntity, rows) {
     // visible, pero su valor se guarda en `bitrixExtra` para no perder nada.
     if (!label) { map[uf] = { extra: uf, items }; return; }
     if (std[label]) { map[uf] = { std: std[label], items }; return; }
+    if ((SAMPLE_UF_LABELS[entity] || []).includes(label)) { map[uf] = { extra: uf, items }; return; }
     let key = slugKey(label);
     for (let n = 2; taken.has(key); n++) key = `${slugKey(label)}_${n}`;
     taken.add(key);
@@ -151,8 +155,11 @@ bxCompanies.forEach((c) => {
   });
 });
 
+// "SUBVENCION KIT DIGITAL" -> "subvencion-kit-digital" (mismo id que crea la app en Tipos de cliente).
+const typeId = (label) => String(label || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
+
 bxContacts.forEach((c) => {
-  const { custom, extra } = ufValues(c, cfContacts);
+  const { custom, std, extra } = ufValues(c, cfContacts);
   const addr = addressOf[`3:${c.ID}`] || {};
   const req = reqOf[`3:${c.ID}`] || {};
   out.contacts.push({
@@ -161,7 +168,7 @@ bxContacts.forEach((c) => {
     email: first(c.EMAIL).toLowerCase(), phone: first(c.PHONE), whatsapp: "",
     otherEmails: all((c.EMAIL || []).slice(1)), otherPhones: all((c.PHONE || []).slice(1)), website: first(c.WEB),
     company: companyName[String(c.COMPANY_ID)] || "", companyId: nz(c.COMPANY_ID) ? id("company", c.COMPANY_ID) : "",
-    role: c.POST || "", clientType: c.TYPE_ID === "CLIENT" ? "recurrente" : "", stage: "Cliente",
+    role: c.POST || "", clientType: typeId(std.clientTypeLabel), relation: c.TYPE_ID === "CLIENT" ? "recurrente" : "", stage: "Cliente",
     dni: req.RQ_IDENT_DOC_NUM || "", address: addr.txt || "", city: addr.city || "", province: addr.province || "",
     notes: htmlToText(c.COMMENTS), source: source(c.SOURCE_ID), responsable: "", tags: [], custom, bitrixExtra: extra,
     bitrixId: c.ID, createdAt: date(c.DATE_CREATE),

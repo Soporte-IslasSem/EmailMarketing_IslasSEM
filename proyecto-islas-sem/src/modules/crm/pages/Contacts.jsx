@@ -6,7 +6,8 @@ import CrmModal from "../components/CrmModal";
 import ClientTypesModal from "../components/ClientTypesModal";
 import TypeChip from "../components/TypeChip";
 import { useCrmCollection, crmCreate, logActivity, fmtDate, tsToDate } from "../lib/crm";
-import { useClientTypes, typeOf } from "../lib/clientTypes";
+import { useClientTypes, typeOf, RELATIONS } from "../lib/clientTypes";
+import { useTaskScope } from "../lib/tasks";
 import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
@@ -16,7 +17,7 @@ const PAGE = 50;
 
 const emptyForm = {
   firstName: "", lastName: "", email: "", phone: "", whatsapp: "",
-  company: "", role: "", area: "", clientType: "", stage: "Lead",
+  company: "", role: "", area: "", clientType: "", relation: "nuevo", stage: "Lead",
   tags: "", responsable: "", dni: "", address: "", city: "", province: "", notes: "",
 };
 
@@ -40,6 +41,8 @@ function Th({ k, sort, onSort, children }) {
 export default function Contacts() {
   const { items, loading, orgId } = useCrmCollection("contacts");
   const { types } = useClientTypes();
+  // Solo los administradores cambian el tipo de cliente (Empleados: rol "Full access"/"Administrador").
+  const { isAdmin } = useTaskScope();
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("");
@@ -101,7 +104,7 @@ export default function Contacts() {
   const selectAllFiltered = () => setSelected(new Set(filtered.map((c) => c.id)));
 
   const applyBulkType = async () => {
-    if (!selected.size || bulkType === "") return;
+    if (!isAdmin || !selected.size || bulkType === "") return;
     const label = bulkType === "__none" ? "sin tipo" : typeOf(types, bulkType)?.label;
     if (!window.confirm(`¿Poner "${label}" a ${selected.size} contactos?`)) return;
     setBulkBusy(true);
@@ -153,7 +156,7 @@ export default function Contacts() {
           <p>Toda tu base de datos en un solo lugar · {items.length} contactos</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="crm-btn ghost" onClick={() => setShowTypes(true)}>🏷 Tipos de cliente</button>
+          {isAdmin && <button className="crm-btn ghost" onClick={() => setShowTypes(true)}>🏷 Tipos de cliente</button>}
           <button className="crm-btn" onClick={() => setShowNew(true)}>+ Añadir contacto</button>
         </div>
       </div>
@@ -178,12 +181,16 @@ export default function Contacts() {
           <b>{selected.size} seleccionados</b>
           {selected.size < filtered.length && <button className="crm-btn ghost sm" onClick={selectAllFiltered}>Seleccionar los {filtered.length} del filtro</button>}
           <span style={{ flex: 1 }} />
-          <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkType} onChange={(e) => setBulkType(e.target.value)}>
-            <option value="">Cambiar tipo de cliente a…</option>
-            {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
-            <option value="__none">— Sin tipo —</option>
-          </select>
-          <button className="crm-btn sm" onClick={applyBulkType} disabled={bulkType === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Aplicar"}</button>
+          {isAdmin && (
+            <>
+              <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkType} onChange={(e) => setBulkType(e.target.value)}>
+                <option value="">Cambiar tipo de cliente a…</option>
+                {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+                <option value="__none">— Sin tipo —</option>
+              </select>
+              <button className="crm-btn sm" onClick={applyBulkType} disabled={bulkType === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Aplicar"}</button>
+            </>
+          )}
           <button className="crm-btn ghost sm" onClick={() => setSelected(new Set())}>Quitar selección</button>
         </div>
       )}
@@ -286,13 +293,18 @@ export default function Contacts() {
             <div className="crm-field"><label>Etapa</label>
               <select value={form.stage} onChange={set("stage")}>{STAGES.map((s) => <option key={s}>{s}</option>)}</select>
             </div>
+            <div className="crm-field"><label>Relación</label>
+              <select value={form.relation} onChange={set("relation")}>{RELATIONS.map((r) => <option key={r.id} value={r.id}>{r.icon} {r.label}</option>)}</select>
+            </div>
+          </div>
+          {isAdmin && (
             <div className="crm-field"><label>Tipo de cliente</label>
               <select value={form.clientType} onChange={set("clientType")}>
                 <option value="">— Sin tipo —</option>
                 {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
               </select>
             </div>
-          </div>
+          )}
           <div className="crm-field"><label>Etiquetas (separadas por coma)</label><input value={form.tags} onChange={set("tags")} placeholder="Newsletter, SEO, Cliente" /></div>
           <div className="crm-two">
             <div className="crm-field"><label>DNI / NIF</label><input value={form.dni} onChange={set("dni")} /></div>

@@ -353,7 +353,7 @@ export default function DealDetail() {
                   <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Color según volumen del presupuesto</div>
                 </div>
               </div>
-              <div className="crm-field" style={{ marginTop: 12 }}><label>Tipología de clientela</label>
+              <div className="crm-field" style={{ marginTop: 12 }}><label>Relación con el cliente</label>
                 <select defaultValue={deal.clientType || "nuevo"} onChange={(e) => upd({ clientType: e.target.value })}>
                   {Object.entries(CLIENT_TIERS).map(([k, t]) => <option key={k} value={k}>{t.icon} {t.label}</option>)}
                 </select>
