@@ -13,6 +13,8 @@
 // 2) Respuesta (respond): un formulario rellenado o un correo respondido mientras espera
 //    → pasa a la siguiente etapa, que vuelve a disparar sus reglas (paso 1).
 // 3) Sin respuesta: si vence el plazo → Kanban Negativo + tarea de re-contacto.
+// 4) Respuesta tardía (ya en el Negativo por no responder): vuelve al Kanban positivo, a la
+//    etapa siguiente a la que estaba, con una tarea para que el responsable lo revise.
 //
 // Las negociaciones que ya existían al activar el motor (antes de organizations.flowSince)
 // no disparan nada hasta que cambien de etapa.
@@ -161,8 +163,21 @@ async function respond(dealId, via) {
     const snap = await tx.get(ref);
     if (!snap.exists) return null;
     const d = snap.data();
-    if (!d.flow?.waiting || d.flow.stage !== d.stage || (d.board || "pos") !== "pos") return null;
     const pipeline = await tx.get(db.collection("pipelines").doc(d.pipelineId || "-"));
+    // Tardía: está en el Negativo porque venció el plazo (motor u oferta) y sabemos de qué etapa venía.
+    const late = (d.board || "pos") === "neg" && d.prevStage && (d.flow?.expiredAt || d.offer?.escalatedAt);
+    if (late) {
+      const next = pipeline.exists ? nextPosStage(pipeline.data(), d.prevStage) : null;
+      const patch = {
+        board: "pos", stage: next?.id || d.prevStage,
+        flow: { ...(d.flow || {}), waiting: false, respondedAt: Date.now(), respondedVia: via, lateReply: true },
+        ...(d.offer?.state === "seguimiento" ? { offer: { ...d.offer, state: "respondio", respondedAt: Date.now() } } : {}),
+        updatedAt: new Date(),
+      };
+      tx.update(ref, patch);
+      return { d, next, patch, late: true };
+    }
+    if (!d.flow?.waiting || d.flow.stage !== d.stage || (d.board || "pos") !== "pos") return null;
     const next = pipeline.exists ? nextPosStage(pipeline.data(), d.stage) : null;
     const patch = { flow: { ...d.flow, waiting: false, respondedAt: Date.now(), respondedVia: via }, updatedAt: new Date() };
     if (next && next.id !== d.stage) patch.stage = next.id;
@@ -170,9 +185,16 @@ async function respond(dealId, via) {
     return { d, next, patch };
   });
   if (!res) return false;
-  const { d, next, patch } = res;
+  const { d, next, patch, late } = res;
+  if (late) {
+    await addActivity(d.orgId, {
+      type: "Tarea", title: `⚠ Respondió tarde (${via}): revisar "${d.title}" — vuelve al Kanban en "${next?.name || "su etapa"}"`,
+      entity: "deal", entityId: dealId, contactId: d.contactId || "", dueDate: new Date().toISOString().slice(0, 10), priority: "Alta",
+      assignee: d.responsable || "Responsable", assigneeType: "person", assigneeId: "", assigneeName: d.responsable || "", assigneeEmail: d.ownerEmail || "",
+    });
+  }
   await addActivity(d.orgId, {
-    type: "Nota", title: `✅ Automatización · Respondió (${via})${patch.stage ? ` → etapa "${next.name}"` : ""}`,
+    type: "Nota", title: `✅ Automatización · Respondió${late ? " tarde, desde el Kanban Negativo" : ""} (${via})${patch.stage ? ` → etapa "${next?.name || patch.stage}"` : ""}`,
     entity: "deal", entityId: dealId, contactId: d.contactId || "",
   });
   return true;

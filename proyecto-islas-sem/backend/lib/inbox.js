@@ -129,7 +129,7 @@ async function handleReply(parsed, pipelines) {
   });
 
   // Esperando respuesta de un envío del flujo de etapas → siguiente etapa.
-  if (deal.flow?.waiting && deal.offer?.state !== "enviada") await respond(deal.id, "correo");
+  if ((deal.flow?.waiting || deal.board === "neg") && deal.offer?.state !== "enviada") await respond(deal.id, "correo");
   // Si estaba esperando respuesta: marcar respondió y avanzar de etapa.
   if (deal.offer?.state === "enviada") {
     const pipeline = pipelines.find((p) => p.id === deal.pipelineId) || pipelines[0];
