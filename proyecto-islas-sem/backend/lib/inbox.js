@@ -136,7 +136,7 @@ async function handleReply(parsed, pipelines) {
     const next = pipeline ? nextPosStage(pipeline, deal.stage) : null;
     const patch = { offer: { ...deal.offer, state: "respondio", respondedAt: Date.now() } };
     if (deal.flow?.waiting) patch["flow.waiting"] = false; // la respuesta también cierra la espera del flujo
-    if (next && next.id !== deal.stage) patch.stage = next.id;
+    if (next && next.id !== deal.stage) { patch.stage = next.id; patch.updatedAt = new Date(); }
     await match.ref.update(patch);
     await db.collection("activities").add({
       orgId: deal.orgId, type: "Nota",

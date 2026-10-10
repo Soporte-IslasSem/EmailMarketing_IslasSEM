@@ -16,6 +16,13 @@
 //
 // Las negociaciones que ya existían al activar el motor (antes de organizations.flowSince)
 // no disparan nada hasta que cambien de etapa.
+//
+// Garantías:
+// - Nunca se ejecuta dos veces la misma entrada en etapa: antes de enviar nada se "reclama"
+//   en una transacción (flowStage) y solo la ejecución que la reclama la procesa, aunque
+//   haya dos crons solapados o el servidor se reinicie a mitad.
+// - Solo se leen las negociaciones que cambiaron desde la última vuelta (updatedAt) y las
+//   que esperan respuesta: el coste no crece con el tamaño del CRM.
 const { db } = require("./firebase");
 const { DEFAULT_ORG_ID, addActivity } = require("./link");
 const { getStages, flattenStages, findStage, nextPosStage, pickNegTarget, plazoTxt } = require("./stages");
@@ -112,18 +119,40 @@ async function runRules(pipeline, deal) {
   return { ran: rules.length, waitH };
 }
 
+// Reclama (en transacción) la entrada en etapa `key` de una negociación. Solo devuelve el
+// documento a quien la reclama primero; el resto recibe null.
+async function claim(ref, key, since) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const d = snap.data();
+    if (d.flowStage === key) return null;
+    tx.update(ref, { flowStage: key, flowClaimedAt: Date.now() });
+    const created = d.createdAt?.toMillis?.() || 0;
+    // Negociación anterior al motor que nunca se procesó: se marca sin enviar nada.
+    if (d.flowStage === undefined && created < since) return null;
+    return { id: snap.id, ...d };
+  });
+}
+
 // Respuesta del cliente (formulario o correo) a una negociación que esperaba → siguiente etapa.
+// En transacción: dos respuestas casi a la vez solo avanzan una etapa.
 async function respond(dealId, via) {
   const ref = db.collection("deals").doc(dealId);
-  const snap = await ref.get();
-  if (!snap.exists) return false;
-  const d = snap.data();
-  if (!d.flow?.waiting || d.flow.stage !== d.stage || (d.board || "pos") !== "pos") return false;
-  const pipeline = await db.collection("pipelines").doc(d.pipelineId || "").get();
-  const next = pipeline.exists ? nextPosStage(pipeline.data(), d.stage) : null;
-  const patch = { flow: { ...d.flow, waiting: false, respondedAt: Date.now(), respondedVia: via }, updatedAt: new Date() };
-  if (next && next.id !== d.stage) patch.stage = next.id;
-  await ref.update(patch);
+  const res = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const d = snap.data();
+    if (!d.flow?.waiting || d.flow.stage !== d.stage || (d.board || "pos") !== "pos") return null;
+    const pipeline = await tx.get(db.collection("pipelines").doc(d.pipelineId || "-"));
+    const next = pipeline.exists ? nextPosStage(pipeline.data(), d.stage) : null;
+    const patch = { flow: { ...d.flow, waiting: false, respondedAt: Date.now(), respondedVia: via }, updatedAt: new Date() };
+    if (next && next.id !== d.stage) patch.stage = next.id;
+    tx.update(ref, patch);
+    return { d, next, patch };
+  });
+  if (!res) return false;
+  const { d, next, patch } = res;
   await addActivity(d.orgId, {
     type: "Nota", title: `✅ Automatización · Respondió (${via})${patch.stage ? ` → etapa "${next.name}"` : ""}`,
     entity: "deal", entityId: dealId, contactId: d.contactId || "",
@@ -138,8 +167,18 @@ async function runStageFlow() {
   if (!since) { since = Date.now(); await orgRef.set({ flowSince: new Date(since) }, { merge: true }); }
 
   const pipelines = Object.fromEntries((await db.collection("pipelines").where("orgId", "==", DEFAULT_ORG_ID).get()).docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
-  const deals = (await db.collection("deals").where("orgId", "==", DEFAULT_ORG_ID).get()).docs;
   const now = Date.now();
+  // Solo lo que cambió desde la última vuelta (con 3 min de margen) y lo que espera
+  // respuesta. La primera vez, todo (para marcar las negociaciones existentes).
+  const last = org.flowLastRun || 0;
+  const byId = new Map();
+  const add = (snap) => snap.docs.forEach((d) => d.data().orgId === DEFAULT_ORG_ID && byId.set(d.id, d));
+  if (!last) add(await db.collection("deals").where("orgId", "==", DEFAULT_ORG_ID).get());
+  else {
+    add(await db.collection("deals").where("updatedAt", ">=", new Date(last - 180e3)).get());
+    add(await db.collection("deals").where("flow.waiting", "==", true).get());
+  }
+  const deals = [...byId.values()];
   const out = { entered: 0, rules: 0, toNegative: 0 };
 
   for (const doc of deals) {
@@ -148,14 +187,20 @@ async function runStageFlow() {
     if (!pipeline || d.status === "ganado" || d.status === "perdido") continue;
     const board = d.board || "pos";
 
-    // 1) Entrada en etapa.
-    if (d.flowStage !== `${board}:${d.stage}`) {
-      const created = d.createdAt?.toMillis?.() || 0;
-      if (d.flowStage === undefined && created < since) { await doc.ref.update({ flowStage: `${board}:${d.stage}` }); continue; }
-      if (board !== "pos") { await doc.ref.update({ flowStage: `${board}:${d.stage}`, "flow.waiting": false }); continue; }
-      const r = await runRules(pipeline, d);
+    // 1) Entrada en etapa (reclamada antes de enviar nada: nunca se ejecuta dos veces).
+    const key = `${board}:${d.stage}`;
+    if (d.flowStage !== key) {
+      const claimed = await claim(doc.ref, key, since);
+      if (!claimed) continue;
+      if (board !== "pos") { if (claimed.flow?.waiting) await doc.ref.update({ "flow.waiting": false }); continue; }
+      let r = { ran: 0, waitH: 0 };
+      try {
+        r = await runRules(pipeline, claimed);
+      } catch (e) {
+        console.error("[stageflow] reglas:", d.id, e.message);
+        await addActivity(d.orgId, { type: "Nota", title: `⚠ Automatización: error al ejecutar las reglas de la etapa (${String(e.message).slice(0, 120)})`, entity: "deal", entityId: d.id });
+      }
       await doc.ref.update({
-        flowStage: `pos:${d.stage}`,
         flow: r.waitH ? { stage: d.stage, waiting: true, sentAt: now, dueAt: now + r.waitH * 3600e3, waitH: r.waitH } : { stage: d.stage, waiting: false },
       });
       out.entered++; out.rules += r.ran;
@@ -166,8 +211,16 @@ async function runStageFlow() {
     const f = d.flow;
     if (board === "pos" && f?.waiting && f.stage === d.stage && f.dueAt && now > f.dueAt) {
       const target = pickNegTarget(pipeline, d);
-      if (!target) { await doc.ref.update({ "flow.waiting": false }); continue; }
-      await doc.ref.update({ board: "neg", stage: target.id, prevStage: d.stage, flowStage: `neg:${target.id}`, flow: { ...f, waiting: false, expiredAt: now } });
+      // En transacción: si justo respondió o alguien la movió, no se toca.
+      const moved = await db.runTransaction(async (tx) => {
+        const cur = (await tx.get(doc.ref)).data();
+        if (!cur?.flow?.waiting || cur.flow.stage !== cur.stage || (cur.board || "pos") !== "pos") return false;
+        tx.update(doc.ref, target
+          ? { board: "neg", stage: target.id, prevStage: cur.stage, flowStage: `neg:${target.id}`, flow: { ...cur.flow, waiting: false, expiredAt: now }, updatedAt: new Date() }
+          : { "flow.waiting": false });
+        return !!target;
+      });
+      if (!moved) continue;
       await addActivity(d.orgId, {
         type: "Tarea", title: `☎ Sin respuesta en ${plazoTxt(f.waitH)} · Re-contactar a ${d.contact || d.title}`,
         entity: "deal", entityId: d.id, contactId: d.contactId || "", dueDate: ymd(new Date()),
@@ -180,6 +233,7 @@ async function runStageFlow() {
       out.toNegative++;
     }
   }
+  await orgRef.set({ flowLastRun: now }, { merge: true });
   return out;
 }
 
