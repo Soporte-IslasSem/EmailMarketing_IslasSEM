@@ -13,6 +13,7 @@ const { admin, db } = require("./lib/firebase");
 const { drainOutbox } = require("./lib/outbox");
 const { runSLA } = require("./lib/sla");
 const { processReplies } = require("./lib/inbox");
+const { runStageFlow } = require("./lib/stageflow");
 const { submitForm, formDefinition, publicForms, processFormSubmissions } = require("./lib/forms");
 const { recordOpen, recordClick } = require("./lib/reports");
 const { processAutomations } = require("./lib/automations");
@@ -130,9 +131,11 @@ async function runAll() {
   const forms = await processFormSubmissions();
   const automations = await processAutomations();
   const sla = await runSLA();
+  // Flujo de etapas: reglas al entrar en etapa y negociaciones sin respuesta → negativo.
+  const flow = await runStageFlow().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
   // Un fallo de Google Calendar no debe frenar el resto de tareas del cron.
   const calendar = await gcal.syncCalendar().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
-  return { mail, replies, forms, automations, sla, calendar };
+  return { mail, replies, forms, automations, sla, flow, calendar };
 }
 
 // Endpoint protegido por CRON_SECRET (para el cron de Plesk o un cron externo).

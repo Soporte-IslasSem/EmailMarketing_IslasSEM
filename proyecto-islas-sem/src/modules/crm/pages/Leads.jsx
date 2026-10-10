@@ -15,7 +15,6 @@ import {
   SOURCE_META,
 } from "../lib/crm";
 import { usePipelines, getStages, flattenStages } from "../lib/pipelines";
-import { runStageAutomations } from "../lib/automations";
 import { CustomFieldsForm } from "../components/CustomFields";
 import { usePerms } from "../lib/permissions";
 import { employeeEmailByName } from "../lib/owners";
@@ -155,7 +154,6 @@ export default function Leads() {
       });
       dealId = dealRef.id;
       await logActivity(orgId, { type: "Nota", title: `Negociación creada desde prospecto: ${name}`, entity: "deal", entityId: dealId, contactId: contactRef.id });
-      if (pipeline && first) runStageAutomations(pipeline, { id: dealId, title: opts.dealTitle || name, responsable: lead.responsable, board: "pos", contactId: contactRef.id, contact: name, contactEmail: lead.email || "" }, first.id, orgId);
     }
 
     await crmUpdate("leads", lead.id, {

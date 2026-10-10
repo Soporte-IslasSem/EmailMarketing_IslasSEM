@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePipelines, getStages, flattenStages, STAGE_COLORS } from "../lib/pipelines";
 import {
@@ -13,13 +13,16 @@ import {
 } from "../lib/automations";
 import { useCrmCollection } from "../lib/crm";
 import { BUILTIN_LIST } from "../../forms/public/builtinForms";
+import { usePerms } from "../lib/permissions";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
 export default function CrmAutomation() {
   const { pipelines } = usePipelines();
   const navigate = useNavigate();
-  const pipeline = pipelines[0];
+  const [pipeId, setPipeId] = useState("");
+  const pipeline = pipelines.find((p) => p.id === pipeId) || pipelines[0];
+  const { isAdmin } = usePerms();
   const stages = pipeline ? flattenStages(getStages(pipeline, "pos")) : [];
   const { items: customForms } = useCrmCollection("crmForms");
   const formOpts = [
@@ -53,9 +56,20 @@ export default function CrmAutomation() {
       <>
           <div className="dealbar-l" style={{ marginBottom: 14 }}>
             <b style={{ fontSize: 15 }}>Reglas de automatización y disparadores</b>
-            <div className="pipesel"><b>{pipeline?.name || "—"}</b></div>
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>Se ejecutan al mover una negociación a esa etapa.</span>
+            <select className="pipesel" value={pipeline?.id || ""} onChange={(e) => setPipeId(e.target.value)} style={{ fontWeight: 700 }}>
+              {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
+          <div className="crm-panel" style={{ fontSize: 13, lineHeight: 1.55, marginBottom: 14 }}>
+            <b>Cómo funciona (24/7, en el servidor):</b> cuando una negociación entra en una etapa —la mueva una persona, un
+            formulario o el propio sistema— se ejecutan sus reglas. Las de <b>Enviar formulario / correo</b> mandan el mensaje al
+            cliente y la negociación queda <b>esperando respuesta</b>: si rellena el formulario o contesta el correo pasa sola a la
+            <b> siguiente etapa</b> (y se ejecutan las reglas de esa etapa); si no responde en las horas indicadas pasa al
+            <b> Kanban Negativo</b>. Con <b>Interés</b> la regla solo se aplica a negociaciones de ese tema (p. ej. «rgpd» o
+            «página web»: se busca en productos, título y notas).
+            {!isAdmin && <div style={{ marginTop: 6, color: "#b0304c" }}>🔒 Solo los administradores pueden cambiar las reglas.</div>}
+          </div>
+          <fieldset disabled={!isAdmin} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <div className="board deals" style={{ display: "flex" }}>
             {stages.map((s, i) => {
               const rules = getStageAutomations(pipeline, s.id);
@@ -82,9 +96,22 @@ export default function CrmAutomation() {
                           {formOpts.map((o) => <option key={o[0]} value={o[0]}>📄 {o[1]}</option>)}
                         </select>
                       )}
-                      <select value={r.to} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { to: e.target.value })} style={ruleSel}>
-                        {TO_OPTS.map((t) => <option key={t[0]} value={t[0]}>→ {t[1]}</option>)}
-                      </select>
+                      {(r.action === "form" || r.action === "email") ? (
+                        <>
+                          <input defaultValue={r.subject || ""} placeholder={`Asunto (por defecto: ${r.title || "Documento"} · ISLAS SEM)`} onBlur={(e) => e.target.value !== (r.subject || "") && updateStageRule(pipeline, s.id, r.id, { subject: e.target.value })} style={ruleIn} />
+                          <textarea defaultValue={r.message || ""} rows={4} placeholder="Mensaje al cliente (si lo dejas vacío se usa un texto estándar). Empieza solo con «Hola <nombre>,»." onBlur={(e) => e.target.value !== (r.message || "") && updateStageRule(pipeline, s.id, r.id, { message: e.target.value })} style={{ ...ruleIn, resize: "vertical" }} />
+                          <label style={ruleLbl}>
+                            Si no responde en
+                            <input type="number" min="0" defaultValue={r.waitH ?? 72} onBlur={(e) => updateStageRule(pipeline, s.id, r.id, { waitH: Math.max(0, Number(e.target.value) || 0) })} style={{ ...ruleIn, width: 70, margin: "0 6px" }} />
+                            h → Negativo <span style={{ color: "#9aa8a8" }}>(0 = no esperar)</span>
+                          </label>
+                        </>
+                      ) : (
+                        <select value={r.to} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { to: e.target.value })} style={ruleSel}>
+                          {TO_OPTS.map((t) => <option key={t[0]} value={t[0]}>→ {t[1]}</option>)}
+                        </select>
+                      )}
+                      <input defaultValue={r.interest || ""} placeholder="Interés (vacío = todas). Ej.: rgpd, kit digital" onBlur={(e) => e.target.value !== (r.interest || "") && updateStageRule(pipeline, s.id, r.id, { interest: e.target.value })} style={ruleIn} title="Palabras separadas por coma: la regla solo se aplica si la negociación habla de eso" />
                     </div>
                   )) : (
                     <div style={{ fontSize: 12.5, color: "#5b6b6a", padding: 4 }}>Sin reglas. Pulsa “+ Añadir regla”.</div>
@@ -93,9 +120,12 @@ export default function CrmAutomation() {
               );
             })}
           </div>
+          </fieldset>
       </>
     </div>
   );
 }
 
+const ruleIn = { width: "100%", boxSizing: "border-box", border: "1px solid #e3eaea", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 6, fontFamily: "inherit" };
+const ruleLbl = { display: "flex", alignItems: "center", flexWrap: "wrap", fontSize: 12, color: "#5b6b6a", marginBottom: 6 };
 const ruleSel = { width: "100%", border: "1px solid #e3eaea", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 6, background: "#fff", cursor: "pointer" };

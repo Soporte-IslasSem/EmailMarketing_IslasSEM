@@ -19,7 +19,6 @@ import {
   moveStage as moveStageDb,
   createPipeline,
 } from "../lib/pipelines";
-import { runStageAutomations } from "../lib/automations";
 import TaskModal from "../components/TaskModal";
 import { useTaskScope, useGoogleStatus } from "../lib/tasks";
 import { usePerms } from "../lib/permissions";
@@ -177,8 +176,7 @@ export default function Pipeline() {
     if (!d || d.stage === stageId) return;
     if (!perms.can("deals", "edit", d)) return alert("Tu rol no permite mover esta negociación.");
     await crmUpdate("deals", id, { stage: stageId });
-    // Bitrix: al entrar en una etapa se ejecutan sus reglas de automatización
-    runStageAutomations(pipeline, { ...d, stage: stageId }, stageId, orgId);
+    // Bitrix: al entrar en una etapa se ejecutan sus reglas (las ejecuta el servidor).
   };
 
   const doMoveBoard = async (d, targetBoard, stageId) => {

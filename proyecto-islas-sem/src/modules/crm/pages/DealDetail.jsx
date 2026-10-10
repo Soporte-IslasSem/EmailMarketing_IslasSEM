@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmUpdate, crmRemove, logActivity, money, fmtDate, LOST_REASONS } from "../lib/crm";
 import { usePipelines, getStages, flattenStages, findStage, budgetTier, STAGE_COLORS, CLIENT_TIERS } from "../lib/pipelines";
-import { runStageAutomations, markResponded } from "../lib/automations";
+import { markResponded } from "../lib/automations";
 import { downloadDocPDF, openDocPDF } from "../lib/pdf";
 import { queueEmail, basicEmail } from "../lib/outbox";
 import { CustomFieldsForm } from "../components/CustomFields";
@@ -99,7 +99,7 @@ export default function DealDetail() {
     upd({ stage: sid });
     const name = findStage(getStages(pipeline, deal.board || "pos"), sid)?.name || sid;
     logActivity(deal.orgId, { type: "Nota", title: `Etapa cambiada a "${name}"`, entity: "deal", entityId: id, contactId: deal.contactId || "" });
-    runStageAutomations(pipeline, { ...deal, stage: sid, contactEmail }, sid, deal.orgId);
+    // Las reglas de la etapa las ejecuta el servidor (backend/lib/stageflow.js) en menos de un minuto.
   };
   const rename = () => {
     const t = window.prompt("Nombre de la negociación:", deal.title);
@@ -140,7 +140,6 @@ export default function DealDetail() {
         ctaUrl: o.link || "",
       }),
     });
-    if (target) runStageAutomations(pipeline, { ...deal, stage: target.id, contactEmail }, target.id, deal.orgId);
     setShowOffer(false);
   };
   const setOfferState = (state) => {

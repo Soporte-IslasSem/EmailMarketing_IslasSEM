@@ -21,6 +21,7 @@ const { db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 const { addSubscriber } = require("./subscriptions");
 const { getStages, flattenStages } = require("./stages");
+const { respond } = require("./stageflow");
 
 const FORM_LABEL = { sepa: "Orden de Domiciliación SEPA", juridicos: "Datos Jurídicos del Representante" };
 const MIN_SCORE = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
@@ -316,6 +317,8 @@ async function processFormSubmissions() {
       entityId: dealId || leadId || contactId || null,
       contactId, leadId, formSubmissionId: doc.id, formType: s.formType,
     });
+    // Formulario rellenado para una negociación que esperaba respuesta → siguiente etapa.
+    if (dealId && !dealCreated) await respond(dealId, `formulario "${label}"`).catch((e) => console.warn("[forms] flujo:", e.message));
     if (dealCreated) {
       await addActivity(orgId, { type: "Nota", title: `Negociación creada desde el formulario "${label}"`, entity: "deal", entityId: dealId, contactId, leadId });
     }

@@ -4,6 +4,7 @@
 // Corre en el mismo cron. Si no hay credenciales IMAP, se desactiva solo (no rompe).
 const { db } = require("./firebase");
 const { nextPosStage } = require("./stages");
+const { respond } = require("./stageflow");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 const { recordBounce, recordReply } = require("./reports");
 const { fireWebhook } = require("./webhooks");
@@ -127,11 +128,14 @@ async function handleReply(parsed, pipelines) {
     done: false, auto: true, createdAt: new Date(),
   });
 
+  // Esperando respuesta de un envío del flujo de etapas → siguiente etapa.
+  if (deal.flow?.waiting && deal.offer?.state !== "enviada") await respond(deal.id, "correo");
   // Si estaba esperando respuesta: marcar respondió y avanzar de etapa.
   if (deal.offer?.state === "enviada") {
     const pipeline = pipelines.find((p) => p.id === deal.pipelineId) || pipelines[0];
     const next = pipeline ? nextPosStage(pipeline, deal.stage) : null;
     const patch = { offer: { ...deal.offer, state: "respondio", respondedAt: Date.now() } };
+    if (deal.flow?.waiting) patch["flow.waiting"] = false; // la respuesta también cierra la espera del flujo
     if (next && next.id !== deal.stage) patch.stage = next.id;
     await match.ref.update(patch);
     await db.collection("activities").add({
