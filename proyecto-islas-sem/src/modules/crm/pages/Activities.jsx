@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import TaskModal from "../components/TaskModal";
 import GoogleCalendarPanel from "../components/GoogleCalendarPanel";
-import { useCrmCollection, crmUpdate, crmRemove, fmtDate } from "../lib/crm";
-import { useTaskScope, useGoogleStatus, assigneeLabel, todayYMD, byWhen } from "../lib/tasks";
+import { useCrmCollection, crmUpdate, crmRemove, fmtDate, ACTIVITY_TYPES } from "../lib/crm";
+import { useTaskScope, useGoogleStatus, assigneeLabel, assigneeKey, todayYMD, byWhen } from "../lib/tasks";
 import "../crm.styles.css";
 
 const WHEN = [
@@ -23,6 +23,9 @@ export default function Activities() {
   const [who, setWho] = useState(null); // "mias" | "todas" (por defecto según el rol)
   const [when, setWhen] = useState("pendientes");
   const [editing, setEditing] = useState(null); // null | {} (nueva) | tarea
+  const [person, setPerson] = useState(""); // "" todos · "__none" sin asignar · "person:id" / "team:id"
+  const [type, setType] = useState("");
+  const [term, setTerm] = useState("");
 
   const view = who || (scope.isAdmin ? "todas" : "mias");
   const today = todayYMD();
@@ -35,9 +38,16 @@ export default function Activities() {
     if (when === "vencidas") r = r.filter((a) => !a.done && a.dueDate && a.dueDate < today);
     if (when === "proximas") r = r.filter((a) => !a.done && a.dueDate && a.dueDate > today);
     if (when === "hechas") r = r.filter((a) => a.done);
+    if (person === "__none") r = r.filter((a) => !a.assigneeType && !a.assignee);
+    else if (person) r = r.filter((a) => assigneeKey(a) === person);
+    if (type) r = r.filter((a) => a.type === type);
+    const t = term.trim().toLowerCase();
+    if (t) r = r.filter((a) => [a.title, a.body, a.assigneeName, a.assignee, ...(a.attendees || []).map((g) => `${g.name} ${g.email}`)]
+      .filter(Boolean).some((v) => String(v).toLowerCase().includes(t)));
     // Con fecha primero (por fecha y hora); sin fecha al final, las más recientes antes.
     return r.sort((a, b) => (a.dueDate && b.dueDate ? byWhen(a, b) : a.dueDate ? -1 : b.dueDate ? 1 : (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-  }, [items, scope, view, when, today]);
+  }, [items, scope, view, when, today, person, type, term]);
+  const types = [...new Set([...ACTIVITY_TYPES, ...items.map((a) => a.type).filter(Boolean)])];
 
   const remove = (a) =>
     window.confirm(a.googleEventId ? "¿Eliminar la tarea? La cita seguirá en Google Calendar: si ya no hace falta, bórrala también allí." : "¿Eliminar la tarea?") &&
@@ -71,6 +81,22 @@ export default function Activities() {
         {WHEN.map(([k, l]) => (
           <button key={k} className={`crm-btn ${when === k ? "" : "ghost"} sm`} onClick={() => setWhen(k)}>{l}</button>
         ))}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14, alignItems: "center" }}>
+        <input className="crm-search" style={{ margin: 0, flex: 1, minWidth: 200 }} placeholder="Buscar por título, notas, invitado o persona…" value={term} onChange={(e) => setTerm(e.target.value)} />
+        {(scope.isAdmin || scope.myTeams.length > 0) && (
+          <select className="crm-search" style={{ margin: 0, maxWidth: 230 }} value={person} onChange={(e) => setPerson(e.target.value)}>
+            <option value="">Todas las personas y equipos</option>
+            {scope.isAdmin && <option value="__none">— Sin asignar —</option>}
+            {scope.options.filter((o) => scope.isAdmin || (o.type === "team" ? scope.myTeams.some((t) => t.id === o.id) : o.id === scope.me?.id))
+              .map((o) => <option key={o.key} value={o.key}>{o.type === "team" ? "👥 " : ""}{o.name}</option>)}
+          </select>
+        )}
+        <select className="crm-search" style={{ margin: 0, maxWidth: 170 }} value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="">Todos los tipos</option>
+          {types.map((t) => <option key={t}>{t}</option>)}
+        </select>
+        <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>{rows.length} tareas</span>
       </div>
 
       {loading ? (

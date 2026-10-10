@@ -37,7 +37,7 @@ export default function TodayTasks() {
 
   const connect = async () => {
     setConnecting(true); setErr("");
-    try { const { url } = await googleApi("connect", { method: "POST" }); window.location.href = url; }
+    try { const { url } = await googleApi("connect", { method: "POST", body: { scope: "me" } }); window.location.href = url; }
     catch (e) { setErr(e.message); setConnecting(false); }
   };
 
@@ -55,7 +55,9 @@ export default function TodayTasks() {
     </div>
   );
 
-  const showConnect = google && !google.error && google.configured && !google.connected;
+  // Cada persona conecta su propio calendario (su cuenta @islassem.com).
+  const showConnect = google && !google.error && google.configured && !google.me?.connected;
+  const fecha = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="TodayTasks">
@@ -66,10 +68,8 @@ export default function TodayTasks() {
 
       {showConnect && (
         <div className="TodayTasks__connect">
-          <span>📅 Conecta Google Calendar para ver aquí las citas que reserva la gente.</span>
-          {google.isAdmin
-            ? <button onClick={connect} disabled={connecting}>{connecting ? "Abriendo Google…" : "Conectar Google Calendar"}</button>
-            : <small>Pídeselo a un administrador.</small>}
+          <span>📅 Conecta tu Google Calendar ({google.me?.email || "@islassem.com"}) para ver aquí tus citas y recibir las tareas que te asignen.</span>
+          <button onClick={connect} disabled={connecting}>{connecting ? "Abriendo Google…" : "Conectar mi calendario"}</button>
           {err && <small className="TodayTasks__err">{err}</small>}
         </div>
       )}
@@ -79,7 +79,7 @@ export default function TodayTasks() {
       ) : (
         <div className="TodayTasks__cols">
           <div className="TodayTasks__agenda">
-            <div className="TodayTasks__label">Agenda de hoy</div>
+            <div className="TodayTasks__label">📆 <span style={{ textTransform: "capitalize" }}>{fecha}</span></div>
             {hours.map((h) => {
               const at = timed.filter((a) => hourOf(a.dueTime) === h);
               return (

@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useCrmCollection, crmGet, crmCreate, crmUpdate, money, fmtDate, ACTIVITY_TYPES } from "../lib/crm";
 import { useOrg } from "../lib/useOrg";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
+import ClientAssignRows from "../components/ClientAssign";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
 import "../crm.styles.css";
 
@@ -143,6 +144,7 @@ export default function CompanyDetail() {
                 {FIELDS.filter(([k]) => k !== "name").map(([k, l]) => (
                   <div className="row" key={k}><dt>{l}</dt><dd>{company[k] || "—"}</dd></div>
                 ))}
+                <ClientAssignRows collection="companies" item={company} onChange={(patch) => setCompany((c) => ({ ...c, ...patch }))} />
                 <div className="row"><dt>Origen</dt><dd>{company.source || (company.importedFrom === "bitrix24" ? "Bitrix24" : "—")}</dd></div>
                 <div className="row"><dt>Alta</dt><dd>{fmtDate(company.createdAt)}</dd></div>
                 {company.notes && <div className="row"><dt>Notas</dt><dd style={{ whiteSpace: "pre-wrap" }}>{company.notes}</dd></div>}

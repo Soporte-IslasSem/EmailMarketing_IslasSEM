@@ -8,6 +8,7 @@ import TypeChip from "../components/TypeChip";
 import { useCrmCollection, crmCreate, logActivity, fmtDate, tsToDate } from "../lib/crm";
 import { useClientTypes, typeOf, RELATIONS } from "../lib/clientTypes";
 import { useTaskScope } from "../lib/tasks";
+import { ownerKey, ownerLabel, ownerFields } from "../lib/owners";
 import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
@@ -42,7 +43,8 @@ export default function Contacts() {
   const { items, loading, orgId } = useCrmCollection("contacts");
   const { types } = useClientTypes();
   // Solo los administradores cambian el tipo de cliente (Empleados: rol "Full access"/"Administrador").
-  const { isAdmin } = useTaskScope();
+  const scope = useTaskScope();
+  const { isAdmin } = scope;
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("");
@@ -51,6 +53,8 @@ export default function Contacts() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkType, setBulkType] = useState("");
+  const [bulkOwner, setBulkOwner] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState(""); // "" todos · "__none" sin responsable · "person:id" / "team:id"
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showTypes, setShowTypes] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -71,6 +75,7 @@ export default function Contacts() {
     let rows = [...items];
     if (stageFilter) rows = rows.filter((c) => (c.stage || "Lead") === stageFilter);
     if (typeFilter) rows = rows.filter((c) => (typeFilter === "__none" ? !c.clientType : c.clientType === typeFilter));
+    if (ownerFilter) rows = rows.filter((c) => (ownerFilter === "__none" ? !ownerKey(c) && !c.responsable : ownerKey(c) === ownerFilter));
     if (t) rows = rows.filter((c) =>
       [c.firstName, c.lastName, c.email, c.phone, c.company, c.role, c.responsable, c.clientId, (c.tags || []).join(" "), typeOf(types, c.clientType)?.label]
         .filter(Boolean).some((v) => String(v).toLowerCase().includes(t))
@@ -81,7 +86,7 @@ export default function Contacts() {
       company: (c) => String(c.company || "~").toLowerCase(),
       type: (c) => (c.clientType ? typeRank[c.clientType] ?? 999 : 1000),
       stage: (c) => STAGES.indexOf(c.stage || "Lead"),
-      responsable: (c) => String(c.responsable || "~").toLowerCase(),
+      responsable: (c) => String(c.ownerName || c.responsable || "~").toLowerCase(),
       created: (c) => tsToDate(c.createdAt)?.getTime() || 0,
     }[sort.key];
     rows.sort((a, b) => {
@@ -90,7 +95,7 @@ export default function Contacts() {
       return r * sort.dir || (a.clientId || "").localeCompare(b.clientId || "", "es", { numeric: true });
     });
     return rows;
-  }, [items, term, stageFilter, typeFilter, sort, types, typeRank]);
+  }, [items, term, stageFilter, typeFilter, ownerFilter, sort, types, typeRank]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE));
   const current = Math.min(page, pages);
@@ -119,6 +124,27 @@ export default function Contacts() {
       setBulkType("");
     } catch (e) {
       alert("No se pudo cambiar el tipo: " + e.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const applyBulkOwner = async () => {
+    if (!isAdmin || !selected.size || bulkOwner === "") return;
+    const opt = scope.options.find((o) => o.key === bulkOwner) || null;
+    if (!window.confirm(`¿Poner como responsable a "${opt ? opt.name : "nadie"}" en ${selected.size} contactos?`)) return;
+    setBulkBusy(true);
+    try {
+      const ids = [...selected];
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = writeBatch(db);
+        ids.slice(i, i + 400).forEach((id) => batch.update(doc(db, "contacts", id), { ...ownerFields(opt), updatedAt: serverTimestamp() }));
+        await batch.commit();
+      }
+      setSelected(new Set());
+      setBulkOwner("");
+    } catch (e) {
+      alert("No se pudo asignar: " + e.message);
     } finally {
       setBulkBusy(false);
     }
@@ -173,6 +199,11 @@ export default function Contacts() {
           <option value="">Todas las etapas</option>
           {STAGES.map((s) => <option key={s}>{s}</option>)}
         </select>
+        <select className="crm-search" style={{ margin: 0, maxWidth: 210 }} value={ownerFilter} onChange={(e) => { setOwnerFilter(e.target.value); setPage(1); }}>
+          <option value="">Todos los responsables</option>
+          <option value="__none">— Sin responsable —</option>
+          {scope.options.map((o) => <option key={o.key} value={o.key}>{o.type === "team" ? "👥 " : ""}{o.name}</option>)}
+        </select>
         <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>{filtered.length} resultados</span>
       </div>
 
@@ -189,6 +220,12 @@ export default function Contacts() {
                 <option value="__none">— Sin tipo —</option>
               </select>
               <button className="crm-btn sm" onClick={applyBulkType} disabled={bulkType === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Aplicar"}</button>
+              <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkOwner} onChange={(e) => setBulkOwner(e.target.value)}>
+                <option value="">Asignar responsable…</option>
+                {scope.options.map((o) => <option key={o.key} value={o.key}>{o.type === "team" ? "👥 " : ""}{o.name}</option>)}
+                <option value="__none">— Sin responsable —</option>
+              </select>
+              <button className="crm-btn sm" onClick={applyBulkOwner} disabled={bulkOwner === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Asignar"}</button>
             </>
           )}
           <button className="crm-btn ghost sm" onClick={() => setSelected(new Set())}>Quitar selección</button>
@@ -240,7 +277,7 @@ export default function Contacts() {
                         </div>
                       </td>
                       <td><span className={`crm-chip ${stageClass(c.stage)}`}>{c.stage || "Lead"}</span></td>
-                      <td>{c.responsable || "—"}</td>
+                      <td>{ownerLabel(c)}</td>
                       <td>{fmtDate(c.createdAt)}</td>
                     </tr>
                   );

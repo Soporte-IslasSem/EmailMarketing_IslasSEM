@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmRemove } from "../lib/crm";
 import { CustomFieldsForm } from "../components/CustomFields";
+import TypeChip from "../components/TypeChip";
+import ClientTypesModal from "../components/ClientTypesModal";
+import { ownerKey, ownerLabel } from "../lib/owners";
+import { useClientTypes, typeOf } from "../lib/clientTypes";
+import { useTaskScope } from "../lib/tasks";
 import "../crm.styles.css";
 
 const empty = { name: "", cif: "", iban: "", industry: "", website: "", email: "", phone: "", city: "", community: "", rgpd: "Pendiente", notes: "" };
@@ -12,18 +17,30 @@ export default function Companies() {
   const { items, loading, orgId } = useCrmCollection("companies");
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
+  const { types } = useClientTypes();
+  const scope = useTaskScope();
+  const [typeFilter, setTypeFilter] = useState(""); // "" todos · "__none" · id
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [showTypes, setShowTypes] = useState(false);
+  const typeCounts = useMemo(() => {
+    const c = {};
+    items.forEach((x) => { const k = x.clientType || "__none"; c[k] = (c[k] || 0) + 1; });
+    return c;
+  }, [items]);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
 
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
-    const rows = [...items].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    let rows = [...items].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    if (typeFilter) rows = rows.filter((c) => (typeFilter === "__none" ? !c.clientType : c.clientType === typeFilter));
+    if (ownerFilter) rows = rows.filter((c) => (ownerFilter === "__none" ? !ownerKey(c) && !c.responsable : ownerKey(c) === ownerFilter));
     if (!t) return rows;
     return rows.filter((c) =>
       [c.name, c.cif, c.industry, c.email, c.city].filter(Boolean).some((v) => String(v).toLowerCase().includes(t))
     );
-  }, [items, term]);
+  }, [items, term, typeFilter, ownerFilter]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -48,12 +65,28 @@ export default function Companies() {
           <h1>Empresas</h1>
           <p>Cuentas y organizaciones con las que trabajas.</p>
         </div>
-        <button className="crm-btn" onClick={() => setShowNew(true)}>
-          + Nueva empresa
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {scope.isAdmin && <button className="crm-btn ghost" onClick={() => setShowTypes(true)}>🏷 Tipos de cliente</button>}
+          <button className="crm-btn" onClick={() => setShowNew(true)}>+ Nueva empresa</button>
+        </div>
       </div>
 
-      <input className="crm-search" placeholder="Buscar empresa…" value={term} onChange={(e) => setTerm(e.target.value)} />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <input className="crm-search" style={{ margin: 0, flex: 1, minWidth: 200 }} placeholder="Buscar empresa…" value={term} onChange={(e) => setTerm(e.target.value)} />
+        <select className="crm-search" style={{ margin: 0, maxWidth: 210 }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          <option value="">Todos los tipos</option>
+          {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+          <option value="__none">— Sin tipo —</option>
+        </select>
+        <select className="crm-search" style={{ margin: 0, maxWidth: 210 }} value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
+          <option value="">Todos los responsables</option>
+          <option value="__none">— Sin responsable —</option>
+          {scope.options.map((o) => <option key={o.key} value={o.key}>{o.type === "team" ? "👥 " : ""}{o.name}</option>)}
+        </select>
+        <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>{filtered.length} empresas</span>
+      </div>
+
+      {showTypes && <ClientTypesModal orgId={orgId} types={types} counts={typeCounts} onClose={() => setShowTypes(false)} />}
 
       {loading ? (
         <div className="crm-loading">Cargando empresas…</div>
@@ -62,6 +95,8 @@ export default function Companies() {
           <thead>
             <tr>
               <th>Nombre</th>
+              <th>Tipo de cliente</th>
+              <th>Responsable</th>
               <th>CIF/NIF</th>
               <th>IBAN</th>
               <th>Comunidad</th>
@@ -75,6 +110,8 @@ export default function Companies() {
               filtered.map((c) => (
                 <tr key={c.id}>
                   <td><span className="crm-link" onClick={() => navigate(`/dashboard/crm/companies/${c.id}`)}><b>{c.name || "(sin nombre)"}</b></span></td>
+                  <td><TypeChip t={typeOf(types, c.clientType)} /></td>
+                  <td>{ownerLabel(c)}</td>
                   <td>{c.cif || "—"}</td>
                   <td>{c.iban || "—"}</td>
                   <td>{c.community || c.city || "—"}</td>
@@ -93,7 +130,7 @@ export default function Companies() {
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="crm-empty">Aún no hay empresas.</td>
+                <td colSpan="9" className="crm-empty">{items.length ? "Ninguna empresa con estos filtros." : "Aún no hay empresas."}</td>
               </tr>
             )}
           </tbody>

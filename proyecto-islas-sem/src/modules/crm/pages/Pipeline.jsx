@@ -20,6 +20,8 @@ import {
   createPipeline,
 } from "../lib/pipelines";
 import { runStageAutomations } from "../lib/automations";
+import TaskModal from "../components/TaskModal";
+import { useTaskScope, useGoogleStatus } from "../lib/tasks";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -63,6 +65,9 @@ export default function Pipeline() {
   const [overCol, setOverCol] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activityFor, setActivityFor] = useState(null); // { deal, type }
+  const scope = useTaskScope();
+  const [google] = useGoogleStatus();
   const unassigned = deals.filter((d) => !d.pipelineId);
 
   const pipeline = useMemo(
@@ -270,9 +275,9 @@ export default function Pipeline() {
           <button className="ct-del" title="Eliminar" onClick={(e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${d.title}"?`)) crmRemove("deals", d.id); }}>🗑</button>
         </div>
         <div className="deal-icons" onClick={(e) => e.stopPropagation()}>
-          <span title="Llamar">{DICON.phone}</span>
-          <span title="Correo">{DICON.mail}</span>
-          <span title="Comentario">{DICON.chat}</span>
+          <span title="Programar llamada" style={{ cursor: "pointer" }} onClick={() => setActivityFor({ deal: d, type: "Llamada" })}>{DICON.phone}</span>
+          <span title="Programar correo" style={{ cursor: "pointer" }} onClick={() => setActivityFor({ deal: d, type: "Email" })}>{DICON.mail}</span>
+          <span title="Añadir comentario" style={{ cursor: "pointer" }} onClick={() => setActivityFor({ deal: d, type: "Nota" })}>{DICON.chat}</span>
         </div>
         {(d.status === "ganado" || d.status === "perdido") && (
           <div className="deal-closed" style={{ background: d.status === "ganado" ? "#e9f9ef" : "#fdeef1", color: d.status === "ganado" ? "#1a7d43" : "#b0304c" }}>
@@ -293,7 +298,7 @@ export default function Pipeline() {
         )}
         <div className="deal-date2">{d.date || ""}</div>
         <div className="deal-foot">
-          <span className="deal-act" onClick={(e) => e.stopPropagation()}>+ Actividad</span>
+          <span className="deal-act" style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setActivityFor({ deal: d, type: "Tarea" }); }}>+ Actividad</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {colMode(d.stage) === "manual" && (
               <span className="prio-arrows" onClick={(e) => e.stopPropagation()}>
@@ -436,6 +441,22 @@ export default function Pipeline() {
           contacts={contacts}
           onClose={() => setNewDeal(null)}
           onSave={saveNewDeal}
+        />
+      )}
+
+      {activityFor && (
+        <TaskModal
+          orgId={orgId}
+          task={null}
+          scope={scope}
+          google={google}
+          preset={{
+            type: activityFor.type,
+            title: `${activityFor.type === "Nota" ? "Comentario" : activityFor.type}: ${activityFor.deal.title}`,
+            entity: "deal", entityId: activityFor.deal.id, contactId: activityFor.deal.contactId || "",
+            link: `Negociación «${activityFor.deal.title}»`,
+          }}
+          onClose={() => setActivityFor(null)}
         />
       )}
 
