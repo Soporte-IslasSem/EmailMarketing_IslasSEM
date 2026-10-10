@@ -14,6 +14,7 @@ import {
 import { useCrmCollection } from "../lib/crm";
 import { BUILTIN_LIST } from "../../forms/public/builtinForms";
 import { usePerms } from "../lib/permissions";
+import { useClientTypes, RELATIONS } from "../lib/clientTypes";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -23,6 +24,7 @@ export default function CrmAutomation() {
   const [pipeId, setPipeId] = useState("");
   const pipeline = pipelines.find((p) => p.id === pipeId) || pipelines[0];
   const { isAdmin } = usePerms();
+  const { types } = useClientTypes();
   const stages = pipeline ? flattenStages(getStages(pipeline, "pos")) : [];
   const { items: customForms } = useCrmCollection("crmForms");
   const formOpts = [
@@ -66,7 +68,9 @@ export default function CrmAutomation() {
             cliente y la negociación queda <b>esperando respuesta</b>: si rellena el formulario o contesta el correo pasa sola a la
             <b> siguiente etapa</b> (y se ejecutan las reglas de esa etapa); si no responde en las horas indicadas pasa al
             <b> Kanban Negativo</b>. Con <b>Interés</b> la regla solo se aplica a negociaciones de ese tema (p. ej. «rgpd» o
-            «página web»: se busca en productos, título y notas).
+            «página web»: se busca en productos, título y notas), con <b>Tipo de cliente</b> solo a ese tipo y con <b>Relación</b> solo a
+            nuevos, recurrentes o VIP: así, en una misma etapa cada cliente recibe solo lo suyo. Cada negociación se procesa por
+            separado: cuando alguien llega a una etapa se le envía <b>solo a esa persona</b>, nunca se reenvía a las demás.
             {!isAdmin && <div style={{ marginTop: 6, color: "#b0304c" }}>🔒 Solo los administradores pueden cambiar las reglas.</div>}
           </div>
           <fieldset disabled={!isAdmin} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -111,6 +115,14 @@ export default function CrmAutomation() {
                           {TO_OPTS.map((t) => <option key={t[0]} value={t[0]}>→ {t[1]}</option>)}
                         </select>
                       )}
+                      <select value={r.clientType || ""} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { clientType: e.target.value })} style={ruleSel} title="Solo para clientes de este tipo">
+                        <option value="">Tipo de cliente: todos</option>
+                        {types.map((t) => <option key={t.id} value={t.id}>Solo tipo: {t.label}</option>)}
+                      </select>
+                      <select value={r.relation || ""} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { relation: e.target.value })} style={ruleSel} title="Solo para negociaciones con esta relación">
+                        <option value="">Relación: todas</option>
+                        {RELATIONS.map((x) => <option key={x.id} value={x.id}>Solo {x.icon} {x.label}</option>)}
+                      </select>
                       <input defaultValue={r.interest || ""} placeholder="Interés (vacío = todas). Ej.: rgpd, kit digital" onBlur={(e) => e.target.value !== (r.interest || "") && updateStageRule(pipeline, s.id, r.id, { interest: e.target.value })} style={ruleIn} title="Palabras separadas por coma: la regla solo se aplica si la negociación habla de eso" />
                     </div>
                   )) : (

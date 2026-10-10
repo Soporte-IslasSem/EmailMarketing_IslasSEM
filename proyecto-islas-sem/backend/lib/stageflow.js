@@ -48,6 +48,13 @@ function matchesInterest(rule, text) {
   const keys = String(rule.interest || "").toLowerCase().split(",").map((k) => k.trim()).filter(Boolean);
   return !keys.length || keys.some((k) => text.includes(k));
 }
+// Filtros de la regla por cliente: tipo de cliente del contacto/empresa (RGPD, Kit Digital…)
+// y relación de la negociación (nuevo / recurrente / VIP). Vacío = cualquiera.
+function matchesClient(rule, clientType, relation) {
+  if (rule.clientType && rule.clientType !== clientType) return false;
+  if (rule.relation && rule.relation !== relation) return false;
+  return true;
+}
 
 function emailHtml({ title, body, cta, ctaUrl }) {
   return `<div style="font-family:Arial,Helvetica,sans-serif;color:#2a3a3a;max-width:560px;margin:auto">
@@ -72,7 +79,18 @@ async function contactEmailOf(d) {
 async function runRules(pipeline, deal) {
   const stageName = findStage(getStages(pipeline, "pos"), deal.stage)?.name || deal.stage;
   const text = interestText(deal);
-  const rules = ((pipeline.automations || {})[deal.stage] || []).filter((r) => matchesInterest(r, text));
+  // Tipo de cliente: el del contacto o, si no tiene, el de su empresa.
+  let clientType = "";
+  if (deal.contactId) {
+    const c = await db.collection("contacts").doc(deal.contactId).get().catch(() => null);
+    clientType = (c?.exists && c.data().clientType) || "";
+    if (!clientType && c?.exists && c.data().companyId) {
+      const co = await db.collection("companies").doc(c.data().companyId).get().catch(() => null);
+      clientType = (co?.exists && co.data().clientType) || "";
+    }
+  }
+  const relation = deal.clientType || "nuevo";
+  const rules = ((pipeline.automations || {})[deal.stage] || []).filter((r) => matchesInterest(r, text) && matchesClient(r, clientType, relation));
   if (!rules.length) return { ran: 0, waitH: 0 };
   const email = await contactEmailOf(deal);
   let waitH = 0;
@@ -237,4 +255,4 @@ async function runStageFlow() {
   return out;
 }
 
-module.exports = { runStageFlow, respond, interestText, matchesInterest };
+module.exports = { runStageFlow, respond, interestText, matchesInterest, matchesClient };
