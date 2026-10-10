@@ -108,6 +108,12 @@ export default function Pipeline() {
     crmUpdate("deals", d.id, { order: (list[j].order ?? j) + (dir > 0 ? 0.5 : -0.5) });
   };
 
+  // Alta completa (formulario con todos los campos) cayendo en esa etapa.
+  const openNewDeal = (stageId) => {
+    const qs = new URLSearchParams({ pipeline: pipeline.id, board, ...(stageId ? { stage: stageId } : {}) });
+    navigate(`/dashboard/crm/newdeal?${qs}`);
+  };
+
   const totalDeals = deals.filter((d) => d.pipelineId === pipeline.id && (d.board || "pos") === board).length;
 
   /* ---------- acciones ---------- */
@@ -200,7 +206,7 @@ export default function Pipeline() {
         {s.name} <span className="colhead-pen">✎</span>
       </span>
       <span className="dcnt">{dealsIn(s.id).length}</span>
-      <button className="colhead-add" title="Añadir negociación" onClick={() => setQuickCol(s.id)}>
+      <button className="colhead-add" title="Nueva negociación en esta etapa" onClick={() => openNewDeal(s.id)}>
         +
       </button>
     </div>
@@ -223,7 +229,7 @@ export default function Pipeline() {
         {colHead(s, color, sub)}
         <div className="deal-total">{money(total)}</div>
         {quickCol === s.id ? (
-          <QuickAdd stageId={s.id} onSave={quickSave} onClose={() => setQuickCol(null)} />
+          <QuickAdd stageId={s.id} onSave={quickSave} onClose={() => setQuickCol(null)} onFull={() => openNewDeal(s.id)} />
         ) : (
           <button className="deal-quick" onClick={() => setQuickCol(s.id)}>+ Negociación rápida</button>
         )}
@@ -325,7 +331,7 @@ export default function Pipeline() {
       <div className="dealbar">
         <div className="dealbar-l">
           <h1>Negociaciones</h1>
-          <button className="crear-split" onClick={() => navigate("/dashboard/crm/newdeal")}>
+          <button className="crear-split" onClick={() => openNewDeal()}>
             + Crear <span className="cx">▾</span>
           </button>
           <div className="pipesel" onClick={() => setShowPipeMenu((v) => !v)}>
@@ -480,7 +486,7 @@ function ListView({ deals, pipeline, board, q, navigate }) {
 }
 
 /* ---------- alta rápida inline ---------- */
-function QuickAdd({ stageId, onSave, onClose }) {
+function QuickAdd({ stageId, onSave, onClose, onFull }) {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const submit = async () => {
@@ -513,6 +519,7 @@ function QuickAdd({ stageId, onSave, onClose }) {
         <button className="qa-save" onClick={submit}>Añadir</button>
         <button className="qa-cancel" onClick={onClose}>Cancelar</button>
       </div>
+      <button className="qa-cancel" style={{ width: "100%", marginTop: 6 }} onClick={onFull}>Con todos los campos →</button>
     </div>
   );
 }

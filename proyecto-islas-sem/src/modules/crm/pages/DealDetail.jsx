@@ -6,7 +6,9 @@ import { usePipelines, getStages, flattenStages, findStage, budgetTier, STAGE_CO
 import { runStageAutomations, markResponded } from "../lib/automations";
 import { downloadDocPDF, openDocPDF } from "../lib/pdf";
 import { queueEmail, basicEmail } from "../lib/outbox";
-import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
+import { CustomFieldsForm } from "../components/CustomFields";
+import { CreateFieldModal, ExtraFieldsEditor } from "../components/DealFields";
+import { LEAD_SOURCES, DEAL_TYPES } from "../lib/crm";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
@@ -38,6 +40,7 @@ export default function DealDetail() {
   const [tab, setTab] = useState("General");
   const [showOffer, setShowOffer] = useState(false);
   const [showClose, setShowClose] = useState(false);
+  const [newField, setNewField] = useState(false);
   const [, setTick] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick((n) => n + 1), 30000); return () => clearInterval(t); }, []);
 
@@ -282,7 +285,26 @@ export default function DealDetail() {
           {/* Columna izquierda: datos */}
           <div className="cd-col">
             <div className="crm-panel">
-              <h4 className="cd-h">Datos de la negociación</h4>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <h4 className="cd-h" style={{ margin: 0 }}>Sobre la negociación</h4>
+                <span className="crm-link" style={{ fontSize: 12.5 }} onClick={() => setNewField(true)}>+ Crear campo</span>
+              </div>
+              <div className="crm-two">
+                <div className="crm-field"><label>Tipo de negociación</label>
+                  <select defaultValue={deal.type || "Sales"} onChange={(e) => upd({ type: e.target.value })}>
+                    {[...new Set([...DEAL_TYPES, deal.type || "Sales"])].map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="crm-field"><label>Origen</label>
+                  <select defaultValue={deal.source || ""} onChange={(e) => upd({ source: e.target.value })}>
+                    <option value="">No seleccionado</option>
+                    {[...new Set([...LEAD_SOURCES, ...(deal.source ? [deal.source] : [])])].map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="crm-field"><label>Origen de información</label>
+                <textarea rows="2" defaultValue={deal.sourceInfo || ""} onBlur={(e) => upd({ sourceInfo: e.target.value })} />
+              </div>
               <div className="crm-two">
                 <div className="crm-field"><label>Importe (€)</label>
                   <input type="number" defaultValue={deal.amount || 0} onBlur={(e) => upd({ amount: Number(e.target.value) || 0 })} />
@@ -299,17 +321,24 @@ export default function DealDetail() {
                   <input defaultValue={deal.company || ""} onBlur={(e) => upd({ company: e.target.value })} />
                 </div>
               </div>
+              <div className="crm-two">
+                <div className="crm-field"><label>Fecha de inicio</label>
+                  <input type="date" defaultValue={deal.startDate || ""} onBlur={(e) => upd({ startDate: e.target.value })} />
+                </div>
+                <div className="crm-field"><label>Observadores</label>
+                  <input defaultValue={deal.observers || ""} onBlur={(e) => upd({ observers: e.target.value })} placeholder="Nombres separados por coma" />
+                </div>
+              </div>
               <div className="crm-field"><label>Comentario</label>
                 <textarea rows="3" defaultValue={deal.notes || ""} onBlur={(e) => upd({ notes: e.target.value })} />
               </div>
+              <DealMoreFields key={deal.id} deal={deal} onSave={upd} />
               <dl className="crm-dl" style={{ marginTop: 12 }}>
                 <div className="row"><dt>Embudo</dt><dd>{pipeline?.name}</dd></div>
                 <div className="row"><dt>Etapa</dt><dd>{stages[ci]?.name || "—"}</dd></div>
                 <div className="row"><dt>Creada</dt><dd>{fmtDate(deal.createdAt)}</dd></div>
                 {deal.bitrixFunnel && <div className="row"><dt>En Bitrix</dt><dd>{deal.bitrixFunnel} › {deal.bitrixStage}</dd></div>}
-                <CustomFieldsView entity="deals" values={deal.custom} />
               </dl>
-              <DealCustomFields deal={deal} onSave={(custom) => upd({ custom })} />
             </div>
           </div>
 
@@ -455,6 +484,13 @@ export default function DealDetail() {
 
       {showOffer && <OfferModal deal={deal} onClose={() => setShowOffer(false)} onSend={sendOffer} />}
       {showClose && <CloseModal deal={deal} onClose={() => setShowClose(false)} onConfirm={closeDeal} />}
+      {newField && (
+        <CreateFieldModal
+          orgId={deal.orgId}
+          onClose={() => setNewField(false)}
+          onAddExtra={(f) => upd({ extraFields: [...(deal.extraFields || []), f] })}
+        />
+      )}
     </div>
   );
 }
@@ -559,21 +595,29 @@ function OfferModal({ deal, onClose, onSend }) {
   );
 }
 
-function DealCustomFields({ deal, onSave }) {
-  const [edit, setEdit] = useState(null);
-  if (!edit)
-    return (
-      <button className="crm-btn ghost sm" style={{ marginTop: 8 }} onClick={() => setEdit({ ...(deal.custom || {}) })}>
-        ✏️ Campos personalizados
-      </button>
-    );
+// Campos personalizados (de todas las negociaciones) y campos extra de esta negociación,
+// editables en la ficha; "Guardar campos" aparece cuando hay cambios.
+function DealMoreFields({ deal, onSave }) {
+  const [custom, setCustom] = useState(null);
+  const [extra, setExtra] = useState(null);
+  const curCustom = custom ?? deal.custom ?? {};
+  const curExtra = extra ?? deal.extraFields ?? [];
+  const dirty = custom !== null || extra !== null;
+  const save = async () => {
+    await onSave({ ...(custom !== null ? { custom } : {}), ...(extra !== null ? { extraFields: extra } : {}) });
+    setCustom(null);
+    setExtra(null);
+  };
   return (
     <>
-      <CustomFieldsForm entity="deals" values={edit} onChange={setEdit} />
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <button className="crm-btn sm" onClick={async () => { await onSave(edit); setEdit(null); }}>Guardar</button>
-        <button className="crm-btn ghost sm" onClick={() => setEdit(null)}>Cancelar</button>
-      </div>
+      <CustomFieldsForm entity="deals" values={curCustom} onChange={setCustom} />
+      <ExtraFieldsEditor value={curExtra} onChange={setExtra} />
+      {dirty && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button className="crm-btn sm" onClick={save}>Guardar campos</button>
+          <button className="crm-btn ghost sm" onClick={() => { setCustom(null); setExtra(null); }}>Descartar</button>
+        </div>
+      )}
     </>
   );
 }

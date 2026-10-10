@@ -60,6 +60,7 @@ export default function Leads() {
   const [historyLead, setHistoryLead] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const { items: contacts } = useCrmCollection("contacts");
+  const { items: deals } = useCrmCollection("deals");
 
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
@@ -117,8 +118,14 @@ export default function Leads() {
       fromLeadId: lead.id,
     });
 
-    let dealId = "";
-    if (opts.deal) {
+    // Negociaciones que ya creó un formulario para este prospecto: pasan al contacto nuevo.
+    const leadDeals = deals.filter((d) => d.leadId === lead.id);
+    await Promise.all(leadDeals.map((d) => crmUpdate("deals", d.id, {
+      contactId: contactRef.id, contact: d.contact || name, contactEmail: d.contactEmail || lead.email || "",
+      ...(companyId ? { companyId } : {}),
+    })));
+    let dealId = leadDeals.find((d) => d.status !== "ganado" && d.status !== "perdido")?.id || "";
+    if (opts.deal && !dealId) {
       const pipeline = pipelines[0];
       const stages = pipeline ? flattenStages(getStages(pipeline, "pos")) : [];
       const first = stages[0];

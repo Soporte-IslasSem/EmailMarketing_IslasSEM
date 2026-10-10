@@ -8,6 +8,7 @@ import { db } from "../../../config/firebaseConfig";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmUpdate } from "../lib/crm";
 import { useOrg } from "../lib/useOrg";
+import { usePipelines } from "../lib/pipelines";
 import { BUILTIN_FORMS, BUILTIN_LIST } from "../../forms/public/builtinForms";
 import { FIELD_LIB, TYPES, libField, draftFromTemplate, draftFromBuiltin, draftFromDoc, toDoc } from "../lib/formBuilder";
 import ShareFormModal from "../components/ShareFormModal";
@@ -22,6 +23,7 @@ export default function CrmFormBuilder() {
   const base = useLocation().pathname.startsWith("/dashboard/forms") ? "/dashboard/forms" : "/dashboard/crm/forms";
   const { user, orgId } = useOrg();
   const { items: forms, loading } = useCrmCollection("crmForms");
+  const { pipelines } = usePipelines();
   const isBuiltin = !!(id && BUILTIN_FORMS[id]);
   const saved = id ? forms.find((f) => f.id === id) : null;
 
@@ -203,8 +205,16 @@ export default function CrmFormBuilder() {
                   {fb.listId && !lists.some((l) => l.id === fb.listId) && <option value={fb.listId}>{fb.listName || "Lista"}</option>}
                 </select>
               </div>
+              <div className="crm-field">
+                <label>Negociación (Kanban)</label>
+                <select value={fb.dealPipelineId || ""} onChange={(e) => setForm({ dealPipelineId: e.target.value })}>
+                  {pipelines.map((p, i) => <option key={p.id} value={i === 0 ? "" : p.id}>Crear en el embudo {p.name}</option>)}
+                  <option value="none">No crear negociación</option>
+                </select>
+              </div>
               <div className="cf-note">
                 Cada envío entra <b>solo</b> en el CRM: crea el <b>prospecto</b> (o se guarda en la ficha si el email ya existe)
+                {fb.dealPipelineId !== "none" && <>, y cae como <b>negociación</b> en la primera etapa del embudo <b>{(pipelines.find((p) => p.id === fb.dealPipelineId) || pipelines[0])?.name || ""}</b> (si esa persona ya tiene una abierta allí, se añade a esa)</>}
                 {fb.listId ? <> y suscribe el email a la lista <b>{lists.find((l) => l.id === fb.listId)?.name || fb.listName}</b> (con doble confirmación si la lista la tiene activada).</> : "."}
               </div>
               <label className="cf-switch"><input type="checkbox" checked={fb.active !== false} onChange={(e) => setForm({ active: e.target.checked })} /> Publicado (si lo desactivas, el enlace deja de funcionar)</label>

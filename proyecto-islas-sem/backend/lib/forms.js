@@ -13,10 +13,14 @@
 // 4) processFormSubmissions() (en el cron): cada envío aún sin vincular se cuelga de
 //    su negociación/contacto (o crea un prospecto), deja una actividad en el timeline y,
 //    si el formulario tiene "lista destino", suscribe el email a esa lista.
+//    Si el envío no viene de una negociación, cae en el Kanban: se reutiliza la negociación
+//    abierta de esa persona en el embudo o se crea una nueva en la primera etapa
+//    (el formulario puede elegir el embudo o "no crear negociación").
 //    Cubre también envíos antiguos escritos directamente desde el navegador.
 const { db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 const { addSubscriber } = require("./subscriptions");
+const { getStages, flattenStages } = require("./stages");
 
 const FORM_LABEL = { sepa: "Orden de Domiciliación SEPA", juridicos: "Datos Jurídicos del Representante" };
 const MIN_SCORE = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
@@ -66,6 +70,7 @@ async function loadCustomForm(id) {
     consentTitle: String(f.consentTitle || "").slice(0, 200),
     successMessage: String(f.successMessage || "").slice(0, 500),
     listId: String(f.listId || "").slice(0, 64),
+    dealPipelineId: String(f.dealPipelineId || "").slice(0, 64),
     fields,
   };
 }
@@ -75,7 +80,7 @@ async function formDefinition(req, res) {
   try {
     const f = await loadCustomForm(String(req.params.id || ""));
     if (!f || !f.active) return res.status(404).json({ ok: false, error: "Formulario no encontrado" });
-    const { orgId: _o, id: _i, listId: _l, active: _a, ...pub } = f;
+    const { orgId: _o, id: _i, listId: _l, active: _a, dealPipelineId: _d, ...pub } = f;
     res.set("Cache-Control", "no-store").json({ ok: true, form: pub });
   } catch (e) {
     console.error("[forms/def]", e);
@@ -144,6 +149,8 @@ async function submitForm(req, res) {
     } else {
       for (const [k, v] of Object.entries(data).slice(0, 60)) clean[String(k).slice(0, 120)] = String(v ?? "").slice(0, 2000);
     }
+    // Embudo destino (vale también para SEPA/Jurídicos editados).
+    if (custom?.dealPipelineId) extra.dealPipelineId = custom.dealPipelineId;
     await db.collection("formSubmissions").add({
       orgId: custom?.orgId || DEFAULT_ORG_ID, formType, dealId: String(dealId || "").slice(0, 64), data: clean, ...extra,
       status: "recibido", recaptchaScore: check.score ?? null, createdAt: new Date(),
@@ -214,6 +221,68 @@ function pickPerson(data) {
   };
 }
 
+// Embudo donde caen los envíos: el elegido en el formulario o el primero de la organización.
+async function pickPipeline(orgId, wanted) {
+  const snap = await db.collection("pipelines").where("orgId", "==", orgId).get();
+  const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return all.find((p) => p.id === wanted) || all[0] || null;
+}
+
+// Producto de interés del formulario ("¿Qué producto…?", "Servicio de interés") que exista en el catálogo.
+const normName = (v) => String(v || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+async function pickProducts(orgId, data) {
+  const wanted = Object.entries(data || {})
+    .filter(([k, v]) => /producto|servicio/i.test(k) && String(v).trim())
+    .flatMap(([, v]) => String(v).split(/[,;]/).map(normName)).filter(Boolean);
+  if (!wanted.length) return [];
+  const snap = await db.collection("products").where("orgId", "==", orgId).get();
+  const out = [];
+  for (const w of wanted) {
+    const p = snap.docs.find((d) => normName(d.data().name) === w);
+    if (p && !out.some((it) => it.prodId === p.id)) out.push({ prodId: p.id, name: p.data().name, price: Number(p.data().price) || 0, qty: 1 });
+  }
+  return out;
+}
+
+// Cuelga el envío de una negociación: la abierta de esa persona en el embudo o una nueva
+// en la primera etapa del Kanban positivo. Devuelve { dealId, created }.
+async function ensureDeal(orgId, s, { contactId, leadId, person, label }) {
+  if (s.dealPipelineId === "none") return { dealId: "", created: false };
+  const pipeline = await pickPipeline(orgId, s.dealPipelineId);
+  if (!pipeline) return { dealId: "", created: false };
+  const owner = contactId ? ["contactId", contactId] : leadId ? ["leadId", leadId] : null;
+  if (owner) {
+    const open = (await db.collection("deals").where("orgId", "==", orgId).where(owner[0], "==", owner[1]).get()).docs
+      .find((d) => d.data().pipelineId === pipeline.id && d.data().status !== "ganado" && d.data().status !== "perdido");
+    if (open) return { dealId: open.id, created: false };
+  }
+  let name = [person.firstName, person.lastName].filter(Boolean).join(" ");
+  let company = person.company || "";
+  if (contactId) {
+    const c = await db.collection("contacts").doc(contactId).get();
+    if (c.exists) {
+      name = name || [c.data().firstName, c.data().lastName].filter(Boolean).join(" ");
+      company = company || c.data().company || "";
+    }
+  }
+  const stage = flattenStages(getStages(pipeline, "pos"))[0];
+  const items = await pickProducts(orgId, s.data).catch(() => []);
+  // Lo que pidió y no está en el catálogo queda escrito en el comentario.
+  const interest = Object.entries(s.data || {}).filter(([k, v]) => /producto|servicio/i.test(k) && String(v).trim())
+    .map(([k, v]) => `${k}: ${v}`).join("\n");
+  const subtotal = items.reduce((a, it) => a + it.price * it.qty, 0);
+  const ref = await db.collection("deals").add({
+    orgId, pipelineId: pipeline.id, board: "pos", stage: stage?.id || "s1",
+    title: `${label} — ${company || name || person.email || "Sin nombre"}`.slice(0, 200),
+    amount: subtotal * 1.21, contact: name, contactId: contactId || null, leadId: leadId || "",
+    contactEmail: person.email || "", company, clientType: "nuevo", priceType: "producto",
+    type: "Sales", source: "Formulario web", responsable: "", notes: items.length ? "" : interest,
+    ...(items.length ? { items, subtotal, itemsCount: items.length } : {}),
+    formSubmissionId: s.id, custom: {}, createdAt: new Date(), updatedAt: new Date(),
+  });
+  return { dealId: ref.id, created: true };
+}
+
 async function processFormSubmissions() {
   const snap = await db.collection("formSubmissions").where("status", "==", "recibido").limit(50).get();
   let linked = 0;
@@ -234,6 +303,12 @@ async function processFormSubmissions() {
       const r = await resolvePerson(orgId, { ...person, source: "Formulario web", notes: `Creado por el formulario "${label}"` });
       contactId = r.contactId; leadId = r.leadId;
     }
+    let dealCreated = false;
+    if (!dealId) {
+      const r = await ensureDeal(orgId, { ...s, id: doc.id }, { contactId, leadId, person, label })
+        .catch((e) => { console.warn("[forms] negociación:", e.message); return { dealId: "", created: false }; });
+      dealId = r.dealId; dealCreated = r.created;
+    }
     await addActivity(orgId, {
       type: "Formulario",
       title: `📋 Formulario recibido: ${label}${person.company ? ` — ${person.company}` : ""}`,
@@ -241,6 +316,9 @@ async function processFormSubmissions() {
       entityId: dealId || leadId || contactId || null,
       contactId, leadId, formSubmissionId: doc.id, formType: s.formType,
     });
+    if (dealCreated) {
+      await addActivity(orgId, { type: "Nota", title: `Negociación creada desde el formulario "${label}"`, entity: "deal", entityId: dealId, contactId, leadId });
+    }
     // Datos Jurídicos (original o editado): RGPD firmado en la empresa.
     if (s.formType === "juridicos") {
       await markRgpdSigned(orgId, s.data, contactId, doc.id).catch((e) => console.warn("[forms] rgpd:", e.message));
@@ -252,4 +330,4 @@ async function processFormSubmissions() {
   return { linked };
 }
 
-module.exports = { submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };
+module.exports = { ensureDeal, submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };

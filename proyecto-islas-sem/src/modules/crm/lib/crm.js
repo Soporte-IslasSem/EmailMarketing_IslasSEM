@@ -43,6 +43,8 @@ export const SOURCE_META = {
 };
 export const LEAD_SOURCES = Object.keys(SOURCE_META);
 
+export const DEAL_TYPES = ["Sales", "Venta recurrente", "Servicios"];
+
 export const LEAD_STATUSES = ["Nuevo", "Contactado", "Cualificado", "No cualificado", "Convertido"];
 
 export const ACTIVITY_TYPES = ["Tarea", "Llamada", "Email", "Reunión", "Nota", "Seguimiento"];
