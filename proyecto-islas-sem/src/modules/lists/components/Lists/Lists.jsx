@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import useLists from "../../hooks/useLists";
+import useCrmListsSync from "../../hooks/useCrmListsSync";
 import CreateListModal from "../CreateListModal/CreateListModal";
 import ListActionsMenu from "./ListActionsMenu"; // 🔹 Import del nuevo componente
 import { useNavigate } from "react-router-dom";
@@ -8,7 +9,13 @@ import { collection, doc, deleteDoc, getDocs, query, where, writeBatch } from "f
 import "./Lists.styles.css";
 
 export default function Lists() {
-  const { lists } = useLists();
+  const { lists: rawLists } = useLists();
+  const crmSync = useCrmListsSync();
+  // Las listas automáticas del CRM primero (Todos, luego por tipo), después el resto.
+  const lists = useMemo(
+    () => [...rawLists].sort((a, b) => (b.crm ? 1 : 0) - (a.crm ? 1 : 0) || (a.crm && b.crm ? (a.crmKey === "all" ? -1 : b.crmKey === "all" ? 1 : a.name.localeCompare(b.name)) : 0)),
+    [rawLists]
+  );
   const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(null);
   const [menuPosition, setMenuPosition] = useState(null);
@@ -35,6 +42,10 @@ export default function Lists() {
   // 🔹 Eliminar lista
   // Borra la lista y sus suscriptores (antes quedaban huérfanos en la base de datos).
   const handleDelete = async (id) => {
+    if (lists.find((l) => l.id === id)?.crm) {
+      window.alert("Es una lista automática del CRM: se mantiene sola con tus contactos y no se puede eliminar.");
+      return;
+    }
     const subsSnap = await getDocs(
       query(collection(db, "subscribers"), where("listId", "==", id), where("userId", "==", auth.currentUser.uid))
     );
@@ -113,6 +124,14 @@ export default function Lists() {
         </button>
       </div>
 
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#eef6f5", border: "1px solid #d5e8e6", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13.5 }}>
+        <span>🔄 Las listas <b>CRM · …</b> se crean y actualizan solas con tus contactos del CRM (todos y por tipo de cliente), listas para usar en campañas. Las bajas se respetan.</span>
+        <span style={{ marginLeft: "auto", color: "#6b7d7d", fontSize: 12.5 }}>
+          {crmSync.busy ? "Actualizando…" : crmSync.error ? `⚠ ${crmSync.error}` : crmSync.last ? `Actualizadas a las ${new Date(crmSync.last).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : ""}
+        </span>
+        <button className="Lists__newButton" style={{ padding: "6px 12px", fontSize: 12.5 }} onClick={crmSync.sync} disabled={crmSync.busy}>Actualizar ahora</button>
+      </div>
+
       {/* BUSCADOR */}
       <input
         type="text"
@@ -142,6 +161,7 @@ export default function Lists() {
                   onClick={() => navigate(`/dashboard/lists/${list.id}`)}
                 >
                   {list.name}
+                  {list.crm && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>CRM · automática</span>}
                 </td>
 
                 <td>{list.subscribersCount || 0} suscriptores</td>
