@@ -1,78 +1,58 @@
-import { useState } from "react";
+// Administración › Integraciones: punto de entrada a las integraciones que funcionan de
+// verdad (importar/exportar datos, formularios en la web, webhooks, Google Calendar).
+import { useNavigate } from "react-router-dom";
 import "../crm.styles.css";
 
-const ENDPOINTS = [
-  ["GET", "/api/v1/leads", "Listar prospectos"],
-  ["POST", "/api/v1/leads", "Crear prospecto"],
-  ["GET", "/api/v1/contacts", "Listar contactos"],
-  ["POST", "/api/v1/contacts", "Crear contacto"],
-  ["GET", "/api/v1/deals", "Listar negociaciones"],
-  ["POST", "/api/v1/deals", "Crear negociación"],
-  ["GET", "/api/v1/products", "Listar productos"],
-  ["POST", "/api/v1/webhooks", "Registrar webhook (eventos)"],
+const CARDS = [
+  {
+    icon: "⬆", title: "Importar datos (CSV / Excel)",
+    text: "Sube contactos, prospectos o productos desde un archivo. Se revisa antes de importar y no se duplican los emails que ya existen.",
+    links: [["Importar contactos", "/dashboard/crm/contacts?import=1"], ["Importar prospectos", "/dashboard/crm/leads?import=1"], ["Importar productos", "/dashboard/crm/products"]],
+  },
+  {
+    icon: "⬇", title: "Exportar a Excel (CSV)",
+    text: "Contactos, empresas, prospectos, negociaciones y productos tienen el botón «⬇ Exportar» (según el permiso de tu rol).",
+    links: [["Contactos", "/dashboard/crm/contacts"], ["Empresas", "/dashboard/crm/companies"], ["Negociaciones", "/dashboard/crm/pipeline"]],
+  },
+  {
+    icon: "🧩", title: "Formularios en tu web",
+    text: "Cada formulario tiene «Compartir»: enlace directo, código para incrustarlo, ventana emergente, barra o aviso al salir. Lo que se rellena entra solo al CRM y, si quieres, a una lista.",
+    links: [["Ir a Formularios", "/dashboard/crm/forms"]],
+  },
+  {
+    icon: "🔔", title: "Webhooks de listas",
+    text: "Avisa a otro sistema (ERP, Zapier, Make…) cuando alguien se suscribe, se da de baja o rebota. Envío firmado con HMAC. Se configura en cada lista › Herramientas.",
+    links: [["Ir a Listas", "/dashboard/lists"]],
+  },
+  {
+    icon: "📅", title: "Google Calendar",
+    text: "El calendario de la empresa y el de cada trabajador: las citas llegan como tareas y las tareas con hora se publican en el calendario de la persona asignada.",
+    links: [["Ir a Tareas", "/dashboard/tasks"]],
+  },
+  {
+    icon: "✉️", title: "Correo",
+    text: "Los envíos (campañas, formularios, avisos) salen por el correo del hosting de ISLAS SEM y las respuestas se leen solas por IMAP para avanzar las negociaciones.",
+    links: [["Bandeja de salida", "/dashboard/crm/outbox"]],
+  },
 ];
 
 export default function Integrations() {
-  const apiKey = "islassem_live_" + "•".repeat(24);
-  const [copied, setCopied] = useState("");
-  const embed = `<script src="https://email-marketing.islassem.com/embed/form.js" data-form="contacto"></script>`;
-  const copy = (txt, id) => {
-    try { navigator.clipboard.writeText(txt); setCopied(id); setTimeout(() => setCopied(""), 1500); } catch (_) {}
-  };
-
+  const navigate = useNavigate();
   return (
     <div className="crm">
       <div className="crm__top">
-        <div><h1>Integraciones / API</h1><p>Cruza los datos del CRM con tu ERP y otras herramientas.</p></div>
+        <div><h1>Integraciones</h1><p>Conecta el CRM con tus archivos, tu web y tus herramientas.</p></div>
       </div>
-
-      <div className="crm-panel">
-        <h4 style={{ marginTop: 0 }}>Clave de API</h4>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <code style={{ background: "#f4f7f7", padding: "8px 12px", borderRadius: 8, fontSize: 13 }}>{apiKey}</code>
-          <button className="crm-btn ghost sm" onClick={() => copy("islassem_live_XXXXXXXXXXXXXXXXXXXXXXXX", "key")}>{copied === "key" ? "Copiado ✓" : "Copiar"}</button>
-          <button className="crm-btn ghost sm" onClick={() => alert("Rotar clave (demo)")}>Rotar</button>
-        </div>
-        <p style={{ color: "var(--crm-muted)", fontSize: 13, marginBottom: 0 }}>Base URL: <b>https://email-marketing.islassem.com/api/v1</b></p>
-      </div>
-
-      <div className="crm-panel">
-        <h4 style={{ marginTop: 0 }}>Endpoints</h4>
-        <table className="crm-table">
-          <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead>
-          <tbody>
-            {ENDPOINTS.map(([m, path, desc]) => (
-              <tr key={path + m}>
-                <td><span className={`crm-chip ${m === "GET" ? "info" : "ok"}`}>{m}</span></td>
-                <td><code>{path}</code></td>
-                <td>{desc}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
-        <div className="crm-panel">
-          <h4 style={{ marginTop: 0 }}>Formulario embebido</h4>
-          <p style={{ fontSize: 13, color: "var(--crm-muted)" }}>Pega este código en cualquier web y los leads entran solos al CRM:</p>
-          <code style={{ display: "block", background: "#f4f7f7", padding: "10px 12px", borderRadius: 8, fontSize: 12, wordBreak: "break-all" }}>{embed}</code>
-          <button className="crm-btn ghost sm" style={{ marginTop: 8 }} onClick={() => copy(embed, "embed")}>{copied === "embed" ? "Copiado ✓" : "Copiar código"}</button>
-        </div>
-        <div className="crm-panel">
-          <h4 style={{ marginTop: 0 }}>Cruce con ERP</h4>
-          <p style={{ fontSize: 13, color: "var(--crm-muted)", marginBottom: 12 }}>Sincroniza productos y clientes con tu ERP por CSV o API.</p>
-          <button className="crm-btn ghost sm" onClick={() => alert("Sincronizar por API (demo)")}>Sincronizar por API</button>{" "}
-          <button className="crm-btn ghost sm" onClick={() => alert("Importar por CSV (demo)")}>Importar por CSV</button>
-        </div>
-        <div className="crm-panel">
-          <h4 style={{ marginTop: 0 }}>Correos de trabajo</h4>
-          <p style={{ fontSize: 13, color: "var(--crm-muted)", marginBottom: 12 }}>Reduce gradualmente el uso de correos fuera del CRM.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span className="crm-chip info">comercio@islassem.com</span>
-            <span className="crm-chip info">grupo@islassem.com</span>
+        {CARDS.map((c) => (
+          <div key={c.title} className="crm-panel" style={{ margin: 0 }}>
+            <h4 style={{ marginTop: 0 }}>{c.icon} {c.title}</h4>
+            <p style={{ fontSize: 13, color: "var(--crm-muted)", marginBottom: 12 }}>{c.text}</p>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {c.links.map(([label, to]) => <button key={to} className="crm-btn ghost sm" onClick={() => navigate(to)}>{label}</button>)}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );

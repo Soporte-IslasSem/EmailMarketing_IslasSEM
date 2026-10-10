@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import CrmModal from "../components/CrmModal";
 import LeadImportModal from "../components/LeadImportModal";
 import {
@@ -63,7 +63,8 @@ export default function Leads() {
   const [saving, setSaving] = useState(false);
   const [convertLead, setConvertLead] = useState(null);
   const [historyLead, setHistoryLead] = useState(null);
-  const [showImport, setShowImport] = useState(false);
+  const [params] = useSearchParams();
+  const [showImport, setShowImport] = useState(() => params.get("import") === "1"); // desde Integraciones
   const { items: contacts } = useCrmCollection("contacts");
   const { items: deals } = useCrmCollection("deals");
 

@@ -57,6 +57,7 @@ export default function Pipeline() {
   // "Propios": solo las negociaciones que lleva, creó o tiene asignadas.
   const deals = useMemo(() => perms.visible("deals", allDeals), [perms, allDeals]);
   const canAdd = perms.can("deals", "add");
+  const isAdmin = perms.isAdmin; // embudos y etapas: solo administradores
   const { items: contacts } = useCrmCollection("contacts");
   const navigate = useNavigate();
 
@@ -219,12 +220,14 @@ export default function Pipeline() {
   /* ---------- render de columna (funciones, NO componentes, para no re-montar) ---------- */
   const colHead = (s, color, sub) => (
     <div className={`deal-colhead${sub ? " sub-head" : ""}`} style={{ background: sub ? "#eef3f3" : color, color: sub ? "#516060" : "#fff" }}>
-      <span className="colmove">
-        <button onClick={() => moveStageDb(pipeline, board, s.id, -1)} title="Mover a la izquierda">◀</button>
-        <button onClick={() => moveStageDb(pipeline, board, s.id, 1)} title="Mover a la derecha">▶</button>
-      </span>
-      <span className="colhead-name" onClick={() => renameStage(s.id, s.name)} title="Editar nombre">
-        {s.name} <span className="colhead-pen">✎</span>
+      {isAdmin && (
+        <span className="colmove">
+          <button onClick={() => moveStageDb(pipeline, board, s.id, -1)} title="Mover a la izquierda">◀</button>
+          <button onClick={() => moveStageDb(pipeline, board, s.id, 1)} title="Mover a la derecha">▶</button>
+        </span>
+      )}
+      <span className="colhead-name" onClick={() => isAdmin && renameStage(s.id, s.name)} title={isAdmin ? "Editar nombre" : s.name}>
+        {s.name} {isAdmin && <span className="colhead-pen">✎</span>}
       </span>
       <span className="dcnt">{dealsIn(s.id).length}</span>
       {canAdd && (
@@ -343,7 +346,13 @@ export default function Pipeline() {
           <button className="crm-btn sm" onClick={() => setAssignOpen(true)}>Asignar a embudos</button>
         </div>
       )}
-      {settingsOpen && <PipelineSettingsModal pipeline={pipeline} board={board} deals={deals} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <PipelineSettingsModal
+          pipeline={pipeline} pipelines={pipelines} board={board} deals={allDeals} orgId={orgId}
+          onClose={() => setSettingsOpen(false)}
+          onSwitch={(id) => { setPipeId(id); setBoard("pos"); }}
+        />
+      )}
       {assignOpen && <AssignImportedDeals deals={unassigned} pipelines={pipelines} onClose={() => setAssignOpen(false)} />}
       {/* Barra de herramientas */}
       <div className="dealbar">
@@ -367,7 +376,7 @@ export default function Pipeline() {
             <input placeholder="buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
-        <button className="iconbtn" title="Ajustes del embudo" onClick={() => setSettingsOpen(true)}>⚙</button>
+        {isAdmin && <button className="iconbtn" title="Ajustes del embudo: etapas, nombre, crear o eliminar embudos" onClick={() => setSettingsOpen(true)}>⚙</button>}
         {showPipeMenu && (
           <div className="pipemenu">
             {pipelines.map((p) => (
@@ -383,7 +392,7 @@ export default function Pipeline() {
                 {p.name}
               </button>
             ))}
-            <button className="new" onClick={addPipeline}>+ Crear embudo nuevo</button>
+            {isAdmin && <button className="new" onClick={addPipeline}>+ Crear embudo nuevo</button>}
           </div>
         )}
       </div>
@@ -428,12 +437,14 @@ export default function Pipeline() {
             return (
               <div className="col-group" key={s.id}>
                 <div className="group-head" style={{ background: color }}>
-                  <span className="colmove">
-                    <button onClick={() => moveStageDb(pipeline, board, s.id, -1)}>◀</button>
-                    <button onClick={() => moveStageDb(pipeline, board, s.id, 1)}>▶</button>
-                  </span>
-                  <span className="colhead-name" onClick={() => renameStage(s.id, s.name)}>
-                    {s.name} <span className="colhead-pen">✎</span>
+                  {isAdmin && (
+                    <span className="colmove">
+                      <button onClick={() => moveStageDb(pipeline, board, s.id, -1)}>◀</button>
+                      <button onClick={() => moveStageDb(pipeline, board, s.id, 1)}>▶</button>
+                    </span>
+                  )}
+                  <span className="colhead-name" onClick={() => isAdmin && renameStage(s.id, s.name)}>
+                    {s.name} {isAdmin && <span className="colhead-pen">✎</span>}
                   </span>
                   <span className="dcnt">{inGroup.length}</span>
                   <span className="group-tot">{money(gtotal)}</span>
@@ -446,12 +457,14 @@ export default function Pipeline() {
           }
           return renderColumn(s, color);
         })}
-        <div className="col addstage-col" onClick={addStage} title="Añadir etapa">
-          <div className="addstage-inner">
-            <span className="addstage-plus">+</span>
-            <span>Añadir etapa</span>
+        {isAdmin && (
+          <div className="col addstage-col" onClick={addStage} title="Añadir etapa">
+            <div className="addstage-inner">
+              <span className="addstage-plus">+</span>
+              <span>Añadir etapa</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       </>
       )}

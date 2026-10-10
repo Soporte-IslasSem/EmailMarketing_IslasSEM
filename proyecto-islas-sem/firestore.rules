@@ -110,9 +110,11 @@ service cloud.firestore {
       allow update: if canEdit('deals');
       allow delete: if canDelete('deals');
     }
+    // Embudos: etapas, nombres y reglas de automatización. Solo administradores.
     match /pipelines/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if ownDocOrg();
+      allow update, delete: if ownDocOrg() && isOrgAdmin();
+      allow create: if createInMyOrg() && isOrgAdmin();
     }
     match /activities/{docId} {
       allow read, update, delete: if ownDocOrg();

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
 import CrmModal from "../components/CrmModal";
@@ -60,7 +60,8 @@ export default function Contacts() {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkType, setBulkType] = useState("");
   const [bulkOwner, setBulkOwner] = useState("");
-  const [showImport, setShowImport] = useState(false);
+  const [params] = useSearchParams();
+  const [showImport, setShowImport] = useState(() => params.get("import") === "1"); // desde Integraciones
   const [ownerFilter, setOwnerFilter] = useState(""); // "" todos · "__none" sin responsable · "person:id" / "team:id"
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showTypes, setShowTypes] = useState(false);

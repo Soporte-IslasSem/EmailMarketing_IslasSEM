@@ -43,7 +43,7 @@ export const AREAS = [
       ["/dashboard/admin/team", "Empleados"],
       ["/dashboard/admin/departments", "Departamentos"],
       { label: "Equipos y roles", menu: [["/dashboard/admin/salesteams", "Equipos comerciales"], ["/dashboard/admin/roles", "Roles y permisos"]] },
-      { label: "Sistema", menu: [["/dashboard/admin/integraciones", "Integraciones / API"], ["/dashboard/admin/audit", "Registro"]] },
+      { label: "Sistema", menu: [["/dashboard/admin/integraciones", "Integraciones"], ["/dashboard/admin/audit", "Registro"]] },
     ],
   },
 ];
@@ -131,7 +131,7 @@ const CRUMB = {
   "/dashboard/admin/departments": "Departamentos",
   "/dashboard/admin/salesteams": "Equipos comerciales",
   "/dashboard/admin/roles": "Roles y permisos",
-  "/dashboard/admin/integraciones": "Integraciones / API",
+  "/dashboard/admin/integraciones": "Integraciones",
   "/dashboard/admin/audit": "Registro / Auditoría",
 };
 export function crumbOf(pathname) {
