@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { AREAS, areaOf, tabMenu } from "../../../../shared/nav.js";
+import { areaOf, tabMenu, visibleArea } from "../../../../shared/nav.js";
+import { usePerms } from "../../../crm/lib/permissions";
 import "./TopNav.styles.css";
 
 export default function TopNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [openMenu, setOpenMenu] = useState(null);
+  const { canSeeRoute } = usePerms();
 
-  const area = areaOf(location.pathname);
+  const area = visibleArea(areaOf(location.pathname), canSeeRoute);
   if (!area) return null;
 
   const isActive = (route) => location.pathname === route || location.pathname.startsWith(route + "/");

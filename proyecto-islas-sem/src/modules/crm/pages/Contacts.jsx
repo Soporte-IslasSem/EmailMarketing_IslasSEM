@@ -9,6 +9,8 @@ import { useCrmCollection, crmCreate, logActivity, fmtDate, tsToDate } from "../
 import { useClientTypes, typeOf, RELATIONS } from "../lib/clientTypes";
 import { useTaskScope } from "../lib/tasks";
 import { ownerKey, ownerLabel, ownerFields } from "../lib/owners";
+import { usePerms } from "../lib/permissions";
+import { exportCsv } from "../lib/exportCsv";
 import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
@@ -40,7 +42,10 @@ function Th({ k, sort, onSort, children }) {
 }
 
 export default function Contacts() {
-  const { items, loading, orgId } = useCrmCollection("contacts");
+  const { items: all, loading, orgId } = useCrmCollection("contacts");
+  const perms = usePerms();
+  // "Propios": solo los contactos que lleva, creó o tiene asignados.
+  const items = useMemo(() => perms.visible("contacts", all), [perms, all]);
   const { types } = useClientTypes();
   // Solo los administradores cambian el tipo de cliente (Empleados: rol "Full access"/"Administrador").
   const scope = useTaskScope();
@@ -157,7 +162,7 @@ export default function Contacts() {
     setSaving(true);
     try {
       const tags = form.tags.split(",").map((s) => s.trim()).filter(Boolean);
-      const ref = await crmCreate("contacts", orgId, { ...form, tags, clientId: nextClientId(items) });
+      const ref = await crmCreate("contacts", orgId, { ...form, tags, clientId: nextClientId(all) });
       await logActivity(orgId, { type: "Nota", title: `Contacto creado: ${form.firstName} ${form.lastName}`.trim(), entity: "contact", entityId: ref.id });
       setForm(emptyForm);
       setShowNew(false);
@@ -183,7 +188,16 @@ export default function Contacts() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {isAdmin && <button className="crm-btn ghost" onClick={() => setShowTypes(true)}>🏷 Tipos de cliente</button>}
-          <button className="crm-btn" onClick={() => setShowNew(true)}>+ Añadir contacto</button>
+          {perms.can("contacts", "export") && (
+            <button className="crm-btn ghost" onClick={() => exportCsv("contactos", filtered, [
+              ["ID", (c) => c.clientId], ["Nombre", (c) => c.firstName], ["Apellidos", (c) => c.lastName], ["Email", (c) => c.email],
+              ["Teléfono", (c) => c.phone || c.whatsapp], ["Empresa", (c) => c.company], ["Cargo", (c) => c.role],
+              ["Tipo de cliente", (c) => typeOf(types, c.clientType)?.label || ""], ["Relación", (c) => c.relation],
+              ["Responsable", (c) => c.ownerName || c.responsable], ["Etapa", (c) => c.stage], ["Etiquetas", (c) => c.tags],
+              ["Ciudad", (c) => c.city], ["Provincia", (c) => c.province], ["DNI/NIF", (c) => c.dni], ["Alta", (c) => fmtDate(c.createdAt)],
+            ])}>⬇ Exportar ({filtered.length})</button>
+          )}
+          {perms.can("contacts", "add") && <button className="crm-btn" onClick={() => setShowNew(true)}>+ Añadir contacto</button>}
         </div>
       </div>
 

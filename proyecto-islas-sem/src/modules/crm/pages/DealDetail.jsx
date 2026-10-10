@@ -9,6 +9,8 @@ import { queueEmail, basicEmail } from "../lib/outbox";
 import { CustomFieldsForm } from "../components/CustomFields";
 import { CreateFieldModal, ExtraFieldsEditor } from "../components/DealFields";
 import { LEAD_SOURCES, DEAL_TYPES } from "../lib/crm";
+import { usePerms } from "../lib/permissions";
+import { employeeEmailByName } from "../lib/owners";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
@@ -35,6 +37,8 @@ export default function DealDetail() {
   const { items: quotes } = useCrmCollection("quotes");
   const { items: invoices } = useCrmCollection("invoices");
   const { items: contacts } = useCrmCollection("contacts");
+  const { items: employees } = useCrmCollection("employees");
+  const perms = usePerms();
   const { items: formSubs } = useCrmCollection("formSubmissions");
   const { pipelines } = usePipelines();
   const [tab, setTab] = useState("General");
@@ -72,12 +76,25 @@ export default function DealDetail() {
     );
   }
 
+  if (perms.ready && !perms.can("deals", "read", deal)) {
+    return (
+      <div className="crmpipe crm">
+        <div className="crm-panel">🔒 No tienes acceso a esta negociación (tu rol solo ve las suyas).</div>
+        <button className="crm-btn ghost" onClick={() => navigate("/dashboard/crm/pipeline")}>← Volver al Kanban</button>
+      </div>
+    );
+  }
+  const ro = perms.ready && !perms.can("deals", "edit", deal);
+
   const ci = stages.findIndex((s) => s.id === deal.stage);
   const acc = STAGE_COLORS[(ci < 0 ? 0 : ci) % STAGE_COLORS.length];
   const bt = budgetTier(deal.amount);
   const tier = CLIENT_TIERS[deal.clientType] || CLIENT_TIERS.nuevo;
 
-  const upd = (data) => crmUpdate("deals", id, data);
+  const upd = (data) => {
+    if (ro) { alert("Tu rol no permite editar esta negociación."); return Promise.resolve(); }
+    return crmUpdate("deals", id, data).catch((e) => alert("No se pudo guardar: " + e.message));
+  };
   const moveStage = (sid) => {
     upd({ stage: sid });
     const name = findStage(getStages(pipeline, deal.board || "pos"), sid)?.name || sid;
@@ -284,6 +301,8 @@ export default function DealDetail() {
         <div className="dcols">
           {/* Columna izquierda: datos */}
           <div className="cd-col">
+            {ro && <div className="crm-panel" style={{ padding: "8px 14px", fontSize: 13 }}>🔒 Solo lectura: tu rol no permite editar esta negociación.</div>}
+            <fieldset disabled={ro} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <div className="crm-panel">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <h4 className="cd-h" style={{ margin: 0 }}>Sobre la negociación</h4>
@@ -310,7 +329,12 @@ export default function DealDetail() {
                   <input type="number" defaultValue={deal.amount || 0} onBlur={(e) => upd({ amount: Number(e.target.value) || 0 })} />
                 </div>
                 <div className="crm-field"><label>Responsable</label>
-                  <input defaultValue={deal.responsable || ""} onBlur={(e) => upd({ responsable: e.target.value })} />
+                  <input
+                    defaultValue={deal.responsable || ""}
+                    list="dd-people"
+                    onBlur={(e) => e.target.value !== (deal.responsable || "") && upd({ responsable: e.target.value, ownerEmail: employeeEmailByName(employees, e.target.value) })}
+                  />
+                  <datalist id="dd-people">{employees.map((x) => <option key={x.id} value={`${x.firstName || ""} ${x.lastName || ""}`.trim() || x.email} />)}</datalist>
                 </div>
               </div>
               <div className="crm-two">
@@ -340,6 +364,7 @@ export default function DealDetail() {
                 {deal.bitrixFunnel && <div className="row"><dt>En Bitrix</dt><dd>{deal.bitrixFunnel} › {deal.bitrixStage}</dd></div>}
               </dl>
             </div>
+            </fieldset>
           </div>
 
           {/* Columna derecha: prioridad + timeline */}

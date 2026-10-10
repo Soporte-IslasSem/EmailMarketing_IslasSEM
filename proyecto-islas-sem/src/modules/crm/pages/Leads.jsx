@@ -17,6 +17,9 @@ import {
 import { usePipelines, getStages, flattenStages } from "../lib/pipelines";
 import { runStageAutomations } from "../lib/automations";
 import { CustomFieldsForm } from "../components/CustomFields";
+import { usePerms } from "../lib/permissions";
+import { employeeEmailByName } from "../lib/owners";
+import { exportCsv } from "../lib/exportCsv";
 import "../crm.styles.css";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
 
@@ -49,7 +52,10 @@ function SourceChip({ source }) {
 }
 
 export default function Leads() {
-  const { items, loading, orgId } = useCrmCollection("leads");
+  const { items: all, loading, orgId } = useCrmCollection("leads");
+  const perms = usePerms();
+  const { items: employees } = useCrmCollection("employees");
+  const items = useMemo(() => perms.visible("leads", all), [perms, all]);
   const { pipelines } = usePipelines();
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
@@ -79,7 +85,7 @@ export default function Leads() {
     if (!form.firstName.trim() && !form.email.trim()) return;
     setSaving(true);
     try {
-      await crmCreate("leads", orgId, { ...form, estimatedValue: Number(form.estimatedValue) || 0 });
+      await crmCreate("leads", orgId, { ...form, estimatedValue: Number(form.estimatedValue) || 0, ownerEmail: employeeEmailByName(employees, form.responsable) });
       setForm(empty);
       setShowNew(false);
     } catch (e) {
@@ -176,8 +182,15 @@ export default function Leads() {
           <p>Leads sin cualificar · conviértelos en contactos y negociaciones · {items.length} prospectos</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="crm-btn ghost" onClick={() => setShowImport(true)}>Importar</button>
-          <button className="crm-btn" onClick={() => setShowNew(true)}>+ Crear prospecto</button>
+          {perms.can("leads", "export") && (
+            <button className="crm-btn ghost" onClick={() => exportCsv("prospectos", filtered, [
+              ["Nombre", (l) => l.firstName], ["Apellidos", (l) => l.lastName], ["Email", (l) => l.email], ["Teléfono", (l) => l.phone || l.whatsapp],
+              ["Empresa", (l) => l.company], ["Origen", (l) => l.source], ["Estado", (l) => l.status], ["Responsable", (l) => l.responsable],
+              ["Valor estimado", (l) => l.estimatedValue], ["Notas", (l) => l.notes],
+            ])}>⬇ Exportar</button>
+          )}
+          {perms.can("leads", "import") && <button className="crm-btn ghost" onClick={() => setShowImport(true)}>Importar</button>}
+          {perms.can("leads", "add") && <button className="crm-btn" onClick={() => setShowNew(true)}>+ Crear prospecto</button>}
         </div>
       </div>
 
@@ -229,7 +242,7 @@ export default function Leads() {
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <button className="crm-btn ghost sm" onClick={() => setHistoryLead(l)} title="Correos, formularios y actividad">📜</button>{" "}
                       {l.status !== "Convertido" && <button className="crm-btn sm" onClick={() => setConvertLead(l)}>Convertir</button>}{" "}
-                      <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar prospecto?") && crmRemove("leads", l.id)}>✕</button>
+                      {perms.can("leads", "delete", l) && <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar prospecto?") && crmRemove("leads", l.id)}>✕</button>}
                     </td>
                   </tr>
                 );

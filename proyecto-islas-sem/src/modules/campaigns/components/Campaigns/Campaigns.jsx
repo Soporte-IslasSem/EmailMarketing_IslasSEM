@@ -9,10 +9,12 @@ import CampaignTags from "../CampaignTags/CampaignTags";
 import { db } from "../../../../config/firebaseConfig";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { usePerms } from "../../../crm/lib/permissions";
 
 export default function Campaigns() {
   const { campaigns } = useCampaigns();
   const navigate = useNavigate();
+  const canCreate = usePerms().can("campaigns", "add");
 
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
@@ -147,7 +149,7 @@ export default function Campaigns() {
           </p>
         </div>
 
-        {activeTab !== "tags" && filteredCampaigns.length > 0 && (
+        {canCreate && activeTab !== "tags" && filteredCampaigns.length > 0 && (
           <Link
             to="/dashboard/campaigns/create"
             className="Campaigns__newButton"
@@ -219,12 +221,14 @@ export default function Campaigns() {
           <h3>{currentEmpty.title}</h3>
           <p>{currentEmpty.text}</p>
 
-          <Link
-            to="/dashboard/campaigns/create"
-            className="Campaigns__newButton Campaigns__newButton--empty"
-          >
-            {currentEmpty.buttonLabel}
-          </Link>
+          {canCreate && (
+            <Link
+              to="/dashboard/campaigns/create"
+              className="Campaigns__newButton Campaigns__newButton--empty"
+            >
+              {currentEmpty.buttonLabel}
+            </Link>
+          )}
         </div>
       )}
     </div>

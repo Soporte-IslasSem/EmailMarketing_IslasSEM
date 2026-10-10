@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmUpdate, crmRemove, fmtDate } from "../lib/crm";
+import { usePerms, syncOrgRoles, ADMIN_ROLES } from "../lib/permissions";
 import "../crm.styles.css";
 
-const ROLES = ["Full access", "Administrador", "Manager", "Comercial", "Marketing", "Colaborador", "Proveedor", "Alumno/a en prácticas"];
 const empty = { firstName: "", lastName: "", email: "", phone: "", department: "", role: "Comercial", twoFA: false };
 
 export default function Employees() {
@@ -13,6 +13,8 @@ export default function Employees() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const perms = usePerms();
+  const ROLES = perms.roles;
 
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
@@ -23,16 +25,40 @@ export default function Employees() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  // Si tras el cambio hay administradores y tú no estás entre ellos, perderías el acceso de
+  // administrador (Empleados, Roles, tipos de cliente…): se pide confirmación.
+  const confirmKeepAdmin = (next) => {
+    const admins = next.filter((e) => ADMIN_ROLES.includes(e.role) && e.email).map((e) => String(e.email).toLowerCase());
+    if (!admins.length || admins.includes(perms.email)) return true;
+    return window.confirm(`Después de este cambio los administradores serán: ${admins.join(", ")}.
+
+Tú (${perms.email}) dejarás de ser administrador y no podrás deshacerlo. ¿Continuar?`);
+  };
+  const remove = async (emp) => {
+    if (!window.confirm("¿Eliminar empleado?")) return;
+    const next = items.filter((e) => e.id !== emp.id);
+    if (!confirmKeepAdmin(next)) return;
+    try {
+      await crmRemove("employees", emp.id);
+      await syncOrgRoles(orgId, next, perms.org);
+    } catch (e) {
+      alert("No se pudo eliminar: " + e.message);
+    }
+  };
+
   const openNew = () => { setForm(empty); setEditing(null); setShowNew(true); };
   const openEdit = (emp) => { setForm({ ...empty, ...emp }); setEditing(emp.id); setShowNew(true); };
 
   const save = async () => {
     if (!form.firstName.trim() && !form.email.trim()) return;
+    const data = { firstName: form.firstName, lastName: form.lastName, email: form.email.trim().toLowerCase(), phone: form.phone, department: form.department, role: form.role, twoFA: !!form.twoFA };
+    const next = editing ? items.map((e) => (e.id === editing ? { ...e, ...data } : e)) : [...items, data];
+    if (!confirmKeepAdmin(next)) return;
     setSaving(true);
     try {
-      const data = { firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, department: form.department, role: form.role, twoFA: !!form.twoFA };
       if (editing) await crmUpdate("employees", editing, data);
       else await crmCreate("employees", orgId, data);
+      await syncOrgRoles(orgId, next, perms.org);
       setShowNew(false);
     } catch (e) {
       alert("No se pudo guardar: " + e.message);
@@ -73,7 +99,7 @@ export default function Employees() {
                   <td>{fmtDate(e.createdAt)}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     <button className="crm-btn ghost sm" onClick={() => openEdit(e)}>✎ Editar</button>{" "}
-                    <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar empleado?") && crmRemove("employees", e.id)}>Eliminar</button>
+                    <button className="crm-btn ghost sm" onClick={() => remove(e)}>Eliminar</button>
                   </td>
                 </tr>
               ))

@@ -26,7 +26,6 @@ const REDIRECT_URI = `${PUBLIC_URL}/api/google/callback`;
 const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events"];
 const DEFAULT_TZ = "Atlantic/Canary";
 const OWN_DOMAIN = "islassem.com";
-const ADMIN_ROLES = ["Full access", "Administrador"];
 const SYNC_EVERY_MS = 110e3;
 const FV = admin.firestore.FieldValue;
 const COMPANY = "company";
@@ -53,12 +52,12 @@ async function authUser(req) {
   return { uid: user.uid, email: norm(user.email), orgId };
 }
 
-// Igual que en la app: administradores = empleados con rol "Full access"/"Administrador".
-// Mientras no haya ninguno marcado, cualquier usuario de la organización lo es.
+// Igual que en la app y en las reglas de Firestore: organizations/{orgId}.adminEmails
+// (empleados con rol "Full access"/"Administrador"). Si está vacío, todos lo son.
 async function isAdmin(u) {
-  const snap = await db.collection("employees").where("orgId", "==", u.orgId).get();
-  const admins = snap.docs.map((d) => d.data()).filter((e) => ADMIN_ROLES.includes(e.role));
-  return !admins.length || admins.some((e) => norm(e.email) === u.email);
+  const org = (await db.collection("organizations").doc(u.orgId).get()).data() || {};
+  const admins = (org.adminEmails || []).map(norm);
+  return !admins.length || admins.includes(u.email);
 }
 
 async function guard(req, res, { adminOnly = false } = {}) {

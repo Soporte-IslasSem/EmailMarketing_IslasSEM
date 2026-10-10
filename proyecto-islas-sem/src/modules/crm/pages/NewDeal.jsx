@@ -5,6 +5,8 @@ import { usePipelines, getStages, flattenStages, STAGE_COLORS, CLIENT_TIERS } fr
 import { LEAD_SOURCES, DEAL_TYPES } from "../lib/crm";
 import { CustomFieldsForm } from "../components/CustomFields";
 import { CreateFieldModal, ExtraFieldsEditor } from "../components/DealFields";
+import { usePerms } from "../lib/permissions";
+import { employeeEmailByName } from "../lib/owners";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -16,6 +18,7 @@ export default function NewDeal() {
   const { pipelines } = usePipelines();
   const { items: contacts, orgId } = useCrmCollection("contacts");
   const { items: employees } = useCrmCollection("employees");
+  const perms = usePerms();
   const pipeline = pipelines.find((p) => p.id === params.get("pipeline")) || pipelines[0];
   const board = params.get("board") === "neg" ? "neg" : "pos";
   const stages = useMemo(() => (pipeline ? flattenStages(getStages(pipeline, board)) : []), [pipeline, board]);
@@ -49,7 +52,7 @@ export default function NewDeal() {
         title: form.title.trim(), amount: Number(form.amount) || 0,
         type: form.type, source: form.source, sourceInfo: form.sourceInfo.trim(), startDate: form.startDate,
         contact: form.contact.trim(), contactId: match?.id || null, contactEmail: match?.email || "", company: form.company.trim(),
-        responsable: form.responsable.trim(), openToAll: form.openToAll, observers: form.observers.trim(),
+        responsable: form.responsable.trim(), ownerEmail: employeeEmailByName(employees, form.responsable), openToAll: form.openToAll, observers: form.observers.trim(),
         clientType: form.clientType, priceType: form.priceType, notes: form.comment,
         custom: form.custom, extraFields: form.extraFields,
       };
@@ -63,6 +66,7 @@ export default function NewDeal() {
   };
 
   if (!pipeline) return <div className="crmpipe crm"><div className="crm-loading">Cargando…</div></div>;
+  if (perms.ready && !perms.can("deals", "add")) return <div className="crmpipe crm"><div className="crm-panel">🔒 Tu rol no permite crear negociaciones.</div></div>;
 
   const actions = (
     <>

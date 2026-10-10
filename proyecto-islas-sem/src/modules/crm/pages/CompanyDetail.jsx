@@ -6,6 +6,7 @@ import { useCrmCollection, crmGet, crmCreate, crmUpdate, money, fmtDate, ACTIVIT
 import { useOrg } from "../lib/useOrg";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
 import ClientAssignRows from "../components/ClientAssign";
+import { usePerms } from "../lib/permissions";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
 import "../crm.styles.css";
 
@@ -27,6 +28,7 @@ export default function CompanyDetail() {
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
   const [noteType, setNoteType] = useState("Nota");
+  const perms = usePerms();
 
   const { items: contacts } = useCrmCollection("contacts");
   const { items: deals } = useCrmCollection("deals");
@@ -99,6 +101,8 @@ export default function CompanyDetail() {
     );
   }
 
+  if (perms.ready && !perms.can("companies", "read", company)) return <div className="crm"><div className="crm-panel">🔒 No tienes acceso a este registro (tu rol solo ve los suyos).</div><button className="crm-btn ghost" onClick={() => navigate("/dashboard/crm/companies")}>← Empresas</button></div>;
+  const ro = perms.ready && !perms.can("companies", "edit", company);
   const rgpd = company.rgpd || "Pendiente";
   const set = (k) => (e) => setEdit((x) => ({ ...x, [k]: e.target.value }));
 
@@ -114,13 +118,15 @@ export default function CompanyDetail() {
             {company.rgpdAt && <span style={{ fontSize: 12.5, color: "var(--crm-muted)" }}> · {fmtDate(company.rgpdAt)}{company.rgpdSource ? ` (${company.rgpdSource})` : ""}</span>}
           </p>
         </div>
-        {!edit && <button className="crm-btn" onClick={() => setEdit({ ...company, custom: { ...(company.custom || {}) } })}>Editar</button>}
+        {!edit && !ro && <button className="crm-btn" onClick={() => setEdit({ ...company, custom: { ...(company.custom || {}) } })}>Editar</button>}
       </div>
 
       <div className="crm-detail">
         <div>
           <div className="crm-panel">
             <h4>Información</h4>
+            {ro && <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "0 0 8px" }}>🔒 Solo lectura: tu rol no permite editar este registro.</p>}
+            <fieldset disabled={ro} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             {edit ? (
               <>
                 <div className="crm-two">
@@ -151,6 +157,7 @@ export default function CompanyDetail() {
                 <CustomFieldsView entity="companies" values={company.custom} />
               </dl>
             )}
+            </fieldset>
           </div>
 
           <div className="crm-panel">

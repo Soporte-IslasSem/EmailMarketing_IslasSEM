@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../../shared/hooks/useAuth.jsx";
-import { AREAS, areaOf, firstRoute } from "../../../../shared/nav.js";
+import { AREAS, areaOf, firstRoute, visibleArea } from "../../../../shared/nav.js";
+import { usePerms } from "../../../crm/lib/permissions";
 import "./Sidebar.styles.css";
 
 const ICONS = {
@@ -27,6 +28,8 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const activeArea = areaOf(location.pathname).id;
+  const { canSeeRoute } = usePerms();
+  const areas = AREAS.map((a) => visibleArea(a, canSeeRoute)).filter(Boolean);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("islassem_sidebar_collapsed") === "1"; } catch { return false; }
   });
@@ -53,7 +56,7 @@ export default function Sidebar() {
         </div>
 
         <nav className="Sidebar__nav">
-          {AREAS.map((area) => (
+          {areas.map((area) => (
             <button
               key={area.id}
               className={`Sidebar__link ${activeArea === area.id ? "active" : ""}`}

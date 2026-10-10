@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useCrmCollection, crmGet, crmCreate, crmUpdate, logActivity, money, fmtDate, ACTIVITY_TYPES } from "../lib/crm";
 import { RELATIONS } from "../lib/clientTypes";
 import ClientAssignRows from "../components/ClientAssign";
+import { usePerms } from "../lib/permissions";
 import { useOrg } from "../lib/useOrg";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
 import "../crm.styles.css";
@@ -17,6 +18,7 @@ export default function ContactDetail() {
 
   const { items: activities } = useCrmCollection("activities");
   const { items: deals } = useCrmCollection("deals");
+  const perms = usePerms();
   const { items: formSubs } = useCrmCollection("formSubmissions");
 
   const [note, setNote] = useState("");
@@ -101,6 +103,9 @@ export default function ContactDetail() {
     setContact((c) => ({ ...c, ...patch }));
   };
 
+  if (perms.ready && !perms.can("contacts", "read", contact)) return <div className="crm"><div className="crm-panel">🔒 No tienes acceso a este registro (tu rol solo ve los suyos).</div><button className="crm-btn ghost" onClick={() => navigate("/dashboard/crm/contacts")}>← Contactos</button></div>;
+  const ro = perms.ready && !perms.can("contacts", "edit", contact);
+
   return (
     <div className="crm">
       <div className="crm__top">
@@ -119,6 +124,8 @@ export default function ContactDetail() {
         <div>
           <div className="crm-panel">
             <h4>Información</h4>
+            {ro && <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "0 0 8px" }}>🔒 Solo lectura: tu rol no permite editar este registro.</p>}
+            <fieldset disabled={ro} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <dl className="crm-dl">
               <div className="row"><dt>ID cliente</dt><dd>{contact.clientId || "—"}</dd></div>
               <div className="row"><dt>Email</dt><dd>{contact.email || "—"}</dd></div>
@@ -150,6 +157,7 @@ export default function ContactDetail() {
                 ✏️ Campos personalizados
               </button>
             )}
+            </fieldset>
             {contact.notes && (
               <p style={{ marginTop: 12, color: "var(--crm-muted)", fontSize: 14 }}>{contact.notes}</p>
             )}

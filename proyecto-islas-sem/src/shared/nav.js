@@ -48,6 +48,14 @@ export const AREAS = [
   },
 ];
 
+// Área con solo las pestañas que el usuario puede ver (según su rol); null si no queda ninguna.
+export function visibleArea(area, canSee) {
+  const tabs = area.tabs
+    .map((t) => (Array.isArray(t) ? (canSee(t[0]) ? t : null) : { ...t, menu: t.menu.filter(([r]) => canSee(r)) }))
+    .filter((t) => t && (Array.isArray(t) || t.menu.length));
+  return tabs.length ? { ...area, tabs } : null;
+}
+
 export const tabMenu = (t) => (Array.isArray(t) ? [t] : t.menu);
 export const tabRoutes = (t) => (Array.isArray(t) ? [t[0]] : t.menu.map((m) => m[0]));
 

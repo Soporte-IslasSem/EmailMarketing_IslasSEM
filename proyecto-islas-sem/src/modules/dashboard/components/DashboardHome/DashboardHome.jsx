@@ -1,4 +1,5 @@
 import "./DashboardHome.styles.css";
+import { usePerms } from "../../../crm/lib/permissions";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
@@ -30,6 +31,7 @@ export default function DashboardHome() {
   const [showCallModal, setShowCallModal] = useState(false);
   const { items: contacts } = useCrmCollection("contacts");
   const stats = useEmailStats();
+  const canCreate = usePerms().can("campaigns", "add");
 
   return (
     <div className="DashboardHome">
@@ -80,12 +82,14 @@ export default function DashboardHome() {
           <p className="DashboardHome__cardText">
             Crea una campaña, capta contactos con formularios y mide tus aperturas. Todo en un solo lugar.
           </p>
-          <Link
-            to="/dashboard/campaigns/create"
-            className="DashboardHome__button"
-          >
-            Crear campaña
-          </Link>
+          {canCreate && (
+            <Link
+              to="/dashboard/campaigns/create"
+              className="DashboardHome__button"
+            >
+              Crear campaña
+            </Link>
+          )}
         </div>
       </div>
 

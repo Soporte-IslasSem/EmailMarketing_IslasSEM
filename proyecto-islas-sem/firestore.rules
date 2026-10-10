@@ -22,6 +22,54 @@ service cloud.firestore {
       return isSignedIn() && request.resource.data.orgId == myOrg();
     }
 
+    // ===== Roles y permisos (Administración › Roles y permisos) =====
+    // organizations/{org}: adminEmails (si está vacío, todos son administradores),
+    // memberRoles { email: rol } y rolePerms { rol: { entidad: { read, add, edit,
+    // delete, export, import } } } con 0 = Denegar, 1 = Propios, 2 = Todo.
+    function orgData() {
+      return get(/databases/$(database)/documents/organizations/$(myOrg())).data;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    function isOrgAdmin() {
+      let admins = orgData().get('adminEmails', []);
+      return isSignedIn() && (admins.size() == 0 || myEmail() in admins);
+    }
+    function myRole() {
+      return orgData().get('memberRoles', {}).get(myEmail(), '_sinrol');
+    }
+    function lvl(entity, perm) {
+      return isOrgAdmin() ? 2 : orgData().get('rolePerms', {}).get(myRole(), {}).get(entity, {}).get(perm, 2);
+    }
+    // "Propios": responsable, creador o asignado.
+    function isOwn(d) {
+      return d.get('ownerEmail', '') == myEmail() || d.get('createdByEmail', '') == myEmail() || d.get('assigneeEmail', '') == myEmail();
+    }
+    function canOn(entity, perm, d) {
+      let l = lvl(entity, perm);
+      return l == 2 || (l == 1 && isOwn(d));
+    }
+    // Lectura: con "Propios" se permite leer la colección (la app filtra lo que muestra);
+    // con "Denegar" no se puede leer nada.
+    function canRead(entity) {
+      return ownDocOrg() && lvl(entity, 'read') > 0;
+    }
+    function canCreate(entity) {
+      return createInMyOrg() && lvl(entity, 'add') > 0;
+    }
+    function canEdit(entity) {
+      return ownDocOrg() && request.resource.data.orgId == resource.data.orgId && canOn(entity, 'edit', resource.data);
+    }
+    function canDelete(entity) {
+      return ownDocOrg() && canOn(entity, 'delete', resource.data);
+    }
+    // Tipo de cliente y responsable de contactos/empresas: solo administradores.
+    function keepsAdminFields() {
+      return isOrgAdmin() || !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['clientType', 'ownerType', 'ownerId', 'ownerName', 'ownerEmail']);
+    }
+
     // Cada usuario solo puede leer/escribir su propio perfil
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -31,25 +79,36 @@ service cloud.firestore {
     match /organizations/{orgId} {
       allow read: if isMember(orgId);
       allow create: if isSignedIn(); // bootstrap de la org por defecto (TODO: endurecer al abrir el SaaS)
-      allow update, delete: if isMember(orgId);
+      // Roles, administradores y tipos de cliente: solo administradores.
+      allow update: if isMember(orgId) && (isOrgAdmin() || !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['adminEmails', 'memberRoles', 'rolePerms', 'roles', 'clientTypes']));
+      allow delete: if isMember(orgId) && isOrgAdmin();
     }
 
     // ===== Colecciones del CRM (aisladas por orgId) =====
     match /contacts/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if canRead('contacts');
+      allow create: if canCreate('contacts');
+      allow update: if canEdit('contacts') && keepsAdminFields();
+      allow delete: if canDelete('contacts');
     }
     match /companies/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if canRead('companies');
+      allow create: if canCreate('companies');
+      allow update: if canEdit('companies') && keepsAdminFields();
+      allow delete: if canDelete('companies');
     }
     match /leads/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if canRead('leads');
+      allow create: if canCreate('leads');
+      allow update: if canEdit('leads');
+      allow delete: if canDelete('leads');
     }
     match /deals/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if canRead('deals');
+      allow create: if canCreate('deals');
+      allow update: if canEdit('deals');
+      allow delete: if canDelete('deals');
     }
     match /pipelines/{docId} {
       allow read, update, delete: if ownDocOrg();
@@ -60,16 +119,22 @@ service cloud.firestore {
       allow create: if createInMyOrg();
     }
     match /products/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if canRead('products');
+      allow create: if canCreate('products');
+      allow update: if canEdit('products');
+      allow delete: if canDelete('products');
     }
     match /quotes/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if canRead('quotes');
+      allow create: if canCreate('quotes');
+      allow update: if canEdit('quotes');
+      allow delete: if canDelete('quotes');
     }
     match /invoices/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if canRead('invoices');
+      allow create: if canCreate('invoices');
+      allow update: if canEdit('invoices');
+      allow delete: if canDelete('invoices');
     }
     match /outbox/{docId} {
       allow read, update, delete: if ownDocOrg();
@@ -89,25 +154,30 @@ service cloud.firestore {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();
     }
+    // Empleados (de aquí salen administradores y roles): solo los administradores los cambian.
     match /employees/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if ownDocOrg();
+      allow update, delete: if ownDocOrg() && isOrgAdmin();
+      allow create: if createInMyOrg() && isOrgAdmin();
     }
     match /departments/{docId} {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();
     }
     match /salesteams/{docId} {
-      allow read, update, delete: if ownDocOrg();
-      allow create: if createInMyOrg();
+      allow read: if ownDocOrg();
+      allow update, delete: if ownDocOrg() && isOrgAdmin();
+      allow create: if createInMyOrg() && isOrgAdmin();
     }
     match /roles/{docId} {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();
     }
     // Campos personalizados (definiciones por entidad) y Papelera de reciclaje
+    // Cualquiera puede crear un campo nuevo ("+ Crear campo"); cambiarlo o quitarlo, solo administradores.
     match /customFields/{docId} {
-      allow read, update, delete: if ownDocOrg();
+      allow read: if ownDocOrg();
+      allow update, delete: if ownDocOrg() && isOrgAdmin();
       allow create: if createInMyOrg();
     }
     match /recyclebin/{docId} {

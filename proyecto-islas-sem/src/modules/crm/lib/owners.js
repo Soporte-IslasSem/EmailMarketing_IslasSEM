@@ -4,6 +4,14 @@
 export const ownerKey = (x) => (x?.ownerType && x?.ownerId ? `${x.ownerType}:${x.ownerId}` : "");
 export const ownerLabel = (x) => (x?.ownerType ? `${x.ownerType === "team" ? "👥 " : ""}${x.ownerName || "—"}` : x?.responsable || "—");
 
+// Email del empleado cuyo nombre coincide (para campos "Responsable" de texto libre).
+export function employeeEmailByName(employees, name) {
+  const n = String(name || "").trim().toLowerCase();
+  if (!n) return "";
+  const e = employees.find((x) => `${x.firstName || ""} ${x.lastName || ""}`.trim().toLowerCase() === n || String(x.email || "").toLowerCase() === n);
+  return e ? String(e.email || "").toLowerCase() : "";
+}
+
 export function ownerFields(opt) {
   return opt
     ? { ownerType: opt.type, ownerId: opt.id, ownerName: opt.name, ownerEmail: opt.email || "", responsable: opt.name }

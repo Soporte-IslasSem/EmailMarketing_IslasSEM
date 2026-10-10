@@ -125,6 +125,8 @@ export function useCrmCollection(name) {
 export async function crmCreate(name, orgId, data) {
   if (!orgId) throw new Error("Sin organización activa");
   return addDoc(collection(db, name), {
+    // Quién lo creó: cuenta como "propio" para los roles con permiso "Propios".
+    createdByEmail: String(auth.currentUser?.email || "").toLowerCase(),
     ...data,
     orgId,
     createdAt: serverTimestamp(),

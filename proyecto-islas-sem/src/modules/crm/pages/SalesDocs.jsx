@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmUpdate, crmRemove, money, fmtDate } from "../lib/crm";
+import { usePerms } from "../lib/permissions";
 import { downloadDocPDF, openDocPDF } from "../lib/pdf";
 import "../crm.styles.css";
 
@@ -29,7 +30,9 @@ const statusClass = (s) =>
 
 export default function SalesDocs({ type }) {
   const cfg = CONFIG[type];
-  const { items, loading, orgId } = useCrmCollection(type);
+  const { items: all, loading, orgId } = useCrmCollection(type);
+  const perms = usePerms();
+  const items = useMemo(() => perms.visible(type, all), [perms, all, type]);
   const { items: contacts } = useCrmCollection("contacts");
   const [term, setTerm] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -71,7 +74,7 @@ export default function SalesDocs({ type }) {
           <h1>{cfg.title}</h1>
           <p>{cfg.subtitle} · Total: {money(total)}</p>
         </div>
-        <button className="crm-btn" onClick={openNew}>+ {cfg.newLabel}</button>
+        {perms.can(type, "add") && <button className="crm-btn" onClick={openNew}>+ {cfg.newLabel}</button>}
       </div>
 
       <input className="crm-search" placeholder={`Buscar ${cfg.title.toLowerCase()}…`} value={term} onChange={(e) => setTerm(e.target.value)} />
@@ -100,7 +103,7 @@ export default function SalesDocs({ type }) {
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     <button className="crm-btn ghost sm" onClick={() => openDocPDF(q, { isInvoice: type === "invoices" })} title="Previsualizar PDF">👁</button>{" "}
                     <button className="crm-btn sm" onClick={() => downloadDocPDF(q, { isInvoice: type === "invoices" })} title="Descargar PDF">📄</button>{" "}
-                    <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar?") && crmRemove(type, q.id)}>Eliminar</button>
+                    {perms.can(type, "delete", q) && <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar?") && crmRemove(type, q.id)}>Eliminar</button>}
                   </td>
                 </tr>
               ))

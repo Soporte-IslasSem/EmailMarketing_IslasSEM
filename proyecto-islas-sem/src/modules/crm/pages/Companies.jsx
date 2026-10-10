@@ -8,13 +8,17 @@ import ClientTypesModal from "../components/ClientTypesModal";
 import { ownerKey, ownerLabel } from "../lib/owners";
 import { useClientTypes, typeOf } from "../lib/clientTypes";
 import { useTaskScope } from "../lib/tasks";
+import { usePerms } from "../lib/permissions";
+import { exportCsv } from "../lib/exportCsv";
 import "../crm.styles.css";
 
 const empty = { name: "", cif: "", iban: "", industry: "", website: "", email: "", phone: "", city: "", community: "", rgpd: "Pendiente", notes: "" };
 const RGPD = ["Pendiente", "Firmado", "No aplica"];
 
 export default function Companies() {
-  const { items, loading, orgId } = useCrmCollection("companies");
+  const { items: all, loading, orgId } = useCrmCollection("companies");
+  const perms = usePerms();
+  const items = useMemo(() => perms.visible("companies", all), [perms, all]);
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const { types } = useClientTypes();
@@ -67,7 +71,15 @@ export default function Companies() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {scope.isAdmin && <button className="crm-btn ghost" onClick={() => setShowTypes(true)}>🏷 Tipos de cliente</button>}
-          <button className="crm-btn" onClick={() => setShowNew(true)}>+ Nueva empresa</button>
+          {perms.can("companies", "export") && (
+            <button className="crm-btn ghost" onClick={() => exportCsv("empresas", filtered, [
+              ["Nombre", (c) => c.name], ["CIF/NIF", (c) => c.cif], ["Tipo de cliente", (c) => typeOf(types, c.clientType)?.label || ""],
+              ["Responsable", (c) => c.ownerName || c.responsable], ["Email", (c) => c.email], ["Teléfono", (c) => c.phone],
+              ["Web", (c) => c.website], ["Sector", (c) => c.industry], ["Ciudad", (c) => c.city], ["Provincia", (c) => c.province],
+              ["Comunidad", (c) => c.community], ["IBAN", (c) => c.iban], ["RGPD", (c) => c.rgpd || "Pendiente"],
+            ])}>⬇ Exportar ({filtered.length})</button>
+          )}
+          {perms.can("companies", "add") && <button className="crm-btn" onClick={() => setShowNew(true)}>+ Nueva empresa</button>}
         </div>
       </div>
 
@@ -119,12 +131,14 @@ export default function Companies() {
                   <td>{c.email || "—"}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     <button className="crm-btn ghost sm" onClick={() => navigate(`/dashboard/crm/companies/${c.id}`)}>Ver ficha</button>{" "}
-                    <button
-                      className="crm-btn ghost sm"
-                      onClick={() => window.confirm(`¿Eliminar "${c.name}"?`) && crmRemove("companies", c.id)}
-                    >
-                      Eliminar
-                    </button>
+                    {perms.can("companies", "delete", c) && (
+                      <button
+                        className="crm-btn ghost sm"
+                        onClick={() => window.confirm(`¿Eliminar "${c.name}"?`) && crmRemove("companies", c.id)}
+                      >
+                        Eliminar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

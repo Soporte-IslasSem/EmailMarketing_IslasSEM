@@ -5,15 +5,17 @@
 // "assignee" (texto): se muestran tal cual.
 //
 // Quién ve qué (vista de la app; los datos del CRM siguen siendo de toda la organización):
-// - Administradores (empleados con rol "Full access" / "Administrador"): todas.
+// - Administradores (empleados con rol "Full access" / "Administrador", ver permissions.js):
+//   todas.
 // - Resto: las suyas, las de sus equipos y las que crearon. Mientras no haya ningún
 //   administrador marcado en Empleados, todos son administradores (nadie se queda fuera).
 import { useEffect, useMemo, useState } from "react";
 import { auth } from "../../../config/firebaseConfig";
 import { useCrmCollection } from "./crm";
 import { useOrg } from "./useOrg";
+import { usePerms, ADMIN_ROLES } from "./permissions";
 
-export const ADMIN_ROLES = ["Full access", "Administrador"];
+export { ADMIN_ROLES };
 const API_BASE = import.meta.env.VITE_API_BASE || "https://email-marketing.islassem.com/api";
 const norm = (s) => String(s || "").trim().toLowerCase();
 export const fullName = (e) => `${e.firstName || ""} ${e.lastName || ""}`.trim() || e.email || "Sin nombre";
@@ -22,13 +24,14 @@ export function useTaskScope() {
   const { user } = useOrg();
   const { items: employees } = useCrmCollection("employees");
   const { items: teams } = useCrmCollection("salesteams");
+  const perms = usePerms();
   return useMemo(() => {
     const email = norm(user?.email);
     const me = employees.find((e) => norm(e.email) === email) || null;
     const myName = me ? fullName(me) : "";
     const myTeams = me ? teams.filter((t) => (t.members || []).includes(myName)) : [];
     const anyAdmin = employees.some((e) => ADMIN_ROLES.includes(e.role));
-    const isAdmin = !anyAdmin || (!!me && ADMIN_ROLES.includes(me.role));
+    const isAdmin = perms.isAdmin;
     const myTeamIds = new Set(myTeams.map((t) => t.id));
 
     const isMine = (a) =>
@@ -47,7 +50,7 @@ export function useTaskScope() {
     const assignOptions = isAdmin ? options : options.filter((o) => o.type === "person" && me && o.id === me.id);
 
     return { email, me, myName, myTeams, isAdmin, anyAdmin, isMine, canSee, people, teams, options, assignOptions };
-  }, [user, employees, teams]);
+  }, [user, employees, teams, perms.isAdmin]);
 }
 
 export const assigneeKey = (a) => (a.assigneeType && a.assigneeId ? `${a.assigneeType}:${a.assigneeId}` : "");

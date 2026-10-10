@@ -2,12 +2,16 @@ import { useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmRemove, money } from "../lib/crm";
+import { usePerms } from "../lib/permissions";
+import { exportCsv } from "../lib/exportCsv";
 import "../crm.styles.css";
 
 const empty = { name: "", sku: "", category: "", price: 0, stock: 0 };
 
 export default function Products() {
-  const { items, loading, orgId } = useCrmCollection("products");
+  const { items: all, loading, orgId } = useCrmCollection("products");
+  const perms = usePerms();
+  const items = useMemo(() => perms.visible("products", all), [perms, all]);
   const [term, setTerm] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState(empty);
@@ -77,11 +81,18 @@ export default function Products() {
           <p>Productos y servicios que se pueden añadir a las negociaciones.</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="crm-btn ghost" onClick={() => fileRef.current?.click()} disabled={importing}>
-            {importing ? "Importando…" : "⬆ Importar CSV"}
-          </button>
+          {perms.can("products", "export") && (
+            <button className="crm-btn ghost" onClick={() => exportCsv("productos", filtered, [
+              ["Nombre", (p) => p.name], ["SKU", (p) => p.sku], ["Categoría", (p) => p.category], ["Precio", (p) => p.price], ["Stock", (p) => p.stock],
+            ])}>⬇ Exportar</button>
+          )}
+          {perms.can("products", "import") && (
+            <button className="crm-btn ghost" onClick={() => fileRef.current?.click()} disabled={importing}>
+              {importing ? "Importando…" : "⬆ Importar CSV"}
+            </button>
+          )}
           <input ref={fileRef} type="file" accept=".csv" hidden onChange={onFile} />
-          <button className="crm-btn" onClick={() => setShowNew(true)}>+ Nuevo producto</button>
+          {perms.can("products", "add") && <button className="crm-btn" onClick={() => setShowNew(true)}>+ Nuevo producto</button>}
         </div>
       </div>
 
@@ -104,7 +115,7 @@ export default function Products() {
                   <td>{money(p.price)}</td>
                   <td>{p.stock || 0}</td>
                   <td style={{ textAlign: "right" }}>
-                    <button className="crm-btn ghost sm" onClick={() => window.confirm(`¿Eliminar "${p.name}"?`) && crmRemove("products", p.id)}>Eliminar</button>
+                    {perms.can("products", "delete", p) && <button className="crm-btn ghost sm" onClick={() => window.confirm(`¿Eliminar "${p.name}"?`) && crmRemove("products", p.id)}>Eliminar</button>}
                   </td>
                 </tr>
               ))

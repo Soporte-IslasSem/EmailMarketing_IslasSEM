@@ -22,6 +22,8 @@ import {
 import { runStageAutomations } from "../lib/automations";
 import TaskModal from "../components/TaskModal";
 import { useTaskScope, useGoogleStatus } from "../lib/tasks";
+import { usePerms } from "../lib/permissions";
+import { exportCsv } from "../lib/exportCsv";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -48,7 +50,11 @@ function sortDeals(items, mode) {
 
 export default function Pipeline() {
   const { pipelines, loading } = usePipelines();
-  const { items: deals, orgId } = useCrmCollection("deals");
+  const { items: allDeals, orgId } = useCrmCollection("deals");
+  const perms = usePerms();
+  // "Propios": solo las negociaciones que lleva, creó o tiene asignadas.
+  const deals = useMemo(() => perms.visible("deals", allDeals), [perms, allDeals]);
+  const canAdd = perms.can("deals", "add");
   const { items: contacts } = useCrmCollection("contacts");
   const navigate = useNavigate();
 
@@ -169,6 +175,7 @@ export default function Pipeline() {
     if (!id) return;
     const d = deals.find((x) => x.id === id);
     if (!d || d.stage === stageId) return;
+    if (!perms.can("deals", "edit", d)) return alert("Tu rol no permite mover esta negociación.");
     await crmUpdate("deals", id, { stage: stageId });
     // Bitrix: al entrar en una etapa se ejecutan sus reglas de automatización
     runStageAutomations(pipeline, { ...d, stage: stageId }, stageId, orgId);
@@ -211,9 +218,11 @@ export default function Pipeline() {
         {s.name} <span className="colhead-pen">✎</span>
       </span>
       <span className="dcnt">{dealsIn(s.id).length}</span>
-      <button className="colhead-add" title="Nueva negociación en esta etapa" onClick={() => openNewDeal(s.id)}>
-        +
-      </button>
+      {canAdd && (
+        <button className="colhead-add" title="Nueva negociación en esta etapa" onClick={() => openNewDeal(s.id)}>
+          +
+        </button>
+      )}
     </div>
   );
 
@@ -233,7 +242,7 @@ export default function Pipeline() {
       >
         {colHead(s, color, sub)}
         <div className="deal-total">{money(total)}</div>
-        {quickCol === s.id ? (
+        {!canAdd ? null : quickCol === s.id ? (
           <QuickAdd stageId={s.id} onSave={quickSave} onClose={() => setQuickCol(null)} onFull={() => openNewDeal(s.id)} />
         ) : (
           <button className="deal-quick" onClick={() => setQuickCol(s.id)}>+ Negociación rápida</button>
@@ -253,7 +262,7 @@ export default function Pipeline() {
       <div
         key={d.id}
         className="kcard deal-card"
-        draggable
+        draggable={perms.can("deals", "edit", d)}
         style={{ borderLeft: `3px solid ${bt.color}` }}
         onDragStart={() => (dragId.current = d.id)}
         onClick={() => navigate(`/dashboard/crm/deals/${d.id}`)}
@@ -261,7 +270,7 @@ export default function Pipeline() {
       >
         <div className="deal-badge">{d.itemsCount || (d.items ? d.items.length : 0)}</div>
         <div className="card-tools">
-          <button
+          {perms.can("deals", "edit", d) && <button
             className="ct-move"
             title={isNeg ? "Devolver al Kanban positivo" : "Enviar al Kanban Negativo"}
             onClick={(e) => {
@@ -270,9 +279,9 @@ export default function Pipeline() {
             }}
           >
             {isNeg ? "↩" : "➡"}
-          </button>
-          <button title="Editar" onClick={(e) => { e.stopPropagation(); editDeal(d); }}>✎</button>
-          <button className="ct-del" title="Eliminar" onClick={(e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${d.title}"?`)) crmRemove("deals", d.id); }}>🗑</button>
+          </button>}
+          {perms.can("deals", "edit", d) && <button title="Editar" onClick={(e) => { e.stopPropagation(); editDeal(d); }}>✎</button>}
+          {perms.can("deals", "delete", d) && <button className="ct-del" title="Eliminar" onClick={(e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${d.title}"?`)) crmRemove("deals", d.id); }}>🗑</button>}
         </div>
         <div className="deal-icons" onClick={(e) => e.stopPropagation()}>
           <span title="Programar llamada" style={{ cursor: "pointer" }} onClick={() => setActivityFor({ deal: d, type: "Llamada" })}>{DICON.phone}</span>
@@ -336,9 +345,11 @@ export default function Pipeline() {
       <div className="dealbar">
         <div className="dealbar-l">
           <h1>Negociaciones</h1>
-          <button className="crear-split" onClick={() => openNewDeal()}>
-            + Crear <span className="cx">▾</span>
-          </button>
+          {canAdd && (
+            <button className="crear-split" onClick={() => openNewDeal()}>
+              + Crear <span className="cx">▾</span>
+            </button>
+          )}
           <div className="pipesel" onClick={() => setShowPipeMenu((v) => !v)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16, color: "var(--teal)" }}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3Z" /></svg>
             <b>{pipeline.name}</b>
@@ -388,6 +399,13 @@ export default function Pipeline() {
           <span><b>{totalDeals}</b> Más ▾</span>
         </div>
         <div className="dealactions">
+          {perms.can("deals", "export") && (
+            <button onClick={() => exportCsv(`negociaciones-${pipeline.name}`, deals.filter((d) => d.pipelineId === pipeline.id && (d.board || "pos") === board), [
+              ["Negociación", (d) => d.title], ["Etapa", (d) => findStage(getStages(pipeline, board), d.stage)?.name || d.stage], ["Importe", (d) => d.amount],
+              ["Contacto", (d) => d.contact], ["Empresa", (d) => d.company], ["Responsable", (d) => d.responsable], ["Origen", (d) => d.source],
+              ["Productos", (d) => (d.items || []).map((i) => i.name)], ["Estado", (d) => d.status || "abierta"],
+            ])}>⬇ Exportar</button>
+          )}
           <button onClick={() => navigate("/dashboard/crm/automation")}>⚙ Reglas de automatización</button>
         </div>
       </div>
