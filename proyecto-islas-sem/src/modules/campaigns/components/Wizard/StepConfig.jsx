@@ -66,26 +66,15 @@ export default function StepConfig() {
         senderEmail: SENDER_EMAIL,
         senderName: form.senderName,
         preheader: form.preheader,
-        createdAt: new Date(),
-        design: {
-          editorType: "dragdrop",
-          html: "",
-        },
+        // Al editar una campaña ya empezada solo se tocan estos datos: la selección de
+        // destinatarios, la plantilla y el diseño se conservan.
+        ...(campaignId ? {} : { createdAt: new Date(), design: { editorType: "dragdrop", html: "" } }),
       },
-      lists: {
-        selectedLists: [],
-        totalSubscribers: 0,
-      },
-      template: {
-        templateId: null,
-        templateName: null,
-        type: type,
-      },
-      send: {
-        scheduleType: "now",
-        scheduledAt: null,
-        status: "draft",
-      },
+      ...(campaignId ? {} : {
+        lists: { selectedLists: [], totalSubscribers: 0 },
+        template: { templateId: null, templateName: null, type: type },
+        send: { scheduleType: "now", scheduledAt: null, status: "draft" },
+      }),
     });
 
     alert("✅ Borrador guardado correctamente");
@@ -109,26 +98,15 @@ export default function StepConfig() {
         senderEmail: SENDER_EMAIL,
         senderName: form.senderName,
         preheader: form.preheader,
-        createdAt: new Date(),
-        design: {
-          editorType: "dragdrop",
-          html: "",
-        },
+        // Al editar una campaña ya empezada solo se tocan estos datos: la selección de
+        // destinatarios, la plantilla y el diseño se conservan.
+        ...(campaignId ? {} : { createdAt: new Date(), design: { editorType: "dragdrop", html: "" } }),
       },
-      lists: {
-        selectedLists: [],
-        totalSubscribers: 0,
-      },
-      template: {
-        templateId: null,
-        templateName: null,
-        type: type,
-      },
-      send: {
-        scheduleType: "now",
-        scheduledAt: null,
-        status: "draft",
-      },
+      ...(campaignId ? {} : {
+        lists: { selectedLists: [], totalSubscribers: 0 },
+        template: { templateId: null, templateName: null, type: type },
+        send: { scheduleType: "now", scheduledAt: null, status: "draft" },
+      }),
     });
 
     navigate(`/dashboard/campaigns/create/lists?id=${idToUse}&type=${type}`);
