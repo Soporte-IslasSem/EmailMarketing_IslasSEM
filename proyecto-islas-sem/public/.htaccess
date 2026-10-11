@@ -1,0 +1,13 @@
+# Caché del navegador para la app (Apache sirve estos archivos directamente).
+# - La página (index.html) se revalida SIEMPRE: así, tras un despliegue, todo el mundo
+#   recibe la versión nueva al recargar (antes el navegador podía quedarse horas con la vieja).
+# - assets/ lleva el nombre con hash: se puede guardar un año sin riesgo.
+# Solo cabeceras: nada de reescrituras (no tocar /api, que sirve Node).
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "^index-[A-Za-z0-9_-]+\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

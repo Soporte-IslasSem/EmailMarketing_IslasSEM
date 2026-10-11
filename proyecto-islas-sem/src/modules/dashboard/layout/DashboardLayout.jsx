@@ -4,6 +4,7 @@ import { useAuth } from "../../../shared/hooks/useAuth";
 import Sidebar from "../components/Sidebar/Sidebar.jsx";
 import Header from "../components/Header/Header.jsx";
 import TopNav from "../components/TopNav/TopNav.jsx";
+import NewVersionBanner from "../components/NewVersionBanner.jsx";
 import ProUpgradeModal from "../../lists/components/ListDetail/modals/ProUpgradeModal";
 import { useResponseWatcher } from "../../crm/lib/useResponseWatcher";
 import { usePerms } from "../../crm/lib/permissions";
@@ -53,6 +54,8 @@ export default function DashboardLayout() {
           </main>
         </div>
       </div>
+
+      <NewVersionBanner />
 
       {showUpgradeModal && (
         <ProUpgradeModal onClose={() => setShowUpgradeModal(false)} />

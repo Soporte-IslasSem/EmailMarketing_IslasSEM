@@ -80,9 +80,10 @@ export default function useCrmListsSync() {
         if (ops.length) ops.push((b) => b.update(ref, { subscribersCount: count, crmSyncedAt: serverTimestamp() }));
         await commit(ops);
       }
-      // Tipos que ya no existen: su lista automática se conserva pero se marca.
+      // Tipos de cliente que ya no existen: su lista automática se conserva pero se marca.
+      // Solo listas de tipo ("type:…"); las demás (todos, empresas…) nunca se marcan.
       for (const [key, d] of crmLists) {
-        if (!wanted.some((w) => w.key === key) && !/\(tipo eliminado\)$/.test(d.data().name)) {
+        if (String(key).startsWith("type:") && !wanted.some((w) => w.key === key) && !/\(tipo eliminado\)$/.test(d.data().name)) {
           await commit([(b) => b.update(d.ref, { name: `${d.data().name} (tipo eliminado)` })]);
         }
       }
