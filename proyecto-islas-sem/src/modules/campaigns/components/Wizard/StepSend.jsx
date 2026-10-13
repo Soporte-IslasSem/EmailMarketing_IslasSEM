@@ -15,7 +15,7 @@ import {
   getDocs
 } from "firebase/firestore";
 import { useOrg } from "../../../crm/lib/useOrg";
-import { enqueueCampaign, enqueueTest, finalRecipients } from "../../lib/campaignSend";
+import { enqueueCampaign, enqueueTest, finalRecipients, loadSuppressed } from "../../lib/campaignSend";
 
 // Modal
 import CampaignSendModal from "./modals/CampaignSendModal";
@@ -32,6 +32,8 @@ export default function StepSend() {
 
   const [campaign, setCampaign] = useState(null);
   const [subscribers, setSubscribers] = useState([]);
+  const [suppressed, setSuppressed] = useState(() => new Set()); // lista "Bajas"
+  useEffect(() => { loadSuppressed(auth.currentUser?.uid).then(setSuppressed).catch(() => {}); }, []);
   const [listsInfo, setListsInfo] = useState([]);
 
   const [testEmail, setTestEmail] = useState("");
@@ -129,7 +131,7 @@ export default function StepSend() {
 
     try {
       const sendAt = scheduleType === "scheduled" && scheduleAt ? new Date(scheduleAt) : undefined;
-      const { enqueued, skipped, scheduled } = await enqueueCampaign(orgId, campaignId, campaign, subscribers, { sendAt });
+      const { enqueued, skipped, scheduled } = await enqueueCampaign(orgId, campaignId, campaign, subscribers, { sendAt, suppressed });
       setProgress(
         scheduled
           ? `Campaña programada para el ${sendAt.toLocaleString("es-ES")}: ${enqueued} destinatario(s)${skipped ? ` · ${skipped} omitido(s)` : ""}.`
@@ -176,8 +178,8 @@ export default function StepSend() {
               </ul>
 
               <h3>Destinatarios reales</h3>
-              <p><strong>Total:</strong> {finalRecipients(subscribers, campaign).length}
-                {subscribers.length > finalRecipients(subscribers, campaign).length && (
+              <p><strong>Total:</strong> {finalRecipients(subscribers, campaign, suppressed).length}
+                {subscribers.length > finalRecipients(subscribers, campaign, suppressed).length && (
                   <span style={{ color: "#6b7d7d", fontSize: 13 }}> (de {subscribers.length} en las listas: sin repetidos, sin bajas y sin los que quitaste)</span>
                 )}
               </p>

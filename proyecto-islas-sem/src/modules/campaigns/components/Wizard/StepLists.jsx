@@ -5,7 +5,7 @@ import WizardSteps from "./WizardSteps";
 import { useAuth } from "../../../../shared/hooks/useAuth";
 import { useCrmCollection } from "../../../crm/lib/crm";
 import { useClientTypes, typeOf } from "../../../crm/lib/clientTypes";
-import { finalRecipients } from "../../lib/campaignSend";
+import { finalRecipients, loadSuppressed } from "../../lib/campaignSend";
 
 // Firestore
 import { db } from "../../../../config/firebaseConfig";
@@ -32,12 +32,14 @@ export default function StepLists() {
   const [term, setTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [saving, setSaving] = useState(false);
+  const [suppressed, setSuppressed] = useState(() => new Set()); // lista "Bajas": nunca reciben
+  useEffect(() => { if (user) loadSuppressed(user.uid).then(setSuppressed).catch(() => {}); }, [user]);
 
   // 1) Listas del usuario (las automáticas del CRM primero).
   useEffect(() => {
     if (!user) return;
     getDocs(query(collection(db, "lists"), where("userId", "==", user.uid)))
-      .then((snap) => setLists(snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      .then((snap) => setLists(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((l) => !l.bajas)
         .sort((a, b) => (b.crm ? 1 : 0) - (a.crm ? 1 : 0) || (a.crmKey === "all" ? -1 : b.crmKey === "all" ? 1 : String(a.name).localeCompare(String(b.name))))))
       .catch((err) => console.error("❌ Error cargando listas:", err));
   }, [user]);
@@ -78,7 +80,7 @@ export default function StepLists() {
     const byContact = new Map(contacts.map((c) => [c.id, c]));
     const byCompany = new Map(companies.map((c) => [c.id, c]));
     const byEmail = new Map(contacts.filter((c) => c.email).map((c) => [String(c.email).toLowerCase(), c]));
-    return finalRecipients(subs.filter((s) => selected.includes(s.listId)), {}).map((s) => {
+    return finalRecipients(subs.filter((s) => selected.includes(s.listId)), {}, suppressed).map((s) => {
       const email = String(s.email).toLowerCase();
       const c = byContact.get(s.contactId) || byEmail.get(email);
       const co = byCompany.get(s.companyId);
@@ -86,7 +88,7 @@ export default function StepLists() {
       const name = s.name || (c ? `${c.firstName || ""} ${c.lastName || ""}`.trim() : co?.name) || "";
       return { email, name, clientType, company: c?.company || (co ? co.name : "") };
     });
-  }, [subs, selected, contacts, companies]);
+  }, [subs, selected, contacts, companies, suppressed]);
 
   const counts = useMemo(() => {
     const m = {};

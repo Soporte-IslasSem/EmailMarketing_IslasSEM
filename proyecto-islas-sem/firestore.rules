@@ -250,7 +250,10 @@ service cloud.firestore {
     // Los crea únicamente la Cloud Function (Admin SDK), nunca el navegador.
     match /reports/{reportId} {
       allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
-      allow write: if false;
+      // Los escribe el servidor; el dueño solo puede ocultarlos ("Eliminar informe").
+      allow update: if request.auth != null && resource.data.ownerId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hidden', 'hiddenAt']);
+      allow create, delete: if false;
     }
 
     // Todo lo demás, bloqueado por defecto

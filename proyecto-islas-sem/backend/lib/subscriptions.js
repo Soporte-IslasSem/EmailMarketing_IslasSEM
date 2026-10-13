@@ -11,6 +11,28 @@ const API = `${PUBLIC_URL}/api`;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const FV = admin.firestore.FieldValue;
 
+// Lista "Bajas" de cada usuario: quien se da de baja sale de su lista y su registro pasa
+// aquí (mismo documento, así los enlaces de baja/aperturas/clics siguen funcionando).
+// Nadie de esta lista recibe campañas (la app la usa como lista de exclusión).
+const BAJAS_NAME = "Bajas (suscripciones canceladas)";
+async function bajasListRef(userId, sender) {
+  const found = await db.collection("lists").where("userId", "==", userId).where("bajas", "==", true).limit(1).get();
+  if (!found.empty) return found.docs[0].ref;
+  return db.collection("lists").add({
+    name: BAJAS_NAME, bajas: true, userId, senderEmail: sender || "", language: "es", subscribersCount: 0, createdAt: new Date(),
+  });
+}
+
+// Mueve un suscriptor dado de baja a la lista "Bajas" (y ajusta los contadores).
+async function moveToBajas(ref, sub, fromList) {
+  if (!sub.userId) return;
+  const bajas = await bajasListRef(sub.userId, fromList?.senderEmail);
+  if (sub.listId === bajas.id) return;
+  await ref.update({ listId: bajas.id, fromListId: sub.listId || "", fromListName: fromList?.name || "" });
+  if (sub.listId) await db.collection("lists").doc(sub.listId).update({ subscribersCount: FV.increment(-1) }).catch(() => {});
+  await bajas.update({ subscribersCount: FV.increment(1) });
+}
+
 async function listSettings(listId) {
   const col = db.collection("lists").doc(listId).collection("notifications");
   const [general, confirmEmail, confirmPage, unsubscribePage] = await Promise.all(
@@ -52,6 +74,12 @@ async function addSubscriber({ listId, email, name = "", userId, source = "form"
   const listRef = db.collection("lists").doc(String(listId || "x"));
   const list = (await listRef.get()).data();
   if (!list) return { error: "Lista no encontrada" };
+  // Se vuelve a suscribir él mismo: deja de estar en "Bajas".
+  const bajas = await db.collection("lists").where("userId", "==", list.userId).where("bajas", "==", true).limit(1).get().catch(() => null);
+  if (bajas && !bajas.empty) {
+    const inBajas = await db.collection("subscribers").where("email", "==", email).where("listId", "==", bajas.docs[0].id).get();
+    for (const d of inBajas.docs) { await d.ref.delete(); await bajas.docs[0].ref.update({ subscribersCount: FV.increment(-1) }); }
+  }
   const s = await listSettings(listRef.id);
   const doubleOptIn = !!s.confirmEmail.enabled;
 
@@ -158,14 +186,15 @@ async function doUnsubscribe(req, res) {
       const sub = snap.data();
       fireWebhook(sub.listId, "unsubscribe", { email: sub.email, subscriberId: sid, reason: reason || null, oneClick });
       const s = await listSettings(sub.listId);
+      const list = (await db.collection("lists").doc(sub.listId).get()).data();
       if (s.general.notifyOnUnsubscribe) {
-        const list = (await db.collection("lists").doc(sub.listId).get()).data();
         await notifyOwner(list, `Baja en "${list?.name}"`, `${sub.email} se ha dado de baja de "${list?.name}".${reason ? ` Motivo: ${reason}` : ""}`);
       }
+      await moveToBajas(ref, sub, list).catch((e) => console.warn("[unsubscribe] bajas:", e.message));
     }
   } catch (e) { console.warn("[unsubscribe]", e.message); }
   if (req.is("application/x-www-form-urlencoded") && String(req.body?.["List-Unsubscribe"] || "") === "One-Click") return res.sendStatus(200);
   return unsubscribePage(req, res, true);
 }
 
-module.exports = { subscribe, addSubscriber, confirm, unsubscribePage, doUnsubscribe };
+module.exports = { subscribe, addSubscriber, confirm, unsubscribePage, doUnsubscribe, moveToBajas, bajasListRef };

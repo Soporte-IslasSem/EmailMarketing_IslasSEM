@@ -4,7 +4,8 @@
 // Se sincronizan al abrir Listas (como mucho cada 10 min, o al pulsar "Actualizar"):
 // - altas: contactos con email válido que deberían estar y no están;
 // - bajas: suscriptores que vinieron del CRM (source "crm") y ya no corresponden;
-// - nunca se toca a quien se dio de baja o rebotó (su estado se respeta).
+// - nunca se toca a quien se dio de baja o rebotó (su estado se respeta), y quien está en
+//   la lista "Bajas" o se quitó a mano de una lista CRM (list.excludedEmails) no se vuelve a añadir.
 // Las listas son del usuario (userId), como el resto de listas de Email Marketing.
 import { useCallback, useEffect, useState } from "react";
 import { collection, doc, getDocs, query, where, writeBatch, serverTimestamp } from "firebase/firestore";
@@ -12,6 +13,7 @@ import { db, auth } from "../../../config/firebaseConfig";
 import { usePerms } from "../../crm/lib/permissions";
 import { useClientTypes } from "../../crm/lib/clientTypes";
 import { useOrg } from "../../crm/lib/useOrg";
+import { loadSuppressed } from "../../campaigns/lib/campaignSend";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const EVERY_MS = 10 * 60e3;
@@ -39,6 +41,7 @@ export default function useCrmListsSync() {
       const load = async (col) => perms.visible(col, (await getDocs(query(collection(db, col), where("orgId", "==", orgId)))).docs.map((d) => ({ id: d.id, ...d.data() })))
         .map((c) => ({ ...c, email: String(c.email || "").trim().toLowerCase() }))
         .filter((c) => EMAIL_RE.test(c.email));
+      const suppressed = await loadSuppressed(uid);
       const contacts = await load("contacts");
       const companies = await load("companies");
       const wanted = [{ key: "all", name: "CRM · Todos los contactos", pool: contacts, match: () => true }]
@@ -62,7 +65,8 @@ export default function useCrmListsSync() {
           ? (await getDocs(query(collection(db, "subscribers"), where("listId", "==", ref.id), where("userId", "==", uid)))).docs
           : [];
         const have = new Map(subs.map((s) => [String(s.data().email || "").toLowerCase(), s]));
-        const should = new Map(w.pool.filter(w.match).map((c) => [c.email, c]));
+        const removed = new Set((crmLists.get(w.key)?.data().excludedEmails || []).map((e) => String(e).toLowerCase()));
+        const should = new Map(w.pool.filter(w.match).filter((c) => !suppressed.has(c.email) && !removed.has(c.email)).map((c) => [c.email, c]));
         let count = subs.length;
         for (const [email, c] of should) {
           if (have.has(email)) continue;

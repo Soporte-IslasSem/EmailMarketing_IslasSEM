@@ -13,7 +13,7 @@ export default function Lists() {
   const crmSync = useCrmListsSync();
   // Las listas automáticas del CRM primero (Todos, luego por tipo), después el resto.
   const lists = useMemo(
-    () => [...rawLists].sort((a, b) => (b.crm ? 1 : 0) - (a.crm ? 1 : 0) || (a.crm && b.crm ? (a.crmKey === "all" ? -1 : b.crmKey === "all" ? 1 : a.name.localeCompare(b.name)) : 0)),
+    () => [...rawLists].sort((a, b) => (a.bajas ? 1 : 0) - (b.bajas ? 1 : 0) || (b.crm ? 1 : 0) - (a.crm ? 1 : 0) || (a.crm && b.crm ? (a.crmKey === "all" ? -1 : b.crmKey === "all" ? 1 : a.name.localeCompare(b.name)) : 0)),
     [rawLists]
   );
   const [showModal, setShowModal] = useState(false);
@@ -42,6 +42,10 @@ export default function Lists() {
   // 🔹 Eliminar lista
   // Borra la lista y sus suscriptores (antes quedaban huérfanos en la base de datos).
   const handleDelete = async (id) => {
+    if (lists.find((l) => l.id === id)?.bajas) {
+      window.alert("Es la lista de bajas: aquí van solos quienes se dan de baja y nunca reciben campañas. No se puede eliminar.");
+      return;
+    }
     if (lists.find((l) => l.id === id)?.crm) {
       window.alert("Es una lista automática del CRM: se mantiene sola con tus contactos y no se puede eliminar.");
       return;
@@ -161,6 +165,7 @@ export default function Lists() {
                   onClick={() => navigate(`/dashboard/lists/${list.id}`)}
                 >
                   {list.name}
+                  {list.bajas && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#b0304c", background: "#fdeef1", borderRadius: 10, padding: "2px 8px" }}>No reciben campañas</span>}
                   {list.crm && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>CRM · automática</span>}
                 </td>
 

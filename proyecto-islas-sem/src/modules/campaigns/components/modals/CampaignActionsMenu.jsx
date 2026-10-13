@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { collection, doc, deleteDoc, getDocs, query, updateDoc, where, writeBatch } from "firebase/firestore";
+import { collection, doc, deleteDoc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "../../../../config/firebaseConfig";
 import { useOrg } from "../../../crm/lib/useOrg";
 
@@ -44,6 +44,30 @@ export default function CampaignActionsMenu({ campaignId, status, reportId }) {
       setOpenUpward(rect.bottom > windowHeight - 100);
     }
   }, [open]);
+
+  // Duplicar: misma configuración, destinatarios, plantilla y diseño, como borrador nuevo
+  // (sin envíos, informes ni estadísticas) y se abre para revisarla.
+  const handleDuplicate = async () => {
+    try {
+      const snap = await getDoc(doc(db, "campaigns", campaignId));
+      if (!snap.exists()) return alert("No se encontró la campaña.");
+      const c = snap.data();
+      const ref = doc(collection(db, "campaigns"));
+      const keep = ["config", "lists", "template", "type", "tags", "ownerId", "orgId", "design"];
+      const copy = Object.fromEntries(keep.filter((k) => c[k] !== undefined).map((k) => [k, structuredClone(c[k])]));
+      copy.config = { ...(copy.config || {}), campaignName: `${c.config?.campaignName || "Campaña"} (copia)`, createdAt: new Date() };
+      await setDoc(ref, {
+        ...copy, status: "draft", step: 1,
+        send: { scheduleType: "now", scheduledAt: null, status: "draft" },
+        duplicatedFrom: campaignId, createdAt: new Date(), updatedAt: new Date(),
+      });
+      setOpen(false);
+      navigate(`/dashboard/campaigns/create/config?id=${ref.id}&type=${c.template?.type || "newsletter"}`);
+    } catch (error) {
+      console.error("Error al duplicar campaña:", error);
+      alert("No se pudo duplicar la campaña: " + error.message);
+    }
+  };
 
   // 🟦 Función: eliminar campaña
   const handleDelete = async () => {
@@ -110,6 +134,7 @@ export default function CampaignActionsMenu({ campaignId, status, reportId }) {
             </li>
           )}
           <li onClick={handleEdit}>Editar campaña</li>
+          <li onClick={handleDuplicate}>Duplicar</li>
           {status === "inactive" ? (
             <li onClick={handleActivate}>Activar</li>
           ) : (

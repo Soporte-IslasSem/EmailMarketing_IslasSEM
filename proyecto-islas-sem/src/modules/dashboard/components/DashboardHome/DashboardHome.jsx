@@ -18,7 +18,7 @@ function useEmailStats() {
   useEffect(() => {
     if (!user) return undefined;
     const u1 = onSnapshot(query(collection(db, "subscribers"), where("userId", "==", user.uid)), (s) => setSubs(s.docs.map((d) => d.data())), () => setSubs([]));
-    const u2 = onSnapshot(query(collection(db, "reports"), where("ownerId", "==", user.uid)), (s) => setReports(s.docs.map((d) => d.data())), () => setReports([]));
+    const u2 = onSnapshot(query(collection(db, "reports"), where("ownerId", "==", user.uid)), (s) => setReports(s.docs.map((d) => d.data()).filter((r) => !r.hidden)), () => setReports([]));
     return () => { u1(); u2(); };
   }, [user]);
   const active = subs.filter((s) => !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid", "pending"].includes(String(s.status || "").toLowerCase())).length;

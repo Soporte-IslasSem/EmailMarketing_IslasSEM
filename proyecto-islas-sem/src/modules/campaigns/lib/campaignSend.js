@@ -2,7 +2,7 @@
 // La app NO envía: encola un correo por destinatario; el backend de Loading los manda
 // con throttle (respetando el límite diario). Incluye baja (unsubscribe) y pixel de apertura.
 import { db } from "../../../config/firebaseConfig";
-import { collection, doc, writeBatch, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, writeBatch, updateDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { cleanEmailHtml } from "../../../utils/emailHtml";
 
 // Base pública del backend (para links de baja y pixel de tracking). Se configura por entorno.
@@ -18,8 +18,10 @@ const emailable = (s) => {
 // Destinatarios finales de una campaña: solo los que pueden recibir, UNA vez por email
 // aunque estén en varias listas elegidas, y sin los que se quitaron a mano en el paso
 // "Listas" (campaign.lists.excludedEmails).
-export function finalRecipients(subscribers, campaign) {
+// `suppressed`: emails de la lista "Bajas" (nunca reciben, estén en la lista que estén).
+export function finalRecipients(subscribers, campaign, suppressed) {
   const excluded = new Set((campaign?.lists?.excludedEmails || []).map((e) => String(e).toLowerCase()));
+  for (const e of suppressed || []) excluded.add(e);
   const seen = new Set();
   return subscribers.filter((s) => {
     const e = String(s.email || "").trim().toLowerCase();
@@ -27,6 +29,18 @@ export function finalRecipients(subscribers, campaign) {
     seen.add(e);
     return true;
   });
+}
+
+// Emails de la lista "Bajas" del usuario (se dieron de baja: no reciben ninguna campaña).
+export async function loadSuppressed(uid) {
+  if (!uid) return new Set();
+  const lists = await getDocs(query(collection(db, "lists"), where("userId", "==", uid), where("bajas", "==", true)));
+  const out = new Set();
+  for (const l of lists.docs) {
+    const subs = await getDocs(query(collection(db, "subscribers"), where("listId", "==", l.id), where("userId", "==", uid)));
+    subs.docs.forEach((d) => d.data().email && out.add(String(d.data().email).trim().toLowerCase()));
+  }
+  return out;
 }
 
 // Enlaces http(s) de la campaña → pasan por /api/c para contar el clic y luego redirigen.
@@ -55,9 +69,9 @@ function personalize(html, { campaignId, sub }) {
 
 // Encola toda la campaña. Con sendAt (Date) futura, los correos quedan "scheduled" y el
 // backend los libera cuando llega la hora. Devuelve { enqueued, skipped, scheduled }.
-export async function enqueueCampaign(orgId, campaignId, campaign, subscribers, { sendAt } = {}) {
+export async function enqueueCampaign(orgId, campaignId, campaign, subscribers, { sendAt, suppressed } = {}) {
   const scheduled = sendAt instanceof Date && sendAt.getTime() > Date.now() + 60e3;
-  const recipients = finalRecipients(subscribers, campaign);
+  const recipients = finalRecipients(subscribers, campaign, suppressed);
   const skipped = subscribers.length - recipients.length;
   const subject = campaign.config?.subject || "(sin asunto)";
   // La dirección la fija el servidor (cuenta SMTP); el nombre visible sí es de cada campaña.

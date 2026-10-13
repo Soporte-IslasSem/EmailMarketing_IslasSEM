@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 // Firestore
 import { db } from "../../../config/firebaseConfig";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "../../../shared/hooks/useAuth";
 
 // PDF
@@ -50,11 +50,23 @@ export default function ReportsList() {
         id: docSnap.id,
         ...docSnap.data(),
       }));
-      setReports(data);
+      setReports(data.filter((r) => !r.hidden)); // eliminados por el usuario
     });
 
     return () => unsubscribe();
   }, [user]);
+
+  // Eliminar informes: se ocultan para siempre (si se borrasen, la siguiente apertura o
+  // clic de esa campaña volvería a crearlos a medias).
+  const removeReports = async (ids) => {
+    if (!window.confirm(`¿Eliminar ${ids.length} informe(s)? Dejarán de aparecer aquí y en las estadísticas de Inicio.`)) return;
+    try {
+      for (const id of ids) await updateDoc(doc(db, "reports", id), { hidden: true, hiddenAt: Date.now() });
+      setSelected([]);
+    } catch (e) {
+      alert("No se pudo eliminar: " + e.message);
+    }
+  };
 
   const filtered = reports
     .filter((r) => (r.campaignName || "").toLowerCase().includes(search.toLowerCase()))
@@ -224,6 +236,11 @@ export default function ReportsList() {
         >
           {selected.length ? `Descargar informe (${selected.length})` : "Descargar informe global"}
         </button>
+        {selected.length > 0 && (
+          <button className="CampaignReports__download" style={{ background: "#fff", color: "#b0304c", border: "1px solid #f0c9d2" }} onClick={() => removeReports(selected)}>
+            🗑 Eliminar ({selected.length})
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -272,13 +289,14 @@ export default function ReportsList() {
                 <td>{m.clicked} <small className="CampaignReports__pct">{m.clickRate}%</small></td>
                 <td>{m.replied} <small className="CampaignReports__pct">{m.replyRate}%</small></td>
 
-                <td>
+                <td style={{ whiteSpace: "nowrap" }}>
                   <button
                     className="CampaignReports__print"
                     onClick={() => handleDownloadIndividual(r)}
                   >
                     🖨️
                   </button>
+                  <button className="CampaignReports__print" title="Eliminar informe" onClick={() => removeReports([r.id])}>🗑</button>
                 </td>
               </tr>
               );
