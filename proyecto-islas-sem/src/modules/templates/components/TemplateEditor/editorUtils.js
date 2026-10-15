@@ -38,9 +38,15 @@ export const NETWORKS = {
 };
 const linkText = (a) => (a.getEl?.()?.textContent || a.components().map((c) => c.get("content") || "").join("")).trim();
 export const networkName = (a) => NETWORKS[linkText(a).toLowerCase()] || NETWORKS[linkText(a)] || linkText(a) || "Red social";
+// El editor guarda los estilos aparte, así que se mira el estilo calculado en pantalla.
+const isRound = (k) => {
+  const el = k.getEl?.();
+  const r = el ? el.ownerDocument.defaultView.getComputedStyle(el).borderTopLeftRadius : k.getStyle()["border-radius"];
+  return !!r && r !== "0px";
+};
 const isSocialGroup = (c) => {
   const kids = c.components();
-  return kids.length >= 2 && kids.every((k) => (k.get("tagName") || "").toLowerCase() === "a" && linkText(k).length <= 3 && /border-radius/.test(k.getEl?.()?.getAttribute("style") || ""));
+  return kids.length >= 2 && kids.every((k) => (k.get("tagName") || "").toLowerCase() === "a" && linkText(k).length <= 3 && isRound(k));
 };
 export function socialGroup(comp) {
   let c = comp;
