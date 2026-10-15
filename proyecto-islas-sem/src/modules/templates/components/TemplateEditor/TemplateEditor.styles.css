@@ -495,3 +495,11 @@
 }
 .TE__head-left { display: flex; align-items: center; gap: 14px; }
 .TE__head-left .TE__back { align-self: center; }
+
+/* Enlaces: destino visible, aviso si está vacío y botón para probarlo */
+.TE__link small { display: block; margin-top: 4px; font-size: 11.5px; font-weight: 500; word-break: break-all; }
+.TE__linkrow { display: flex; gap: 6px; align-items: center; }
+.TE__linkrow input { flex: 1; min-width: 0; }
+.TE__linkrow a { font-size: 12px; white-space: nowrap; color: #1a9190; font-weight: 600; text-decoration: none; }
+.TE__linkwarn { color: #b0304c; }
+.TE__linkok { color: #1a7a5a; }
