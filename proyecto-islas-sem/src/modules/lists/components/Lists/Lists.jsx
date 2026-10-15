@@ -50,6 +50,10 @@ export default function Lists() {
       window.alert("Es una lista automática del CRM: se mantiene sola con tus contactos y no se puede eliminar.");
       return;
     }
+    if (lists.find((l) => l.id === id)?.restaurants) {
+      window.alert("Es la lista automática de Restaurantes: se mantiene sola con el email de cada ficha y no se puede eliminar.");
+      return;
+    }
     const subsSnap = await getDocs(
       query(collection(db, "subscribers"), where("listId", "==", id), where("userId", "==", auth.currentUser.uid))
     );
@@ -167,6 +171,7 @@ export default function Lists() {
                   {list.name}
                   {list.bajas && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#b0304c", background: "#fdeef1", borderRadius: 10, padding: "2px 8px" }}>No reciben campañas</span>}
                   {list.crm && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>CRM · automática</span>}
+                  {list.restaurants && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#1f5c46", background: "#e4ece6", borderRadius: 10, padding: "2px 8px" }}>Restaurantes · automática</span>}
                 </td>
 
                 <td>{list.subscribersCount || 0} suscriptores</td>
