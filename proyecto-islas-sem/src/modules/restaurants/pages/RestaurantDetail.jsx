@@ -163,9 +163,9 @@ export default function RestaurantDetail() {
           <div style={{ minWidth: 0, flex: 1 }}>
             <input className="rf-name" value={r.name} onChange={(e) => set("name")(e.target.value)} placeholder="[Nombre del restaurante]" />
             <div className="rf-sub">
-              <input value={r.city} onChange={(e) => set("city")(e.target.value)} placeholder="[Ciudad]" style={{ width: `${Math.max(8, (r.city || "").length + 1)}ch` }} />
+              <input value={r.city} onChange={(e) => set("city")(e.target.value)} placeholder="[Ciudad]" />
               <span>·</span>
-              <input value={r.cuisine} onChange={(e) => set("cuisine")(e.target.value)} placeholder="[Tipo de cocina]" style={{ width: `${Math.max(15, (r.cuisine || "").length + 1)}ch` }} />
+              <input value={r.cuisine} onChange={(e) => set("cuisine")(e.target.value)} placeholder="[Tipo de cocina]" />
               <span>·</span>
               {r.website
                 ? <a href={toUrl(r.website)} target="_blank" rel="noreferrer">{r.website}</a>

@@ -4,6 +4,12 @@
   --rl-muted: #6f736d;
   --rl-line: #e8e4da;
   --rl-green: #1f5c46;
+  /* variables de la ficha (.rf-btn, .rf-open… se usan en todas las páginas) */
+  --rf-ink: #1c1f1d;
+  --rf-muted: #6f736d;
+  --rf-line: #e8e4da;
+  --rf-green: #1f5c46;
+  --rf-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   /* variables del CRM para sus modales (CrmModal) */
   --crm-teal: #1f5c46;
   --crm-teal-dark: #184a38;
@@ -63,7 +69,7 @@
 .rp-sub { margin: 0 0 20px; color: var(--rl-muted); font-size: 13.5px; }
 .rp-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
 .rp-card { background: #fff; border: 1px solid var(--rl-line); border-radius: 14px; padding: 18px; }
-.rp-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.rp-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .rp-stat { background: #fff; border: 1px solid var(--rl-line); border-radius: 14px; padding: 16px 18px; }
 .rp-stat small { color: var(--rl-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
 .rp-stat b { display: block; font-size: 28px; margin-top: 6px; }
@@ -76,7 +82,7 @@
 .rp-name { font-weight: 600; color: var(--rl-ink); cursor: pointer; }
 .rp-name:hover { text-decoration: underline; }
 .rp-muted { color: var(--rl-muted); }
-.rp-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+.rp-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: nowrap; }
 .rp-empty { text-align: center; color: var(--rl-muted); padding: 34px 14px !important; }
 .rp-input { border: 1px solid #dedad0; background: #fff; border-radius: 8px; padding: 10px 12px; font: inherit; outline: none; }
 .rp-input:focus { border-color: var(--rl-green); }
@@ -93,6 +99,8 @@
   .rl-side.open { transform: none; }
   .rl-main { padding: 18px 16px 40px; }
   .rl-top { padding: 0 12px; gap: 10px; }
+  .rp-title { font-size: 22px; }
+  .rp-stat b { font-size: 22px; }
 }
 
 @media print {

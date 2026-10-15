@@ -26,14 +26,15 @@
 }
 .rf-logo.has { border: 1px solid var(--rf-line); background: #fff; }
 .rf-logo img { width: 100%; height: 100%; object-fit: contain; }
-.rf-name {
+.rf .rf-name {
   display: block; width: 100%; border: 0; background: transparent; padding: 0; outline: none;
   font-size: 30px !important; font-weight: 700; letter-spacing: -0.5px; line-height: 1.15;
 }
 .rf-name::placeholder { color: var(--rf-ink); }
 .rf-name:focus, .rf-sub input:focus, .rf-val:focus, .rf-src__from:focus, .rf-pill:focus { background: #fff; box-shadow: 0 0 0 2px #cfe3d8; border-radius: 4px; }
 .rf-sub { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--rf-muted); margin-top: 4px; }
-.rf-sub input { border: 0; background: transparent; padding: 0; outline: none; color: var(--rf-muted); }
+.rf .rf-sub input { border: 0; background: transparent; padding: 0; outline: none; color: var(--rf-muted); width: 14ch; }
+@supports (field-sizing: content) { .rf .rf-sub input { field-sizing: content; width: auto; min-width: 2ch; } }
 .rf-sub input::placeholder { color: var(--rf-muted); }
 .rf-sub a, .rf-sub__ph { color: var(--rf-green); text-decoration: underline; }
 .rf-head__actions { display: flex; gap: 8px; }
@@ -128,7 +129,7 @@
 .rf-src:last-child { border-bottom: 0; }
 .rf-src__from { border: 0; background: transparent; outline: none; padding: 2px 0; width: 100%; font-size: 13.5px !important; }
 .rf-src__to { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 6px; color: var(--rf-muted); }
-.rf-pill { border: 1px solid #dedad0; background: #f6f5f1; border-radius: 20px; padding: 5px 11px; font-size: 11.5px !important; outline: none; text-align: center; max-width: 100%; }
+.rf .rf-pill { border: 1px solid #dedad0; background: #f6f5f1; border-radius: 20px; padding: 5px 11px; font-size: 11.5px; font-weight: 500; color: var(--rf-ink); outline: none; text-align: center; max-width: 100%; }
 
 /* Estados (fichaje, TPV) */
 .rf-status { position: relative; display: inline-flex; align-items: center; gap: 6px; border-radius: 20px; padding: 5px 11px; font-size: 11.5px; font-weight: 600; white-space: nowrap; cursor: pointer; }
