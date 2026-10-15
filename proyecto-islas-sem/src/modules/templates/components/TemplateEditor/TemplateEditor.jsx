@@ -71,6 +71,8 @@ export default function TemplateEditor() {
 
   // ================================ 1. Cargar plantilla
   useEffect(() => {
+    // Esperar a la sesión: al abrir el enlace directo, Firebase aún no sabe quién eres.
+    if (!user) return;
     const load = async () => {
       const snap = await getDoc(doc(db, "templates", id));
       if (!snap.exists()) {
@@ -82,8 +84,11 @@ export default function TemplateEditor() {
       setInitialHtml(data.html && data.html.trim() !== "" ? data.html : BLANK_TEMPLATE);
       setLoading(false);
     };
-    load();
-  }, [id]);
+    load().catch((e) => {
+      console.error("Error cargando plantilla:", e);
+      setNotice("No se pudo cargar la plantilla. Recarga la página.");
+    });
+  }, [id, user]);
 
   // ================================ 2. Guardado (automático y manual)
   const saveNow = useCallback(async () => {
