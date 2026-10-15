@@ -34,8 +34,13 @@ const CANVAS_CSS = `
   [data-ism-row]:hover{outline-color:#8f84ff}
 `;
 
-export default function TemplateEditor() {
-  const { id } = useParams();
+// Con `campaignId` edita el diseño de una campaña (paso «Diseño» del asistente): lee y
+// guarda en campaigns/{id}.template.html y nunca toca la plantilla de la que salió.
+// `onSaveReady` recibe la función de guardado para que el asistente guarde antes de avanzar.
+export default function TemplateEditor({ campaignId = null, onSaveReady = null }) {
+  const params = useParams();
+  const isCampaign = !!campaignId;
+  const id = campaignId || params.id;
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -74,21 +79,22 @@ export default function TemplateEditor() {
     // Esperar a la sesión: al abrir el enlace directo, Firebase aún no sabe quién eres.
     if (!user) return;
     const load = async () => {
-      const snap = await getDoc(doc(db, "templates", id));
+      const snap = await getDoc(doc(db, isCampaign ? "campaigns" : "templates", id));
       if (!snap.exists()) {
-        setNotice("No se encontró la plantilla.");
+        setNotice(isCampaign ? "No se encontró la campaña." : "No se encontró la plantilla.");
         return;
       }
       const data = snap.data();
-      setTemplateName(data.name || "Plantilla sin nombre");
-      setInitialHtml(data.html && data.html.trim() !== "" ? data.html : BLANK_TEMPLATE);
+      const html = isCampaign ? data.template?.html : data.html;
+      setTemplateName(isCampaign ? data.config?.campaignName || "Campaña" : data.name || "Plantilla sin nombre");
+      setInitialHtml(html && html.trim() !== "" ? html : BLANK_TEMPLATE);
       setLoading(false);
     };
     load().catch((e) => {
       console.error("Error cargando plantilla:", e);
       setNotice("No se pudo cargar la plantilla. Recarga la página.");
     });
-  }, [id, user]);
+  }, [id, user, isCampaign]);
 
   // ================================ 2. Guardado (automático y manual)
   const saveNow = useCallback(async () => {
@@ -97,13 +103,18 @@ export default function TemplateEditor() {
     clearTimeout(saveTimer.current);
     setSaveState("saving");
     try {
-      await updateDoc(doc(db, "templates", id), { html: inlineEditorHtml(editor), updatedAt: new Date() });
+      const html = inlineEditorHtml(editor);
+      if (isCampaign) await updateDoc(doc(db, "campaigns", id), { "template.html": html, updatedAt: new Date() });
+      else await updateDoc(doc(db, "templates", id), { html, updatedAt: new Date() });
       setSaveState("saved");
     } catch (err) {
       console.error("Error guardando plantilla:", err);
       setSaveState("error");
     }
-  }, [id]);
+  }, [id, isCampaign]);
+  useEffect(() => {
+    onSaveReady?.(saveNow);
+  }, [onSaveReady, saveNow]);
 
   const scheduleSave = useCallback(() => {
     setSaveState("dirty");
@@ -114,7 +125,7 @@ export default function TemplateEditor() {
   // ================================ 3. Miniatura
   const generateThumbnail = useCallback(async (scale = 0.35) => {
     const editor = editorInstance.current;
-    if (!editor || !user) return false;
+    if (!editor || !user || isCampaign) return false;
     try {
       const canvas = await html2canvas(editor.Canvas.getDocument().body, { backgroundColor: "#ffffff", scale, useCORS: true });
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
@@ -127,7 +138,7 @@ export default function TemplateEditor() {
       console.error("Error generando miniatura:", err);
       return false;
     }
-  }, [id, user]);
+  }, [id, user, isCampaign]);
 
   // Lee los ajustes generales (fondos y tipografía) del documento cargado.
   const readGlobals = (editor) => {
@@ -147,7 +158,7 @@ export default function TemplateEditor() {
   // Sube un archivo a Storage (carpeta de la plantilla) y devuelve su URL pública.
   const uploadImage = async (file) => {
     const safe = file.name.replace(/[^\w.-]+/g, "_");
-    const storageRef = ref(storage, `templates/${user.uid}/${id}/img-${Date.now()}-${safe}`);
+    const storageRef = ref(storage, `templates/${user.uid}/${isCampaign ? `campaign-${id}` : id}/img-${Date.now()}-${safe}`);
     await uploadBytes(storageRef, file);
     return getDownloadURL(storageRef);
   };
@@ -221,7 +232,7 @@ export default function TemplateEditor() {
           for (const file of files) {
             try {
               const safe = file.name.replace(/[^\w.-]+/g, "_");
-              const storageRef = ref(storage, `templates/${user.uid}/${id}/img-${Date.now()}-${safe}`);
+              const storageRef = ref(storage, `templates/${user.uid}/${isCampaign ? `campaign-${id}` : id}/img-${Date.now()}-${safe}`);
               await uploadBytes(storageRef, file);
               const url = await getDownloadURL(storageRef);
               editor.AssetManager.add({ src: url, name: file.name });
@@ -471,7 +482,7 @@ export default function TemplateEditor() {
   return (
     <div className="TE">
       {/* Cabecera */}
-      <div className="TE__head">
+      {!isCampaign && <div className="TE__head">
         <div className="TE__head-left">
           <button className="TE__back" onClick={() => navigate("/dashboard/templates?ver=mis")}>‹ Volver</button>
           <div>
@@ -482,7 +493,7 @@ export default function TemplateEditor() {
         <button className="TE__btn TE__btn--primary" onClick={handleSendTemplate} disabled={loading}>
           Enviar plantilla
         </button>
-      </div>
+      </div>}
 
       <div className="TE__frame">
         {/* Barra de herramientas */}
@@ -497,15 +508,15 @@ export default function TemplateEditor() {
           </div>
           <div className="TE__toolbar-right">
             <span className={`TE__status TE__status--${notice ? "notice" : saveState}`}>{notice || saveLabel}</span>
-            <button className="TE__btn" onClick={() => saveNow().then(() => flash("Plantilla guardada"))}>Guardar plantilla</button>
+            <button className="TE__btn" onClick={() => saveNow().then(() => flash(isCampaign ? "Diseño guardado" : "Plantilla guardada"))}>{isCampaign ? "Guardar diseño" : "Guardar plantilla"}</button>
             <div className="TE__menu-wrap">
               <button className="TE__btn TE__btn--dots" onClick={() => { setMenuOpen((o) => !o); setConfirmClear(false); }}>⋯</button>
               {menuOpen && (
                 <div className="TE__menu" onMouseLeave={() => setMenuOpen(false)}>
-                  <button onClick={async () => { setMenuOpen(false); flash((await generateThumbnail(0.5)) ? "Miniatura actualizada" : "No se pudo actualizar la miniatura"); }}>Actualizar miniatura</button>
+                  {!isCampaign && <button onClick={async () => { setMenuOpen(false); flash((await generateThumbnail(0.5)) ? "Miniatura actualizada" : "No se pudo actualizar la miniatura"); }}>Actualizar miniatura</button>}
                   <button onClick={downloadHtml}>Descargar HTML</button>
                   {!confirmClear ? (
-                    <button className="danger" onClick={() => setConfirmClear(true)}>Vaciar plantilla</button>
+                    <button className="danger" onClick={() => setConfirmClear(true)}>{isCampaign ? "Vaciar diseño" : "Vaciar plantilla"}</button>
                   ) : (
                     <button className="danger" onClick={clearTemplate}>¿Seguro? Sí, vaciar</button>
                   )}
