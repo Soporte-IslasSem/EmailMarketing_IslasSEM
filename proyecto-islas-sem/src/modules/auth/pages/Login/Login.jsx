@@ -44,7 +44,11 @@ export default function Login() {
 
       window.location.href = "/dashboard";
     } catch (err) {
-      setError("Error al iniciar sesión con Google");
+      const code = err?.code || "";
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
+      if (code === "auth/popup-blocked") setError("El navegador bloqueó la ventana de Google. Permite las ventanas emergentes e inténtalo de nuevo.");
+      else if (code === "auth/unauthorized-domain") setError("Este dominio aún no está autorizado para iniciar sesión con Google.");
+      else setError(`Error al iniciar sesión con Google${code ? ` (${code})` : ""}`);
     }
   };
 
