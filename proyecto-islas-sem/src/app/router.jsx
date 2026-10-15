@@ -96,7 +96,9 @@ import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
 import RestaurantsLayout from "../modules/restaurants/layout/RestaurantsLayout.jsx";
 import RestaurantClients from "../modules/restaurants/pages/Clients.jsx";
 import RestaurantDetail from "../modules/restaurants/pages/RestaurantDetail.jsx";
-import { Panel as RestaurantPanel, Reservations as RestaurantReservations, Reviews as RestaurantReviews, Campaigns as RestaurantCampaigns, Team as RestaurantTeam, Settings as RestaurantSettings } from "../modules/restaurants/pages/SectionPages.jsx";
+import RestaurantCampaigns from "../modules/restaurants/pages/CampaignsPage.jsx";
+import RestaurantCampaignWizard from "../modules/restaurants/pages/CampaignWizard.jsx";
+import { Panel as RestaurantPanel, Reservations as RestaurantReservations, Reviews as RestaurantReviews, Team as RestaurantTeam, Settings as RestaurantSettings } from "../modules/restaurants/pages/SectionPages.jsx";
 import RecycleBin from "../modules/crm/pages/RecycleBin.jsx";
 import History from "../modules/crm/pages/History.jsx";
 
@@ -164,6 +166,7 @@ const router = createBrowserRouter([
       { path: "reservas", element: <RestaurantReservations /> },
       { path: "resenas", element: <RestaurantReviews /> },
       { path: "campanas", element: <RestaurantCampaigns /> },
+      { path: "campanas/:id", element: <RestaurantCampaignWizard /> },
       { path: "equipo", element: <RestaurantTeam /> },
       { path: "ajustes", element: <RestaurantSettings /> },
       { path: "*", element: <Navigate to="/restaurantes" replace /> },

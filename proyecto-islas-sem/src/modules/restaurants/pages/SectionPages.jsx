@@ -143,55 +143,6 @@ export function Reviews() {
   );
 }
 
-/* ============ Campañas ============ */
-export function Campaigns() {
-  const { items, loading } = useOutletContext();
-  const navigate = useNavigate();
-  const rows = useMemo(() => byName(items), [items]);
-  return (
-    <div>
-      <div className="rp-top">
-        <div>
-          <h1 className="rp-title">Campañas</h1>
-          <p className="rp-sub">Fidelización de cada restaurante y acceso a las campañas de email de ISLAS SEM.</p>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="rf-btn" onClick={() => navigate("/dashboard/campaigns")}>Ver campañas de email</button>
-          <button className="rf-btn primary" onClick={() => navigate("/dashboard/campaigns/create")}>+ Crear campaña de email</button>
-        </div>
-      </div>
-      <div className="rp-wrap">
-        <table className="rp-table">
-          <thead><tr><th>Restaurante</th><th>Clientela</th><th>Cumpleaños / aniversarios</th><th>NFC en mesa</th><th>Redes</th></tr></thead>
-          <tbody>
-            {rows.length ? rows.map((r) => (
-              <tr key={r.id}>
-                <td><Name r={r} /></td>
-                <td className="rp-mono">{r.customerCount ? `${num(r.customerCount).toLocaleString("es-ES")} registros` : "—"}</td>
-                <td>
-                  <label className="rf-switch" title="Indica si el restaurante tiene activa esta automatización">
-                    <b>{r.birthdayAutomation ? "ON" : "OFF"}</b>
-                    <input type="checkbox" checked={!!r.birthdayAutomation} onChange={(e) => quickSave(r.id, { birthdayAutomation: e.target.checked })} />
-                    <span />
-                  </label>
-                </td>
-                <td className="rp-mono">{r.nfcUnits ? `${num(r.nfcUnits)} unidades activas` : "—"}</td>
-                <td>
-                  <div className="rp-links">
-                    <Link href={toUrl(r.instagram)} label="Instagram" />
-                    <Link href={toUrl(r.facebook)} label="Facebook" />
-                    <Link href={toUrl(r.tiktok)} label="TikTok" />
-                  </div>
-                </td>
-              </tr>
-            )) : <Empty cols={5} loading={loading} text="Aún no hay restaurantes." />}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 /* ============ Equipo y fichajes ============ */
 function StatusSelect({ value, options, onChange, tone }) {
   return (

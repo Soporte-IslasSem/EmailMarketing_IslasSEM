@@ -24,7 +24,7 @@ const MENU = [
 const FIELD_LABEL = {
   name: "Nombre", city: "Ciudad", cuisine: "Cocina", website: "Web", maps: "Ubicación", tour360: "Visita 360º", instagram: "Instagram",
   facebook: "Facebook", tiktok: "TikTok", tripadvisor: "TripAdvisor", otherSocial: "Otras redes", menuText: "Carta", menuLink: "Menú",
-  phoneLandline: "Teléfono fijo", phoneMobile: "Móvil", whatsapp: "WhatsApp", bookingCalendar: "Calendario", reviewsGoogle: "Reseñas Google",
+  phoneLandline: "Teléfono fijo", phoneMobile: "Móvil", whatsapp: "WhatsApp", email: "Email", bookingCalendar: "Calendario", reviewsGoogle: "Reseñas Google",
   reviewsTripadvisor: "Reseñas TripAdvisor", rgpdLink: "RGPD",
 };
 

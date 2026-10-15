@@ -8,7 +8,7 @@ export const COLLECTION = "restaurants";
 export const EMPTY = {
   name: "", city: "", cuisine: "", website: "", logo: "",
   maps: "", tour360: "", instagram: "", facebook: "", tiktok: "", tripadvisor: "", otherSocial: "", freeToilets: "",
-  menuText: "", menuLink: "", qr: "", phoneLandline: "", phoneMobile: "", whatsapp: "", bookingCalendar: "",
+  menuText: "", menuLink: "", qr: "", phoneLandline: "", phoneMobile: "", whatsapp: "", email: "", bookingCalendar: "",
   customerCount: "", birthdayAutomation: false,
   dataSources: [
     { from: "Código QR cautivo", to: "Data del móvil" },
@@ -63,7 +63,7 @@ export const FIELDS = [
   ["website", "Quién soy"], ["maps", "Ubicación"], ["tour360", "Visita 360º"], ["cuisine", "Propuesta gastronómica"],
   ["instagram", "Instagram"], ["facebook", "Facebook"], ["tiktok", "TikTok"], ["tripadvisor", "TripAdvisor"], ["otherSocial", "Otras redes"],
   ["freeToilets", "Baños gratis"], ["menuText", "Carta y precios"], ["menuLink", "Enlace del menú"], ["qr", "Código QR"],
-  ["phoneLandline", "Teléfono fijo"], ["phoneMobile", "Teléfono móvil"], ["whatsapp", "WhatsApp"], ["bookingCalendar", "Calendario de reservas"],
+  ["phoneLandline", "Teléfono fijo"], ["phoneMobile", "Teléfono móvil"], ["whatsapp", "WhatsApp"], ["email", "Email de contacto"], ["bookingCalendar", "Calendario de reservas"],
   ["customerCount", "Base de datos de clientela"], ["nfcUnits", "NFC en mesa"], ["reviewsGoogle", "Reseñas Google"],
   ["reviewsTripadvisor", "Reseñas TripAdvisor"], ["rgpdLink", "RGPD"], ["city", "Ciudad"], ["logo", "Logo"],
 ];
@@ -74,7 +74,7 @@ export const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 // Texto en el que busca el buscador superior (nombre, ciudad, cocina, enlaces y teléfonos).
 const SEARCH_KEYS = ["name", "city", "cuisine", "website", "maps", "tour360", "instagram", "facebook", "tiktok", "tripadvisor", "otherSocial",
-  "menuText", "menuLink", "phoneLandline", "phoneMobile", "whatsapp", "bookingCalendar", "reviewsGoogle", "reviewsTripadvisor", "rgpdLink"];
+  "menuText", "menuLink", "phoneLandline", "phoneMobile", "whatsapp", "email", "bookingCalendar", "reviewsGoogle", "reviewsTripadvisor", "rgpdLink"];
 export function searchRestaurants(items, term) {
   const t = String(term || "").trim().toLowerCase();
   if (!t) return [];

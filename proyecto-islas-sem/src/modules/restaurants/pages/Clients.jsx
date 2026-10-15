@@ -38,7 +38,7 @@ export default function Clients() {
     ["Ubicación", (r) => r.maps], ["Visita 360º", (r) => r.tour360], ["Instagram", (r) => r.instagram], ["Facebook", (r) => r.facebook],
     ["TikTok", (r) => r.tiktok], ["TripAdvisor", (r) => r.tripadvisor], ["Otras redes", (r) => r.otherSocial], ["Baños gratis", (r) => r.freeToilets],
     ["Carta y precios", (r) => r.menuText], ["Enlace del menú", (r) => r.menuLink], ["Teléfono fijo", (r) => r.phoneLandline],
-    ["Teléfono móvil", (r) => r.phoneMobile], ["WhatsApp", (r) => r.whatsapp], ["Calendario de reservas", (r) => r.bookingCalendar],
+    ["Teléfono móvil", (r) => r.phoneMobile], ["WhatsApp", (r) => r.whatsapp], ["Email de contacto", (r) => r.email], ["Calendario de reservas", (r) => r.bookingCalendar],
     ["Base de clientela", (r) => r.customerCount], ["Automatización cumpleaños", (r) => (r.birthdayAutomation ? "ON" : "OFF")],
     ["NFC (unidades)", (r) => r.nfcUnits], ["Reseñas Google", (r) => r.reviewsGoogle], ["Reseñas TripAdvisor", (r) => r.reviewsTripadvisor],
     ["Control horario", (r) => r.timeTracking], ["RGPD", (r) => r.rgpdLink], ["Integración TPV", (r) => r.tpvStatus],

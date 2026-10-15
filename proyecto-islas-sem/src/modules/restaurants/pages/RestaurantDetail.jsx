@@ -9,9 +9,11 @@ import { COLLECTION, EMPTY, TIME_TRACKING, TPV_STATUS, toUrl, waUrl, imageToData
 import "../../crm/crm.styles.css";
 import "./restaurants.styles.css";
 
+const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
+
 const SECTIONS = [
   { n: "01", id: "escaparate", short: "Escaparate", count: 10 },
-  { n: "02", id: "conversiones", short: "Conversiones", count: 8 },
+  { n: "02", id: "conversiones", short: "Conversiones", count: 9 },
   { n: "03", id: "data", short: "La data", count: 3 },
   { n: "04", id: "marketing", short: "Marketing", count: 3 },
   { n: "05", id: "gestion", short: "Gestión", count: 3 },
@@ -226,6 +228,10 @@ export default function RestaurantDetail() {
             <Val value={r.phoneMobile} onChange={set("phoneMobile")} placeholder="[Móvil]" width={`${Math.max(8, (r.phoneMobile || "").length + 1)}ch`} />
           </Row>
           <Row label="WhatsApp"><Val value={r.whatsapp} onChange={set("whatsapp")} placeholder="[Móvil]" /><Open href={waUrl(r.whatsapp)} /></Row>
+          <Row label="Email de contacto">
+            <Val type="email" value={r.email} onChange={set("email")} placeholder="[email@restaurante.com]" />
+            {r.email && !EMAIL_OK.test(String(r.email).trim()) ? <span className="rf-open off" title="Revisa el email: no parece válido" style={{ color: "#b0304c" }}>⚠</span> : <Open href={r.email ? `mailto:${String(r.email).trim()}` : ""} />}
+          </Row>
           <Group>Citas especiales · Recordar</Group>
           <Row label="Calendario de reservas"><Val value={r.bookingCalendar} onChange={set("bookingCalendar")} placeholder="[Enlace calendario]" /><Open href={toUrl(r.bookingCalendar)} /></Row>
           <Row label="Base de datos de clientela">

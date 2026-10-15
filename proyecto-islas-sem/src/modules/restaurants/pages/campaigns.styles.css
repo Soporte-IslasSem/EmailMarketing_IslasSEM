@@ -1,0 +1,33 @@
+/* ============ Restaurantes · campañas ============ */
+.rc-steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+.rc-step { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--rl-line); border-radius: 8px; padding: 8px 13px; font: inherit; font-size: 13.5px; cursor: pointer; color: var(--rl-ink); }
+.rc-step span { width: 20px; height: 20px; border-radius: 50%; background: #ebeae5; color: #3a3a36; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+.rc-step.done span { background: #e2f1e7; color: #1f5c3a; }
+.rc-step.on { border-color: var(--rl-green); color: var(--rl-green); font-weight: 600; }
+.rc-step.on span { background: var(--rl-green); color: #fff; }
+.rc-step:disabled { opacity: .5; cursor: default; }
+
+.rc-form { display: flex; flex-direction: column; gap: 6px; max-width: 640px; }
+.rc-form label { font-weight: 600; font-size: 13.5px; margin-top: 10px; }
+.rc-form label small { font-weight: 400; color: var(--rl-muted); }
+.rc-err { color: #b0304c; font-size: 13px; margin: 10px 0 0; }
+.rc-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.rc-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.rc-bar .rp-input { padding: 8px 10px; }
+.rf-open.rc-on { background: #e4ece6; border-color: var(--rl-green); }
+
+.rc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.rc-tpl { background: #fff; border: 1px solid var(--rl-line); border-radius: 12px; padding: 8px; text-align: left; cursor: pointer; font: inherit; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.rc-tpl:hover { border-color: var(--rl-green); box-shadow: 0 4px 14px rgba(0,0,0,.06); }
+.rc-tpl b { font-size: 13px; padding: 0 4px 4px; }
+.rc-tpl:disabled { opacity: .6; cursor: wait; }
+
+.rc-editor { background: #fff; border: 1px solid var(--rl-line); border-radius: 12px; overflow: hidden; }
+
+.rc-send { display: grid; gap: 14px; max-width: 760px; }
+.rc-send h3 { margin: 0 0 10px; font-size: 15px; }
+.rc-dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 0; font-size: 13.5px; }
+.rc-dl dt { color: var(--rl-muted); }
+.rc-dl dd { margin: 0; word-break: break-word; }
+.rc-radio { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; cursor: pointer; }
+@media (max-width: 600px) { .rc-dl { grid-template-columns: 1fr; } .rc-dl dt { margin-top: 6px; } }
