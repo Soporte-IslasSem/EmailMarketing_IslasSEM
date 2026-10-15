@@ -20,6 +20,7 @@ const { processAutomations } = require("./lib/automations");
 const { checkDomains } = require("./lib/domains");
 const { subscribe, confirm, unsubscribePage, doUnsubscribe } = require("./lib/subscriptions");
 const { testWebhook } = require("./lib/webhooks");
+const { checkAccess } = require("./lib/access");
 const gcal = require("./lib/gcal");
 
 const app = express();
@@ -64,6 +65,9 @@ api.get("/google/status", gcal.status);
 api.post("/google/settings", gcal.settings);
 api.post("/google/disconnect", gcal.disconnect);
 api.post("/google/events", gcal.pushEvent);
+
+// --- Acceso: tras registrarse/entrar, ¿este email puede usar la app? ---
+api.post("/access/check", checkAccess);
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

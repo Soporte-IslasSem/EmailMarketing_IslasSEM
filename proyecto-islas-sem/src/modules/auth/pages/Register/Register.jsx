@@ -3,12 +3,14 @@ import { auth } from "../../../../config/firebaseConfig";
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  sendEmailVerification,
   signInWithPopup
 } from "firebase/auth";
 
 import { db } from "../../../../config/firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
+import { ensureAllowed, NO_ACCESS_MSG } from "../../../../shared/access/checkAccess";
 import "./Register.styles.css";
 
 export default function Register() {
@@ -26,8 +28,10 @@ export default function Register() {
   // ------------------------------
   const handleGoogleLogin = async () => {
     try {
+      setError("");
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      if (!(await ensureAllowed(user))) return setError(NO_ACCESS_MSG);
 
       const userRef = doc(db, "users", user.uid);
       const exists = await getDoc(userRef);
@@ -68,6 +72,8 @@ export default function Register() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      if (!(await ensureAllowed(user))) return setError(NO_ACCESS_MSG);
+      await sendEmailVerification(user).catch(() => {}); // para entrar hay que confirmar el email
 
       await setDoc(doc(db, "users", user.uid), {
         email,
@@ -80,7 +86,9 @@ export default function Register() {
 
       window.location.href = "/dashboard";
     } catch (err) {
-      setError("No se pudo crear la cuenta");
+      if (err?.code === "auth/email-already-in-use") setError("Ese email ya tiene cuenta: entra desde «Iniciar sesión».");
+      else if (err?.code === "auth/weak-password") setError("La contraseña es demasiado débil.");
+      else setError("No se pudo crear la cuenta");
     }
   };
 
@@ -101,6 +109,7 @@ export default function Register() {
           <img src="/islas-sem-logo.png" className="register-logo-inside" />
           <h2>Crear cuenta</h2>
           <p className="register-slogan">Influir positivamente cuidando tu negocio</p>
+          <p style={{ fontSize: 12.5, color: "#6b7d7d", margin: "8px 0 0" }}>Solo para personas dadas de alta por ISLAS SEM. Usa el email con el que te dieron acceso.</p>
         </div>
 
         <div className="google-btn-wrapper">

@@ -10,6 +10,7 @@ import {
 import { db } from "../../../../config/firebaseConfig";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
+import { ensureAllowed, NO_ACCESS_MSG } from "../../../../shared/access/checkAccess";
 import "./Login.styles.css";
 
 export default function Login() {
@@ -24,8 +25,10 @@ export default function Login() {
   // ------------------------------
   const handleGoogleLogin = async () => {
     try {
+      setError("");
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      if (!(await ensureAllowed(user))) return setError(NO_ACCESS_MSG);
 
       const userRef = doc(db, "users", user.uid);
       const exists = await getDoc(userRef);
@@ -60,7 +63,8 @@ export default function Login() {
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const { user } = await signInWithEmailAndPassword(auth, email, password);
+      if (!(await ensureAllowed(user))) return setError(NO_ACCESS_MSG);
       window.location.href = "/dashboard";
     } catch (err) {
       setError("Credenciales incorrectas");
