@@ -12,12 +12,15 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.orgId;
     }
     // ===== Acceso a la app =====
-    // Solo entra quien está en organizations/islas-sem.accessEmails (Administración ›
-    // Sistema › Accesos) y tiene el email verificado (Google lo verifica; con contraseña,
-    // el enlace que llega por email). Así nadie puede usar un email que no es suyo.
+    // Solo entra quien es empleado (Administración › Empleados, memberRoles) o está en la
+    // lista de acceso (organizations/islas-sem.accessEmails, Administración › Sistema ›
+    // Accesos) y tiene el email verificado (Google lo verifica; con contraseña, el enlace
+    // que llega por email). Así nadie puede usar un email que no es suyo.
     function staff() {
+      let org = get(/databases/$(database)/documents/organizations/islas-sem).data;
+      let email = request.auth.token.email.lower();
       return isSignedIn() && request.auth.token.email_verified == true
-        && request.auth.token.email.lower() in get(/databases/$(database)/documents/organizations/islas-sem).data.get('accessEmails', []);
+        && (email in org.get('accessEmails', []) || email in org.get('memberRoles', {}));
     }
     function isMember(orgId) {
       return isSignedIn() && myOrg() == orgId && staff();

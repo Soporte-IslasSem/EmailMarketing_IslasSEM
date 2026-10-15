@@ -1,7 +1,9 @@
 // Administración › Sistema › Accesos: quién puede entrar en la app.
-// organizations/{org}.accessEmails. Lo aplican la app (AccessGate), las reglas de Firestore
-// y el servidor. Solo los administradores pueden cambiarlo.
+// Entran los empleados (Administración › Empleados → memberRoles) y los emails de esta
+// lista (organizations/{org}.accessEmails, para quien no es empleado). Lo aplican la app
+// (AccessGate), las reglas de Firestore y el servidor. Solo los administradores lo cambian.
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { arrayRemove, arrayUnion, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../../config/firebaseConfig";
 import { useOrg } from "../lib/useOrg";
@@ -13,13 +15,14 @@ const norm = (s) => String(s || "").trim().toLowerCase();
 export default function Access() {
   const { orgId } = useOrg();
   const [emails, setEmails] = useState(null);
+  const [staff, setStaff] = useState([]); // empleados con email (memberRoles)
   const [value, setValue] = useState("");
   const [msg, setMsg] = useState("");
   const me = norm(auth.currentUser?.email);
 
   useEffect(() => {
     if (!orgId) return undefined;
-    return onSnapshot(doc(db, "organizations", orgId), (s) => setEmails([...(s.data()?.accessEmails || [])].map(norm).sort()), (e) => setMsg("No se pudo leer: " + e.message));
+    return onSnapshot(doc(db, "organizations", orgId), (s) => { setEmails([...(s.data()?.accessEmails || [])].map(norm).sort()); setStaff(Object.entries(s.data()?.memberRoles || {}).map(([e, r]) => [norm(e), r]).sort()); }, (e) => setMsg("No se pudo leer: " + e.message));
   }, [orgId]);
 
   const add = async () => {
@@ -30,7 +33,7 @@ export default function Access() {
     catch (er) { setMsg("No se pudo añadir: " + er.message); }
   };
   const remove = async (e) => {
-    if (e === me) return setMsg("No puedes quitarte el acceso a ti mismo.");
+    if (e === me && !staff.some(([x]) => x === me)) return setMsg("No puedes quitarte el acceso a ti mismo.");
     if (!window.confirm(`¿Quitar el acceso a ${e}? Dejará de poder entrar en la app.`)) return;
     try { await updateDoc(doc(db, "organizations", orgId), { accessEmails: arrayRemove(e) }); setMsg(`${e} ya no tiene acceso.`); }
     catch (er) { setMsg("No se pudo quitar: " + er.message); }
@@ -41,7 +44,7 @@ export default function Access() {
       <div className="crm__top">
         <div>
           <h1>Accesos</h1>
-          <p>Solo pueden entrar en la app los emails de esta lista. Quien se registre sin estar aquí verá «No tienes acceso».</p>
+          <p>Pueden entrar los <b>empleados</b> (con su email en Empleados) y los emails que añadas aquí para quien no es empleado. Quien se registre sin estar en ninguno verá «No tienes acceso».</p>
         </div>
       </div>
       <div style={{ background: "#fff", border: "1px solid var(--crm-line)", borderRadius: 12, padding: 18, maxWidth: 640 }}>
@@ -56,17 +59,28 @@ export default function Access() {
           tendrá que confirmar su email con el enlace que le llega. Lo que ve dentro depende de su rol en Empleados.
         </p>
         <table className="crm-table" style={{ marginTop: 14 }}>
-          <thead><tr><th>Email con acceso</th><th></th></tr></thead>
+          <thead><tr><th>Acceso añadido aquí</th><th></th></tr></thead>
           <tbody>
             {emails === null ? <tr><td colSpan={2} className="crm-loading">Cargando…</td></tr>
               : emails.length ? emails.map((e) => (
                 <tr key={e}>
                   <td>{e}{e === me && <span style={{ color: "var(--crm-muted)", fontSize: 12 }}> · tú</span>}</td>
-                  <td style={{ textAlign: "right" }}>{e !== me && <button className="crm-btn ghost sm" onClick={() => remove(e)}>Quitar acceso</button>}</td>
+                  <td style={{ textAlign: "right" }}>{(e !== me || staff.some(([x]) => x === me)) && <button className="crm-btn ghost sm" onClick={() => remove(e)}>Quitar acceso</button>}</td>
                 </tr>
-              )) : <tr><td colSpan={2} style={{ color: "var(--crm-muted)" }}>Nadie tiene acceso todavía.</td></tr>}
+              )) : <tr><td colSpan={2} style={{ color: "var(--crm-muted)" }}>Nadie añadido aquí.</td></tr>}
           </tbody>
         </table>
+        <table className="crm-table" style={{ marginTop: 18 }}>
+          <thead><tr><th>Empleados (acceso por ser empleado)</th><th>Rol</th></tr></thead>
+          <tbody>
+            {staff.length ? staff.map(([e, r]) => (
+              <tr key={e}><td>{e}{e === me && <span style={{ color: "var(--crm-muted)", fontSize: 12 }}> · tú</span>}</td><td>{r === "_sinrol" ? "Sin rol" : r}</td></tr>
+            )) : <tr><td colSpan={2} style={{ color: "var(--crm-muted)" }}>Aún no hay empleados con email.</td></tr>}
+          </tbody>
+        </table>
+        <p style={{ fontSize: 13, color: "var(--crm-muted)", margin: "10px 0 0" }}>
+          Para dar o quitar acceso a un empleado, añádelo o bórralo en <Link to="/dashboard/admin/team">Administración › Empleados</Link>.
+        </p>
       </div>
     </div>
   );

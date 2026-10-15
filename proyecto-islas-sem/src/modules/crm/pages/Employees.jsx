@@ -126,7 +126,7 @@ Tú (${perms.email}) dejarás de ser administrador y no podrás deshacerlo. ¿Co
             <div className="crm-field"><label>Apellidos</label><input value={form.lastName} onChange={set("lastName")} /></div>
           </div>
           <div className="crm-two">
-            <div className="crm-field"><label>Email</label><input type="email" value={form.email} onChange={set("email")} /></div>
+            <div className="crm-field"><label>Email</label><input type="email" value={form.email} onChange={set("email")} /><small style={{ color: "var(--crm-muted)", fontSize: 12 }}>Con este email podrá entrar en la app (con Google o registrándose y confirmando su email). Lo que vea depende de su rol.</small></div>
             <div className="crm-field"><label>Teléfono</label><input value={form.phone} onChange={set("phone")} /></div>
           </div>
           <div className="crm-two">

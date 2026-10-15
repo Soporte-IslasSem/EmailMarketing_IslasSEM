@@ -25,7 +25,8 @@ export function useAccess() {
         if (!u.emailVerified) { if (alive) setResult({ uid: u.uid, state: "unverified" }); return; }
         await u.getIdToken(true).catch(() => {}); // el token lleva email_verified para las reglas
         const snap = await getDoc(doc(db, "organizations", DEFAULT_ORG_ID));
-        const list = (snap.data()?.accessEmails || []).map(norm);
+        // Con acceso: lista de Accesos o empleado (Administración › Empleados).
+        const list = [...(snap.data()?.accessEmails || []), ...Object.keys(snap.data()?.memberRoles || {})].map(norm);
         if (alive) setResult({ uid: u.uid, state: list.includes(norm(u.email)) ? "ok" : "denied" });
       } catch {
         if (alive) setResult({ uid: user.uid, state: "denied" }); // las reglas no le dejan leer la organización
