@@ -182,6 +182,11 @@ service cloud.firestore {
       allow update, delete: if ownDocOrg() && isOrgAdmin();
       allow create: if createInMyOrg();
     }
+    // Restaurantes: fichas de cliente (separado del CRM), compartidas por la organización
+    match /restaurants/{docId} {
+      allow read, update, delete: if ownDocOrg();
+      allow create: if createInMyOrg();
+    }
     match /recyclebin/{docId} {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();

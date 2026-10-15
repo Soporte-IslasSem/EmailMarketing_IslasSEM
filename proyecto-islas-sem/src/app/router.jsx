@@ -93,6 +93,8 @@ import Outbox from "../modules/crm/pages/Outbox.jsx";
 import CrmForms from "../modules/crm/pages/CrmForms.jsx";
 import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
+import Restaurants from "../modules/restaurants/pages/Restaurants.jsx";
+import RestaurantDetail from "../modules/restaurants/pages/RestaurantDetail.jsx";
 import RecycleBin from "../modules/crm/pages/RecycleBin.jsx";
 import History from "../modules/crm/pages/History.jsx";
 
@@ -196,6 +198,10 @@ const router = createBrowserRouter([
       { path: "crm/history", element: <History /> },
       { path: "crm/recyclebin", element: <RecycleBin /> },
       { path: "crm/settings", element: <CrmSettings /> },
+
+      // Restaurantes (fichas de cliente, separado del CRM)
+      { path: "restaurants", element: <Restaurants /> },
+      { path: "restaurants/:id", element: <RestaurantDetail /> },
 
       // Tareas
       { path: "tasks", element: <Activities /> },
