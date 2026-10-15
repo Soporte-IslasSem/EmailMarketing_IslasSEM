@@ -42,6 +42,9 @@ export default function Sidebar() {
     return n;
   });
 
+  // La primera (Panel) solo cuenta exacta; el resto también en sus páginas de detalle
+  const isOn = (route, exact) => location.pathname === route || (!exact && location.pathname.startsWith(route + "/"));
+
   const handleLogout = async () => {
     await logout();
     navigate("/auth/login");
@@ -60,15 +63,31 @@ export default function Sidebar() {
 
         <nav className="Sidebar__nav">
           {areas.map((area) => (
-            <button
-              key={area.id}
-              className={`Sidebar__link ${activeArea === area.id ? "active" : ""}`}
-              onClick={() => navigate(firstRoute(area))}
-              title={collapsed ? area.label : undefined}
-            >
-              <span className="Sidebar__ic">{ICONS[area.icon]}</span>
-              <span className="Sidebar__label">{area.label}</span>
-            </button>
+            <div key={area.id} className="Sidebar__group">
+              <button
+                className={`Sidebar__link ${activeArea === area.id ? "active" : ""}`}
+                onClick={() => navigate(firstRoute(area))}
+                title={collapsed ? area.label : undefined}
+              >
+                <span className="Sidebar__ic">{ICONS[area.icon]}</span>
+                <span className="Sidebar__label">{area.label}</span>
+                {area.side && <span className="Sidebar__caret">{activeArea === area.id ? "▾" : "▸"}</span>}
+              </button>
+              {/* Submenú vertical (Restaurantes): abierto mientras se está en esa área */}
+              {area.side && activeArea === area.id && !collapsed && (
+                <div className="Sidebar__sub">
+                  {area.tabs.map(([route, label], i) => (
+                    <button
+                      key={route}
+                      className={`Sidebar__subLink ${isOn(route, i === 0) ? "on" : ""}`}
+                      onClick={() => navigate(route)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
       </div>

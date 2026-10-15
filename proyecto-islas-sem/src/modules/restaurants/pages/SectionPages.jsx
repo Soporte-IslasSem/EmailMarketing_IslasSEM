@@ -14,7 +14,7 @@ const byName = (items) => [...items].sort((a, b) => (a.name || "").localeCompare
 
 function Name({ r }) {
   const navigate = useNavigate();
-  return <span className="rp-name" onClick={() => navigate(`/restaurantes/clientes/${r.id}`)}>{r.name || "(sin nombre)"}</span>;
+  return <span className="rp-name" onClick={() => navigate(`/dashboard/restaurantes/clientes/${r.id}`)}>{r.name || "(sin nombre)"}</span>;
 }
 
 function Link({ href, label = "Abrir" }) {
@@ -27,7 +27,7 @@ function Empty({ cols, loading, text }) {
   const navigate = useNavigate();
   return (
     <tr><td colSpan={cols} className="rp-empty">
-      {loading ? "Cargando…" : <>{text} <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate("/restaurantes/clientes")}>Ir a Clientes</span></>}
+      {loading ? "Cargando…" : <>{text} <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate("/dashboard/restaurantes/clientes")}>Ir a Clientes</span></>}
     </td></tr>
   );
 }
@@ -57,7 +57,7 @@ export function Panel() {
           <h1 className="rp-title">Panel</h1>
           <p className="rp-sub">Resumen de todos los restaurantes.</p>
         </div>
-        <button className="rf-btn primary" onClick={() => navigate("/restaurantes/clientes")}>Ver clientes</button>
+        <button className="rf-btn primary" onClick={() => navigate("/dashboard/restaurantes/clientes")}>Ver clientes</button>
       </div>
       <div className="rp-stats">
         <div className="rp-stat"><small>Restaurantes</small><b>{loading ? "…" : s.total}</b></div>

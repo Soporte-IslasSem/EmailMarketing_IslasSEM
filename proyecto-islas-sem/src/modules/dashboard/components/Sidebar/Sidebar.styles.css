@@ -175,3 +175,11 @@
 .Sidebar__logoutButton:hover {
   background: #cfa32f;
 }
+
+/* Submenú vertical (Restaurantes) */
+.Sidebar__caret { margin-left: auto; font-size: 11px; opacity: .8; }
+.Sidebar__sub { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 6px 30px; padding-left: 10px; border-left: 1px solid rgba(255, 255, 255, 0.25); }
+.Sidebar__subLink { background: none; border: 0; text-align: left; cursor: pointer; font-family: inherit; font-size: 14px; color: rgba(255, 255, 255, 0.75); padding: 7px 10px; border-radius: 8px; transition: 0.2s ease; }
+.Sidebar__subLink:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.Sidebar__subLink.on { background: rgba(255, 255, 255, 0.2); color: #fff; font-weight: 600; }
+.Sidebar.collapsed .Sidebar__caret { display: none; }

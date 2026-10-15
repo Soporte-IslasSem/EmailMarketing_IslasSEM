@@ -11,7 +11,7 @@ export default function TopNav() {
   const { canSeeRoute } = usePerms();
 
   const area = visibleArea(areaOf(location.pathname), canSeeRoute);
-  if (!area) return null;
+  if (!area || area.side) return null; // su submenú va en el lateral
 
   const isActive = (route) => location.pathname === route || location.pathname.startsWith(route + "/");
 

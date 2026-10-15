@@ -95,7 +95,7 @@ import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
 import AccessGate from "../shared/access/AccessGate.jsx";
 import Access from "../modules/crm/pages/Access.jsx";
-import RestaurantsLayout from "../modules/restaurants/layout/RestaurantsLayout.jsx";
+import RestaurantsLayout, { LegacyRestaurants } from "../modules/restaurants/layout/RestaurantsLayout.jsx";
 import RestaurantClients from "../modules/restaurants/pages/Clients.jsx";
 import RestaurantDetail from "../modules/restaurants/pages/RestaurantDetail.jsx";
 import RestaurantCampaigns from "../modules/restaurants/pages/CampaignsPage.jsx";
@@ -157,23 +157,8 @@ const router = createBrowserRouter([
     ],
   },
 
-  // RESTAURANTES (pantalla completa con su propio menú; separado del CRM)
-  {
-    path: "/restaurantes",
-    element: <AccessGate><RestaurantsLayout /></AccessGate>,
-    children: [
-      { index: true, element: <RestaurantPanel /> },
-      { path: "clientes", element: <RestaurantClients /> },
-      { path: "clientes/:id", element: <RestaurantDetail /> },
-      { path: "reservas", element: <RestaurantReservations /> },
-      { path: "resenas", element: <RestaurantReviews /> },
-      { path: "campanas", element: <RestaurantCampaigns /> },
-      { path: "campanas/:id", element: <RestaurantCampaignWizard /> },
-      { path: "equipo", element: <RestaurantTeam /> },
-      { path: "ajustes", element: <RestaurantSettings /> },
-      { path: "*", element: <Navigate to="/restaurantes" replace /> },
-    ],
-  },
+  // Enlaces antiguos de Restaurantes (era una pantalla aparte): llevan a la misma página dentro del panel
+  { path: "/restaurantes/*", element: <LegacyRestaurants /> },
 
   // DASHBOARD
   {
@@ -181,6 +166,24 @@ const router = createBrowserRouter([
     element: <AccessGate><DashboardLayout /></AccessGate>,
     children: [
       { index: true, element: <DashboardHome /> },
+
+      // RESTAURANTES (submenú en el lateral)
+      {
+        path: "restaurantes",
+        element: <RestaurantsLayout />,
+        children: [
+        { index: true, element: <RestaurantPanel /> },
+        { path: "clientes", element: <RestaurantClients /> },
+        { path: "clientes/:id", element: <RestaurantDetail /> },
+        { path: "reservas", element: <RestaurantReservations /> },
+        { path: "resenas", element: <RestaurantReviews /> },
+        { path: "campanas", element: <RestaurantCampaigns /> },
+        { path: "campanas/:id", element: <RestaurantCampaignWizard /> },
+        { path: "equipo", element: <RestaurantTeam /> },
+        { path: "ajustes", element: <RestaurantSettings /> },
+        { path: "*", element: <Navigate to="/dashboard/restaurantes" replace /> },
+        ],
+      },
 
       // CAMPAIGNS
       { path: "campaigns", element: <Campaigns /> },
@@ -223,8 +226,8 @@ const router = createBrowserRouter([
       { path: "crm/recyclebin", element: <RecycleBin /> },
       { path: "crm/settings", element: <CrmSettings /> },
 
-      // Restaurantes vive en /restaurantes (pantalla propia); enlaces antiguos
-      { path: "restaurants/*", element: <Navigate to="/restaurantes/clientes" replace /> },
+      // enlaces antiguos
+      { path: "restaurants/*", element: <Navigate to="/dashboard/restaurantes/clientes" replace /> },
 
       // Tareas
       { path: "tasks", element: <Activities /> },

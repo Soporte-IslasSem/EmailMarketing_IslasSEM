@@ -134,7 +134,7 @@ function StepRecipients({ campaign, items, onBack, onSaved }) {
                   <td>{r.city || "—"}</td>
                   <td>
                     {!validEmail(r.email)
-                      ? <span className="rp-muted">Sin email · <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate(`/restaurantes/clientes/${r.id}`)}>añadirlo en la ficha</span></span>
+                      ? <span className="rp-muted">Sin email · <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate(`/dashboard/restaurantes/clientes/${r.id}`)}>añadirlo en la ficha</span></span>
                       : !ok ? <span style={{ color: "#8a1f45" }}>{r.email} · {bajas.has(cleanEmail(r.email)) ? "se dio de baja" : `no puede recibir (${st})`}</span>
                       : <span className="rp-mono">{r.email}</span>}
                   </td>
@@ -299,7 +299,7 @@ function StepSend({ campaign, items, orgId, onBack }) {
     try {
       const sendAt = when === "scheduled" ? new Date(at) : undefined;
       await enqueueCampaign(orgId, campaign.id, fresh, subs, { sendAt, suppressed });
-      navigate("/restaurantes/campanas");
+      navigate("/dashboard/restaurantes/campanas");
     } catch (e) { setErr("No se pudo poner en cola: " + e.message); setBusy(false); setConfirm(false); }
   };
 
@@ -423,18 +423,18 @@ export default function CampaignWizard() {
       const s = await getDoc(doc(db, "campaigns", cid));
       setCampaign({ id: cid, ...s.data() });
       setStep(next);
-      navigate(`/restaurantes/campanas/${cid}`, { replace: true });
+      navigate(`/dashboard/restaurantes/campanas/${cid}`, { replace: true });
     } else setStep(next);
   };
 
-  if (missing) return <div className="rp-empty">Esta campaña no existe o se eliminó. <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate("/restaurantes/campanas")}>Volver a Campañas</span></div>;
+  if (missing) return <div className="rp-empty">Esta campaña no existe o se eliminó. <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate("/dashboard/restaurantes/campanas")}>Volver a Campañas</span></div>;
   if (campaign === undefined) return <div className="rp-empty">Cargando campaña…</div>;
 
   const draft = !campaign || campaign.status === "draft";
   const max = campaign ? Math.min(Math.max(campaign.step || 1, step), 4) : 1;
   return (
     <div>
-      <div className="rf-crumb"><span className="rf-crumb__link" onClick={() => navigate("/restaurantes/campanas")}>Campañas</span> / {campaign?.config?.campaignName || "Nueva campaña"}</div>
+      <div className="rf-crumb"><span className="rf-crumb__link" onClick={() => navigate("/dashboard/restaurantes/campanas")}>Campañas</span> / {campaign?.config?.campaignName || "Nueva campaña"}</div>
       <h1 className="rp-title">{campaign?.config?.campaignName || "Nueva campaña"}</h1>
       <p className="rp-sub">Email de ISLAS SEM a los restaurantes que elijas.</p>
       {draft ? (

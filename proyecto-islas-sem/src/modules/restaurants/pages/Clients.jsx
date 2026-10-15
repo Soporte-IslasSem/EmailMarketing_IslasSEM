@@ -26,7 +26,7 @@ export default function Clients() {
     setSaving(true);
     try {
       const ref = await crmCreate(COLLECTION, orgId, { ...EMPTY, name: name.trim() });
-      navigate(`/restaurantes/clientes/${ref.id}`);
+      navigate(`/dashboard/restaurantes/clientes/${ref.id}`);
     } catch (e) {
       alert("No se pudo crear: " + e.message);
       setSaving(false);
@@ -75,14 +75,14 @@ export default function Clients() {
               return (
                 <tr key={r.id}>
                   <td style={{ width: 44 }}>{r.logo ? <img src={r.logo} alt="" className="rf-thumb" /> : <span className="rf-thumb empty">🍽</span>}</td>
-                  <td><span className="rp-name" onClick={() => navigate(`/restaurantes/clientes/${r.id}`)}>{r.name || "(sin nombre)"}</span></td>
+                  <td><span className="rp-name" onClick={() => navigate(`/dashboard/restaurantes/clientes/${r.id}`)}>{r.name || "(sin nombre)"}</span></td>
                   <td>{r.city || "—"}</td>
                   <td>{r.cuisine || "—"}</td>
                   <td>{r.website ? <a href={toUrl(r.website)} target="_blank" rel="noreferrer" style={{ color: "#1f5c46" }}>{r.website}</a> : "—"}</td>
                   <td style={{ whiteSpace: "nowrap" }}><span className="rp-bar"><i style={{ width: `${pct}%` }} /></span><span className="rp-muted">{pct}%</span></td>
                   <td>{fmtDate(r.updatedAt)}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                    <button className="rf-open" onClick={() => navigate(`/restaurantes/clientes/${r.id}`)}>Ver ficha</button>{" "}
+                    <button className="rf-open" onClick={() => navigate(`/dashboard/restaurantes/clientes/${r.id}`)}>Ver ficha</button>{" "}
                     <button className="rf-open" style={{ color: "#8a1f45" }} onClick={() => window.confirm(`¿Eliminar "${r.name}"? Podrás recuperarlo desde la Papelera de reciclaje del CRM.`) && crmRemove(COLLECTION, r.id).catch((e) => alert("No se pudo eliminar: " + e.message))}>Eliminar</button>
                   </td>
                 </tr>

@@ -33,7 +33,16 @@ export const AREAS = [
     id: "restaurants",
     label: "Restaurantes",
     icon: "restaurant",
-    tabs: [["/restaurantes", "Restaurantes"]], // abre su propia pantalla
+    side: true, // submenú vertical en el lateral (sin pestañas arriba)
+    tabs: [
+      ["/dashboard/restaurantes", "Panel"],
+      ["/dashboard/restaurantes/clientes", "Clientes"],
+      ["/dashboard/restaurantes/reservas", "Reservas"],
+      ["/dashboard/restaurantes/resenas", "Reseñas"],
+      ["/dashboard/restaurantes/campanas", "Campañas"],
+      ["/dashboard/restaurantes/equipo", "Equipo y fichajes"],
+      ["/dashboard/restaurantes/ajustes", "Ajustes"],
+    ],
   },
   {
     id: "tasks",
@@ -67,6 +76,7 @@ export const tabRoutes = (t) => (Array.isArray(t) ? [t[0]] : t.menu.map((m) => m
 
 // Prefijo de sección → área (para rutas de detalle no listadas como pestaña)
 const SECTION = [
+  ["/dashboard/restaurantes", "restaurants"],
   ["/dashboard/crm", "crm"],
   ["/dashboard/admin", "admin"],
   ["/dashboard/tasks", "tasks"],
@@ -109,6 +119,13 @@ export function firstRoute(area) {
 // Breadcrumb / título de página para el Header (como el prototipo)
 const CRUMB = {
   "/dashboard": "Inicio",
+  "/dashboard/restaurantes": "Restaurantes",
+  "/dashboard/restaurantes/clientes": "Restaurantes · Clientes",
+  "/dashboard/restaurantes/reservas": "Restaurantes · Reservas",
+  "/dashboard/restaurantes/resenas": "Restaurantes · Reseñas",
+  "/dashboard/restaurantes/campanas": "Restaurantes · Campañas",
+  "/dashboard/restaurantes/equipo": "Restaurantes · Equipo y fichajes",
+  "/dashboard/restaurantes/ajustes": "Restaurantes · Ajustes",
   "/dashboard/campaigns": "Campañas",
   "/dashboard/automations": "Automatizaciones",
   "/dashboard/lists": "Listas",

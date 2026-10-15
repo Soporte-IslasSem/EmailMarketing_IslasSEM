@@ -61,7 +61,7 @@ export default function CampaignsPage() {
           <h1 className="rp-title">Campañas</h1>
           <p className="rp-sub">Emails de ISLAS SEM a los restaurantes. {withEmail} de {items.length} restaurantes tienen email de contacto.</p>
         </div>
-        <button className="rf-btn primary" onClick={() => navigate("/restaurantes/campanas/nueva")}>+ Nueva campaña</button>
+        <button className="rf-btn primary" onClick={() => navigate("/dashboard/restaurantes/campanas/nueva")}>+ Nueva campaña</button>
       </div>
 
       {error && <p style={{ color: "#b0304c", fontSize: 13 }}>No se pudieron cargar las campañas: {error}</p>}
@@ -80,7 +80,7 @@ export default function CampaignsPage() {
               return (
                 <tr key={c.id}>
                   <td>
-                    <span className="rp-name" onClick={() => navigate(`/restaurantes/campanas/${c.id}`)}>{c.config?.campaignName || "Sin nombre"}</span>
+                    <span className="rp-name" onClick={() => navigate(`/dashboard/restaurantes/campanas/${c.id}`)}>{c.config?.campaignName || "Sin nombre"}</span>
                     <div className="rp-muted" style={{ fontSize: 12 }}>{c.config?.subject || "(sin asunto)"}</div>
                   </td>
                   <td><span className={`rf-status ${tone}`}><i />{label}</span></td>
@@ -90,7 +90,7 @@ export default function CampaignsPage() {
                   <td>{m ? `${m.clicked} (${m.clickRate}%)` : "—"}</td>
                   <td>{fmt(c.sentAt || c.queuedAt || c.createdAt)}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                    <button className="rf-open" onClick={() => navigate(`/restaurantes/campanas/${c.id}`)}>{draft ? "Continuar" : "Ver resultados"}</button>{" "}
+                    <button className="rf-open" onClick={() => navigate(`/dashboard/restaurantes/campanas/${c.id}`)}>{draft ? "Continuar" : "Ver resultados"}</button>{" "}
                     <button className="rf-open" style={{ color: "#8a1f45" }} onClick={() => remove(c)}>Eliminar</button>
                   </td>
                 </tr>
@@ -110,7 +110,7 @@ export default function CampaignsPage() {
           <tbody>
             {restaurants.length ? restaurants.map((r) => (
               <tr key={r.id}>
-                <td><span className="rp-name" onClick={() => navigate(`/restaurantes/clientes/${r.id}`)}>{r.name || "(sin nombre)"}</span></td>
+                <td><span className="rp-name" onClick={() => navigate(`/dashboard/restaurantes/clientes/${r.id}`)}>{r.name || "(sin nombre)"}</span></td>
                 <td className="rp-mono">{validEmail(r.email) ? r.email : <span className="rp-muted">— sin email</span>}</td>
                 <td className="rp-mono">{r.customerCount ? `${num(r.customerCount).toLocaleString("es-ES")} registros` : "—"}</td>
                 <td>

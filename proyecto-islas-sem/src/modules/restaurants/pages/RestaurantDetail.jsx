@@ -146,14 +146,14 @@ export default function RestaurantDetail() {
   const goSection = (sid) => document.getElementById(`rf-${sid}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   if (missing) return (
-    <div className="rp-empty">Este restaurante no existe o se eliminó. <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate("/restaurantes/clientes")}>Volver a Clientes</span></div>
+    <div className="rp-empty">Este restaurante no existe o se eliminó. <span className="rp-name" style={{ color: "#1f5c46" }} onClick={() => navigate("/dashboard/restaurantes/clientes")}>Volver a Clientes</span></div>
   );
   if (!r) return <div className="rp-empty">Cargando ficha…</div>;
 
   return (
     <div className="rf">
       <div className="rf-crumb">
-        <span className="rf-crumb__link" onClick={() => navigate("/restaurantes/clientes")}>Clientes</span> / Ficha de cliente
+        <span className="rf-crumb__link" onClick={() => navigate("/dashboard/restaurantes/clientes")}>Clientes</span> / Ficha de cliente
       </div>
 
       <div className="rf-head">
