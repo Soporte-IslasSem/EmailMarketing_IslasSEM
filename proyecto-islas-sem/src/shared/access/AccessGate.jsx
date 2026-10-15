@@ -20,10 +20,11 @@ export default function AccessGate({ children }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (loading) return <div className="AG__wait">Cargando…</div>;
+  const wait = (txt) => <div className="AG__wait"><span className="AG__spin" aria-hidden="true" />{txt}</div>;
+  if (loading) return wait("Cargando…");
   if (!user) return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />;
   if (state === "ok") return children;
-  if (state === "checking") return <div className="AG__wait">Comprobando acceso…</div>;
+  if (state === "checking") return wait("Comprobando acceso…");
 
   const out = async () => { await logout(); navigate("/auth/login"); };
   const resend = async () => {

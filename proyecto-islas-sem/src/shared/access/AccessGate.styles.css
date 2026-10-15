@@ -1,5 +1,7 @@
 .AG { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: #f4f7f7; font-family: Inter, system-ui, sans-serif; color: #1f2a2a; box-sizing: border-box; }
-.AG__wait { padding: 40px; text-align: center; color: #6b7d7d; font-family: Inter, system-ui, sans-serif; }
+.AG__wait { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #f4f7f7; color: #6b7d7d; font-family: Inter, system-ui, sans-serif; font-size: 14px; }
+.AG__spin { width: 28px; height: 28px; border: 3px solid #d5e6e6; border-top-color: #1a9190; border-radius: 50%; animation: AG-spin .8s linear infinite; }
+@keyframes AG-spin { to { transform: rotate(360deg); } }
 .AG__card { width: 100%; max-width: 460px; background: #fff; border: 1px solid #e3eaea; border-radius: 16px; padding: 32px 28px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.05); box-sizing: border-box; }
 .AG__logo { height: 42px; margin-bottom: 18px; }
 .AG__card h1 { font-size: 22px; margin: 0 0 10px; }
