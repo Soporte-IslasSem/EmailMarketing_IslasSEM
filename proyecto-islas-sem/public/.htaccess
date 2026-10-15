@@ -4,6 +4,8 @@
 # - assets/ lleva el nombre con hash: se puede guardar un año sin riesgo.
 # Solo cabeceras: nada de reescrituras (no tocar /api, que sirve Node).
 <IfModule mod_headers.c>
+  # Que ningún buscador indexe la app (portada, panel, formularios, imágenes...).
+  Header always set X-Robots-Tag "noindex, nofollow"
   <FilesMatch "\.html$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
