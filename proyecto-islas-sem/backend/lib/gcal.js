@@ -20,6 +20,7 @@
 const crypto = require("crypto");
 const { admin, db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson } = require("./link");
+const { staffFromReq } = require("./access");
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
 const REDIRECT_URI = `${PUBLIC_URL}/api/google/callback`;
@@ -42,9 +43,7 @@ const configured = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_C
 
 // Usuario de la app (token de Firebase) que pertenece a la organización.
 async function authUser(req) {
-  const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!token) return null;
-  const user = await admin.auth().verifyIdToken(token).catch(() => null);
+  const user = await staffFromReq(req); // con acceso a la app (lista de acceso + email verificado)
   if (!user) return null;
   const prof = await db.collection("users").doc(user.uid).get().catch(() => null);
   const orgId = prof?.exists ? prof.data().orgId : null;

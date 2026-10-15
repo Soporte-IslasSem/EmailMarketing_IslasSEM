@@ -11,15 +11,23 @@ service cloud.firestore {
     function myOrg() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.orgId;
     }
+    // ===== Acceso a la app =====
+    // Solo entra quien está en organizations/islas-sem.accessEmails (Administración ›
+    // Sistema › Accesos) y tiene el email verificado (Google lo verifica; con contraseña,
+    // el enlace que llega por email). Así nadie puede usar un email que no es suyo.
+    function staff() {
+      return isSignedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in get(/databases/$(database)/documents/organizations/islas-sem).data.get('accessEmails', []);
+    }
     function isMember(orgId) {
-      return isSignedIn() && myOrg() == orgId;
+      return isSignedIn() && myOrg() == orgId && staff();
     }
     // Un documento del CRM pertenece a la organización del usuario
     function ownDocOrg() {
-      return isSignedIn() && resource.data.orgId == myOrg();
+      return isSignedIn() && resource.data.orgId == myOrg() && staff();
     }
     function createInMyOrg() {
-      return isSignedIn() && request.resource.data.orgId == myOrg();
+      return isSignedIn() && request.resource.data.orgId == myOrg() && staff();
     }
 
     // ===== Roles y permisos (Administración › Roles y permisos) =====
@@ -77,11 +85,12 @@ service cloud.firestore {
 
     // ===== Organizaciones (multi-tenant) =====
     match /organizations/{orgId} {
-      allow read: if isMember(orgId);
-      allow create: if isSignedIn(); // bootstrap de la org por defecto (TODO: endurecer al abrir el SaaS)
-      // Roles, administradores y tipos de cliente: solo administradores.
+      // Quien tiene acceso puede leerla aunque aún no tenga perfil (primer inicio de sesión).
+      allow read: if isMember(orgId) || (orgId == 'islas-sem' && staff());
+      allow create: if false; // la organización ya existe; nadie crea otras desde la app
+      // Accesos, roles, administradores y tipos de cliente: solo administradores.
       allow update: if isMember(orgId) && (isOrgAdmin() || !request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['adminEmails', 'memberRoles', 'rolePerms', 'roles', 'clientTypes']));
+        .hasAny(['accessEmails', 'adminEmails', 'memberRoles', 'rolePerms', 'roles', 'clientTypes']));
       allow delete: if isMember(orgId) && isOrgAdmin();
     }
 
@@ -198,56 +207,56 @@ service cloud.firestore {
 
     // Listas: dueño mediante el campo "userId"
     match /lists/{listId} {
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if staff() && resource.data.userId == request.auth.uid;
+      allow create: if staff() && request.resource.data.userId == request.auth.uid;
 
       // Subcolecciones de una lista: mismo dueño que la lista "padre"
       match /fields/{fieldId} {
-        allow read, write: if request.auth != null &&
+        allow read, write: if staff() &&
           get(/databases/$(database)/documents/lists/$(listId)).data.userId == request.auth.uid;
       }
 
       match /segments/{segmentId} {
-        allow read, write: if request.auth != null &&
+        allow read, write: if staff() &&
           get(/databases/$(database)/documents/lists/$(listId)).data.userId == request.auth.uid;
       }
     }
 
     // Suscriptores: dueño mediante "userId"
     match /subscribers/{subId} {
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if staff() && resource.data.userId == request.auth.uid;
+      allow create: if staff() && request.resource.data.userId == request.auth.uid;
     }
 
     // Campañas: dueño mediante "ownerId" (nombre distinto al resto de colecciones)
     match /campaigns/{campaignId} {
-      allow read, update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow read, update, delete: if staff() && resource.data.ownerId == request.auth.uid;
+      allow create: if staff() && request.resource.data.ownerId == request.auth.uid;
     }
 
     // Plantillas: dueño mediante "userId"
     match /templates/{templateId} {
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if staff() && resource.data.userId == request.auth.uid;
+      allow create: if staff() && request.resource.data.userId == request.auth.uid;
     }
 
     // Formularios: dueño mediante "userId"
     match /forms/{formId} {
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if staff() && resource.data.userId == request.auth.uid;
+      allow create: if staff() && request.resource.data.userId == request.auth.uid;
     }
 
     // Automatizaciones de email marketing: dueño mediante "userId".
     // Las inscripciones (automationEnrollments) solo las toca el backend (Admin SDK).
     match /automations/{automationId} {
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if staff() && resource.data.userId == request.auth.uid;
+      allow create: if staff() && request.resource.data.userId == request.auth.uid;
     }
 
     // Etiquetas de plantillas/campañas: dueño mediante "userEmail"
     match /templateTags/{tagId} {
-      allow read, update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;
-      allow create: if request.auth != null && request.resource.data.userEmail == request.auth.token.email;
+      allow read, update, delete: if staff() && resource.data.userEmail == request.auth.token.email;
+      allow create: if staff() && request.resource.data.userEmail == request.auth.token.email;
     }
 
     // Colección "tags": código muerto, no se usa desde ninguna pantalla. Bloqueada por defecto.
@@ -258,9 +267,9 @@ service cloud.firestore {
     // Informes: solo el dueño de la campaña puede leerlos.
     // Los crea únicamente la Cloud Function (Admin SDK), nunca el navegador.
     match /reports/{reportId} {
-      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow read: if staff() && resource.data.ownerId == request.auth.uid;
       // Los escribe el servidor; el dueño solo puede ocultarlos ("Eliminar informe").
-      allow update: if request.auth != null && resource.data.ownerId == request.auth.uid
+      allow update: if staff() && resource.data.ownerId == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hidden', 'hiddenAt']);
       allow create, delete: if false;
     }

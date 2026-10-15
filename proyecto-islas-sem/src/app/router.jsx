@@ -93,6 +93,8 @@ import Outbox from "../modules/crm/pages/Outbox.jsx";
 import CrmForms from "../modules/crm/pages/CrmForms.jsx";
 import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
+import AccessGate from "../shared/access/AccessGate.jsx";
+import Access from "../modules/crm/pages/Access.jsx";
 import RestaurantsLayout from "../modules/restaurants/layout/RestaurantsLayout.jsx";
 import RestaurantClients from "../modules/restaurants/pages/Clients.jsx";
 import RestaurantDetail from "../modules/restaurants/pages/RestaurantDetail.jsx";
@@ -158,7 +160,7 @@ const router = createBrowserRouter([
   // RESTAURANTES (pantalla completa con su propio menú; separado del CRM)
   {
     path: "/restaurantes",
-    element: <RestaurantsLayout />,
+    element: <AccessGate><RestaurantsLayout /></AccessGate>,
     children: [
       { index: true, element: <RestaurantPanel /> },
       { path: "clientes", element: <RestaurantClients /> },
@@ -176,7 +178,7 @@ const router = createBrowserRouter([
   // DASHBOARD
   {
     path: "/dashboard",
-    element: <DashboardLayout />,
+    element: <AccessGate><DashboardLayout /></AccessGate>,
     children: [
       { index: true, element: <DashboardHome /> },
 
@@ -233,6 +235,7 @@ const router = createBrowserRouter([
       { path: "admin/departments", element: <Departments /> },
       { path: "admin/salesteams", element: <SalesTeams /> },
       { path: "admin/roles", element: <Roles /> },
+      { path: "admin/accesos", element: <Access /> },
       { path: "admin/integraciones", element: <Integrations /> },
       { path: "admin/audit", element: <Audit /> },
 

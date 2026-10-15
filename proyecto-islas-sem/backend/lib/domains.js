@@ -2,7 +2,7 @@
 // Un dominio "acepta correo" si tiene registros MX (o, en su defecto, A/AAAA, que es el
 // respaldo que usan los servidores de correo). Solo para usuarios con sesión de la app.
 const dns = require("dns").promises;
-const { admin } = require("./firebase");
+const { staffFromReq } = require("./access");
 
 const cache = new Map(); // dominio -> { ok, at }
 const TTL = 6 * 3600e3;
@@ -29,9 +29,7 @@ async function domainAcceptsMail(domain) {
 // POST /api/lists/check-domains  { domains: ["gmail.com", ...] }  (Authorization: Bearer <idToken>)
 async function checkDomains(req, res) {
   try {
-    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) return res.status(401).json({ error: "Sin sesión" });
-    await admin.auth().verifyIdToken(token);
+    if (!(await staffFromReq(req))) return res.status(401).json({ error: "Sin acceso" });
     const domains = [...new Set((req.body?.domains || []).map((d) => String(d).trim().toLowerCase()))]
       .filter((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d))
       .slice(0, 300);

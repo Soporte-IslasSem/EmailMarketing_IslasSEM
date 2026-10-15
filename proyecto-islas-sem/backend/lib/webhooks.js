@@ -9,6 +9,7 @@ const crypto = require("crypto");
 const dns = require("dns").promises;
 const net = require("net");
 const { admin, db } = require("./firebase");
+const { staffFromReq } = require("./access");
 
 function isPrivateIp(ip) {
   if (net.isIPv4(ip)) {
@@ -72,10 +73,8 @@ async function fireWebhook(listId, event, data) {
 // POST /api/lists/:id/webhook-test  (Authorization: Bearer <idToken>) — solo el dueño de la lista
 async function testWebhook(req, res) {
   try {
-    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) return res.status(401).json({ error: "Sin sesión" });
-    const user = await admin.auth().verifyIdToken(token).catch(() => null);
-    if (!user) return res.status(401).json({ error: "Sesión no válida" });
+    const user = await staffFromReq(req);
+    if (!user) return res.status(401).json({ error: "Sin acceso" });
     const snap = await db.collection("lists").doc(String(req.params.id).slice(0, 64)).get();
     if (!snap.exists || snap.data().userId !== user.uid) return res.status(404).json({ error: "Lista no encontrada" });
     const hook = { ...(snap.data().webhook || {}), ...(req.body?.url ? { url: String(req.body.url) } : {}), ...(req.body?.secret ? { secret: String(req.body.secret) } : {}) };
