@@ -7,7 +7,7 @@ import "../crm.styles.css";
 const LABEL = {
   contacts: "Contacto", companies: "Compañía", leads: "Prospecto", deals: "Negociación",
   products: "Producto", quotes: "Cotización", invoices: "Factura", employees: "Empleado",
-  departments: "Departamento", salesteams: "Equipo", roles: "Rol", pipelines: "Embudo",
+  departments: "Departamento", salesteams: "Equipo", roles: "Rol", pipelines: "Embudo", restaurants: "Restaurante",
   crmForms: "Formulario",
 };
 
