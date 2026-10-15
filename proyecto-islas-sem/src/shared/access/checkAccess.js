@@ -9,7 +9,7 @@ export const NO_ACCESS_MSG = "Este email no tiene acceso a ISLAS SEM. Si trabaja
 
 export async function ensureAllowed(user) {
   try {
-    const res = await fetch(`${API_BASE}/access/check`, { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
+    const res = await fetch(`${API_BASE}/access/check`, { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken()}`, "Content-Type": "application/json" }, body: "{}" });
     if (!res.ok) return true;
     const { allowed } = await res.json();
     if (allowed) return true;
