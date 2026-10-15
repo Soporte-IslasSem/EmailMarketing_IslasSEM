@@ -57,3 +57,35 @@ export function imageToDataUrl(file, max = 320) {
     reader.readAsDataURL(file);
   });
 }
+
+// Campos que cuentan para "ficha completa" (los del diseño, sin contar La data ni los estados).
+export const FIELDS = [
+  ["website", "Quién soy"], ["maps", "Ubicación"], ["tour360", "Visita 360º"], ["cuisine", "Propuesta gastronómica"],
+  ["instagram", "Instagram"], ["facebook", "Facebook"], ["tiktok", "TikTok"], ["tripadvisor", "TripAdvisor"], ["otherSocial", "Otras redes"],
+  ["freeToilets", "Baños gratis"], ["menuText", "Carta y precios"], ["menuLink", "Enlace del menú"], ["qr", "Código QR"],
+  ["phoneLandline", "Teléfono fijo"], ["phoneMobile", "Teléfono móvil"], ["whatsapp", "WhatsApp"], ["bookingCalendar", "Calendario de reservas"],
+  ["customerCount", "Base de datos de clientela"], ["nfcUnits", "NFC en mesa"], ["reviewsGoogle", "Reseñas Google"],
+  ["reviewsTripadvisor", "Reseñas TripAdvisor"], ["rgpdLink", "RGPD"], ["city", "Ciudad"], ["logo", "Logo"],
+];
+const filled = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+export const missingFields = (r) => FIELDS.filter(([k]) => !filled(r[k]));
+export const completion = (r) => Math.round(((FIELDS.length - missingFields(r).length) / FIELDS.length) * 100);
+export const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// Texto en el que busca el buscador superior (nombre, ciudad, cocina, enlaces y teléfonos).
+const SEARCH_KEYS = ["name", "city", "cuisine", "website", "maps", "tour360", "instagram", "facebook", "tiktok", "tripadvisor", "otherSocial",
+  "menuText", "menuLink", "phoneLandline", "phoneMobile", "whatsapp", "bookingCalendar", "reviewsGoogle", "reviewsTripadvisor", "rgpdLink"];
+export function searchRestaurants(items, term) {
+  const t = String(term || "").trim().toLowerCase();
+  if (!t) return [];
+  const out = [];
+  for (const r of items) {
+    const hit = SEARCH_KEYS.find((k) => String(r[k] || "").toLowerCase().includes(t));
+    if (hit) out.push({ r, field: hit });
+  }
+  return out.slice(0, 12);
+}
+
+// Ajustes de la sección (nombre de la marca), un documento por organización.
+export const SETTINGS_COLLECTION = "restaurantSettings";
+export const DEFAULT_BRAND = "ISLAS SEM CRM";

@@ -33,7 +33,7 @@ export const AREAS = [
     id: "restaurants",
     label: "Restaurantes",
     icon: "restaurant",
-    tabs: [["/dashboard/restaurants", "Restaurantes"]],
+    tabs: [["/restaurantes", "Restaurantes"]], // abre su propia pantalla
   },
   {
     id: "tasks",
@@ -70,7 +70,6 @@ const SECTION = [
   ["/dashboard/crm", "crm"],
   ["/dashboard/admin", "admin"],
   ["/dashboard/tasks", "tasks"],
-  ["/dashboard/restaurants", "restaurants"],
   ["/dashboard/campaigns", "marketing"],
   ["/dashboard/lists", "marketing"],
   ["/dashboard/templates", "marketing"],
@@ -132,7 +131,6 @@ const CRUMB = {
   "/dashboard/crm/history": "Historial de CRM",
   "/dashboard/crm/recyclebin": "Papelera de reciclaje",
   "/dashboard/crm/settings": "Ajustes de CRM",
-  "/dashboard/restaurants": "Restaurantes",
   "/dashboard/tasks": "Tareas · Mis tareas",
   "/dashboard/tasks/calendar": "Tareas · Calendario",
   "/dashboard/admin/team": "Empleados · Estructura de empresa",
@@ -146,7 +144,6 @@ export function crumbOf(pathname) {
   if (CRUMB[pathname]) return CRUMB[pathname];
   if (/^\/dashboard\/crm\/deals\//.test(pathname)) return "Negociación";
   if (/^\/dashboard\/crm\/contacts\//.test(pathname)) return "Contacto";
-  if (/^\/dashboard\/restaurants\//.test(pathname)) return "Restaurantes · Ficha de cliente";
   // prefijo más largo
   let best = "";
   for (const p of Object.keys(CRUMB)) if (pathname.startsWith(p) && p.length > best.length) best = p;

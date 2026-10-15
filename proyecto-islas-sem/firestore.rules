@@ -187,6 +187,10 @@ service cloud.firestore {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();
     }
+    // Ajustes de Restaurantes (nombre de la marca): un documento por organización
+    match /restaurantSettings/{orgId} {
+      allow read, write: if isMember(orgId);
+    }
     match /recyclebin/{docId} {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();

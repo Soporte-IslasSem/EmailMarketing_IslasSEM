@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 // Layouts
 import DashboardLayout from "../modules/dashboard/layout/DashboardLayout.jsx";
@@ -93,8 +93,10 @@ import Outbox from "../modules/crm/pages/Outbox.jsx";
 import CrmForms from "../modules/crm/pages/CrmForms.jsx";
 import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
-import Restaurants from "../modules/restaurants/pages/Restaurants.jsx";
+import RestaurantsLayout from "../modules/restaurants/layout/RestaurantsLayout.jsx";
+import RestaurantClients from "../modules/restaurants/pages/Clients.jsx";
 import RestaurantDetail from "../modules/restaurants/pages/RestaurantDetail.jsx";
+import { Panel as RestaurantPanel, Reservations as RestaurantReservations, Reviews as RestaurantReviews, Campaigns as RestaurantCampaigns, Team as RestaurantTeam, Settings as RestaurantSettings } from "../modules/restaurants/pages/SectionPages.jsx";
 import RecycleBin from "../modules/crm/pages/RecycleBin.jsx";
 import History from "../modules/crm/pages/History.jsx";
 
@@ -151,6 +153,23 @@ const router = createBrowserRouter([
     ],
   },
 
+  // RESTAURANTES (pantalla completa con su propio menú; separado del CRM)
+  {
+    path: "/restaurantes",
+    element: <RestaurantsLayout />,
+    children: [
+      { index: true, element: <RestaurantPanel /> },
+      { path: "clientes", element: <RestaurantClients /> },
+      { path: "clientes/:id", element: <RestaurantDetail /> },
+      { path: "reservas", element: <RestaurantReservations /> },
+      { path: "resenas", element: <RestaurantReviews /> },
+      { path: "campanas", element: <RestaurantCampaigns /> },
+      { path: "equipo", element: <RestaurantTeam /> },
+      { path: "ajustes", element: <RestaurantSettings /> },
+      { path: "*", element: <Navigate to="/restaurantes" replace /> },
+    ],
+  },
+
   // DASHBOARD
   {
     path: "/dashboard",
@@ -199,9 +218,8 @@ const router = createBrowserRouter([
       { path: "crm/recyclebin", element: <RecycleBin /> },
       { path: "crm/settings", element: <CrmSettings /> },
 
-      // Restaurantes (fichas de cliente, separado del CRM)
-      { path: "restaurants", element: <Restaurants /> },
-      { path: "restaurants/:id", element: <RestaurantDetail /> },
+      // Restaurantes vive en /restaurantes (pantalla propia); enlaces antiguos
+      { path: "restaurants/*", element: <Navigate to="/restaurantes/clientes" replace /> },
 
       // Tareas
       { path: "tasks", element: <Activities /> },
