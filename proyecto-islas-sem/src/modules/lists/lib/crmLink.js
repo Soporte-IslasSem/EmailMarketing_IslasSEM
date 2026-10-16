@@ -233,7 +233,7 @@ export async function removeFromTypeList(list, subs) {
 /* ------------------------------------------------------------------ tipos ⇄ listas */
 
 // Nuevo tipo de cliente con su lista (al crear una lista en Email Marketing o un tipo en el CRM).
-export async function createTypeWithList(label, orgId, types) {
+export async function createTypeWithList(label, orgId, types, { language = "es" } = {}) {
   const name = String(label || "").trim();
   if (!name) throw new Error("Falta el nombre");
   if (types.some((t) => t.label.trim().toLowerCase() === name.toLowerCase())) throw new Error(`Ya existe "${name}"`);
@@ -241,7 +241,7 @@ export async function createTypeWithList(label, orgId, types) {
   await saveClientTypes(orgId, [...types, { id, label: name, icon: "", color: "#1a9190" }]);
   const ref = doc(collection(db, "lists"));
   const b = writeBatch(db);
-  b.set(ref, { name, crm: true, crmKey: `type:${id}`, userId: auth.currentUser.uid, senderEmail: SENDER_EMAIL, language: "es", subscribersCount: 0, createdAt: new Date() });
+  b.set(ref, { name, crm: true, crmKey: `type:${id}`, userId: auth.currentUser.uid, senderEmail: SENDER_EMAIL, language, subscribersCount: 0, createdAt: new Date() });
   await b.commit();
   return { typeId: id, listId: ref.id };
 }
@@ -257,6 +257,86 @@ export async function convertListToType(list, orgId, types) {
   await updateDoc(doc(db, "lists", list.id), { crm: true, crmKey: `type:${id}`, name, convertedAt: serverTimestamp() });
   const subs = (await getDocs(query(collection(db, "subscribers"), where("listId", "==", list.id), where("userId", "==", auth.currentUser.uid)))).docs.map((d) => d.data());
   return addEmailsToTypeList({ ...list, crm: true, crmKey: `type:${id}` }, subs.map((s) => ({ email: s.email, name: s.name })), orgId);
+}
+
+// Listas hechas a mano que aún no van unidas al CRM (las especiales no se tocan).
+// (mergedTypeId: lista repetida cuya gente ya pasó al tipo del mismo nombre.)
+export const isLooseList = (l) => !!l && !l.crm && !l.bajas && !l.restaurants && !l.mergedTypeId;
+
+// Convertir de una vez todas las listas hechas a mano en tipos de cliente (lo decide un
+// administrador desde Listas). Lee los contactos una sola vez y escribe en bloque:
+// - Lista con nombre nuevo → nuevo tipo de cliente; la lista pasa a ser la de ese tipo.
+// - Lista con el mismo nombre que un tipo ya existente (o que otra lista convertida aquí) →
+//   su gente recibe ese tipo y entra en la lista del tipo; la lista original no se borra ni se
+//   cambia (queda repetida y el administrador decide si la borra).
+// Nadie pierde los tipos que ya tenía; las bajas y rebotes se respetan (syncContacts).
+export async function convertListsToTypes(lists, orgId, types) {
+  const uid = auth.currentUser.uid;
+  const key = (s) => String(s || "").trim().toLowerCase();
+  const allTypes = [...types];
+  const byName = new Map(types.map((t) => [key(t.label), t.id]));
+  const plan = [];
+  for (const l of lists.filter(isLooseList)) {
+    const name = String(l.name || "").trim() || "Sin nombre";
+    let typeId = byName.get(key(name));
+    const merged = !!typeId;
+    if (!typeId) {
+      typeId = newTypeId(name, allTypes);
+      allTypes.push({ id: typeId, label: name, icon: "", color: "#1a9190" });
+      byName.set(key(name), typeId);
+    }
+    plan.push({ list: l, name, typeId, merged });
+  }
+  const out = { lists: plan.length, newTypes: allTypes.length - types.length, merged: plan.filter((p) => p.merged).map((p) => p.name), created: 0, tagged: 0, invalid: 0 };
+  if (!plan.length) return out;
+
+  // 1) Tipos nuevos (una sola escritura) y listas que pasan a ser la de su tipo.
+  if (out.newTypes) await saveClientTypes(orgId, allTypes);
+  await commitOps(plan.map((p) => (b) => b.update(doc(db, "lists", p.list.id), p.merged
+    ? { mergedTypeId: p.typeId, convertedAt: serverTimestamp() }
+    : { crm: true, crmKey: `type:${p.typeId}`, name: p.name, convertedAt: serverTimestamp() })));
+
+  // 2) Personas de cada lista → contacto con ese tipo (se crea si no existe).
+  const contacts = (await getDocs(query(collection(db, "contacts"), where("orgId", "==", orgId)))).docs.map((d) => ({ id: d.id, ...d.data() }));
+  const byEmail = new Map(contacts.filter((c) => c.email).map((c) => [normEmail(c.email), c]));
+  let n = 0;
+  contacts.forEach((c) => { const m = /^CLI-(\d+)$/.exec(c.clientId || ""); if (m) n = Math.max(n, parseInt(m[1], 10)); });
+  const want = new Map(); // email → { contact, name, types }
+  for (const p of plan) {
+    const subs = (await getDocs(query(collection(db, "subscribers"), where("listId", "==", p.list.id), where("userId", "==", uid)))).docs.map((d) => d.data());
+    for (const s of subs) {
+      const email = normEmail(s.email);
+      if (!EMAIL_RE.test(email)) { out.invalid++; continue; }
+      const w = want.get(email) || { contact: byEmail.get(email), name: "", types: new Set() };
+      w.types.add(p.typeId);
+      if (!w.name && s.name) w.name = String(s.name).trim();
+      want.set(email, w);
+    }
+  }
+  const me = normEmail(auth.currentUser?.email);
+  const ops = [];
+  for (const [email, w] of want) {
+    const [firstName, ...rest] = String(w.name || "").split(/\s+/);
+    if (w.contact) {
+      const cur = typesOf(w.contact);
+      const next = [...cur, ...[...w.types].filter((t) => !cur.includes(t))];
+      if (next.length === cur.length) continue;
+      // Contacto sin nombre en el CRM: se queda con el de la lista.
+      const name = !w.contact.firstName && !w.contact.lastName && w.name ? { firstName, lastName: rest.join(" ") } : {};
+      ops.push((b) => b.update(doc(db, "contacts", w.contact.id), { ...typeFields(next), ...name, updatedAt: serverTimestamp() }));
+      out.tagged++;
+    } else {
+      const ref = doc(collection(db, "contacts"));
+      const clientId = "CLI-" + String(++n).padStart(4, "0");
+      ops.push((b) => b.set(ref, {
+        firstName: firstName || "", lastName: rest.join(" "), email, ...typeFields([...w.types]), clientId, relation: "nuevo", stage: "Lead",
+        source: "Email Marketing", createdByEmail: me, orgId, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      }));
+      out.created++;
+    }
+  }
+  await commitOps(ops);
+  return out;
 }
 
 // Borrar un tipo de cliente en todas partes: su lista (con sus suscriptores), el tipo en los

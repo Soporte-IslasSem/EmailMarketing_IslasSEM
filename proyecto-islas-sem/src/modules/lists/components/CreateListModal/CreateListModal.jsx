@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { SENDER_EMAIL } from "../../../../config/sender";
-import { addDoc, collection } from "firebase/firestore";
-import { db } from "../../../../config/firebaseConfig";
-import { useAuth } from "../../../../shared/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { usePerms } from "../../../crm/lib/permissions";
 import { useClientTypes } from "../../../crm/lib/clientTypes";
@@ -11,7 +8,6 @@ import { createTypeWithList } from "../../lib/crmLink";
 import "./CreateListModal.css";
 
 export default function CreateListModal({ onClose }) {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
@@ -19,7 +15,8 @@ export default function CreateListModal({ onClose }) {
   const [language, setLanguage] = useState("es");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Un administrador crea a la vez el tipo de cliente del CRM (son lo mismo); el resto, una lista suelta.
+  // Cada lista es un tipo de cliente del CRM (son lo mismo): se crean a la vez. Los tipos de
+  // cliente solo los crean los administradores, así que crear listas también.
   const { isAdmin, ready } = usePerms();
   const { types } = useClientTypes();
   const { orgId } = useOrg();
@@ -28,21 +25,10 @@ export default function CreateListModal({ onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!asType) return setError("Solo un administrador puede crear listas: cada lista es también un tipo de cliente del CRM.");
     setBusy(true);
     try {
-      let id;
-      if (asType) {
-        ({ listId: id } = await createTypeWithList(name, orgId, types));
-      } else {
-        id = (await addDoc(collection(db, "lists"), {
-          name: name.trim(),
-          senderEmail,
-          language,
-          userId: user.uid,
-          subscribersCount: 0,
-          createdAt: new Date(),
-        })).id;
-      }
+      const { listId: id } = await createTypeWithList(name, orgId, types, { language });
       onClose();
       navigate(`/dashboard/lists/${id}`);
     } catch (err) {
@@ -102,6 +88,11 @@ export default function CreateListModal({ onClose }) {
             </select>
           </div>
 
+          {ready && !isAdmin && (
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: "#8a5a00", background: "#fff6e5", borderRadius: 8, padding: "8px 10px" }}>
+              Cada lista es también un <b>tipo de cliente</b> del CRM, y esos solo los crea un administrador. Pídeselo a un administrador.
+            </p>
+          )}
           {asType && (
             <p style={{ margin: "0 0 12px", fontSize: 13, color: "#136b68", background: "#eef6f5", borderRadius: 8, padding: "8px 10px" }}>
               También se crea el <b>tipo de cliente</b> con este nombre en el CRM: podrás clasificar a los contactos con él y aparecerán aquí solos.
@@ -109,7 +100,7 @@ export default function CreateListModal({ onClose }) {
           )}
           {error && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#b0304c" }}>{error}</p>}
 
-          <button className="CreateButton" type="submit" disabled={busy}>
+          <button className="CreateButton" type="submit" disabled={busy || !asType}>
             {busy ? "Creando…" : "Crear"}
           </button>
         </form>

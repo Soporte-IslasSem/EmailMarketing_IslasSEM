@@ -31,7 +31,6 @@ import StepSend from "../modules/campaigns/components/Wizard/StepSend.jsx";
 
 // Lists
 import Lists from "../modules/lists/components/Lists/Lists.jsx";
-import CreateList from "../modules/lists/components/CreateList/CreateList.jsx";
 import ListDetail from "../modules/lists/components/ListDetail/ListDetail.jsx";
 
 // ListDetail submodules
@@ -247,7 +246,7 @@ const router = createBrowserRouter([
 
       // LISTS
       { path: "lists", element: <Lists /> },
-      { path: "lists/create", element: <CreateList /> },
+      { path: "lists/create", element: <Navigate to="/dashboard/lists" replace /> }, // se crean desde Listas (cada lista es un tipo de cliente)
 
       {
         path: "lists/:id",

@@ -9,7 +9,7 @@ import { collection, doc, deleteDoc, getDocs, query, where, writeBatch } from "f
 import { usePerms } from "../../../crm/lib/permissions";
 import { useClientTypes } from "../../../crm/lib/clientTypes";
 import { useOrg } from "../../../crm/lib/useOrg";
-import { isTypeList, typeIdOfList, deleteTypeEverywhere, convertListToType } from "../../lib/crmLink";
+import { isTypeList, typeIdOfList, deleteTypeEverywhere, convertListsToTypes, isLooseList } from "../../lib/crmLink";
 import "./Lists.styles.css";
 
 export default function Lists() {
@@ -94,21 +94,31 @@ Si la eliminas, se borra el tipo de cliente y se les quita a todos los contactos
     await deleteDoc(doc(db, "lists", id));
   };
 
-  // Lista hecha a mano → tipo de cliente del CRM (lo decide un administrador)
-  const handleConvert = async (list) => {
+  // Listas hechas a mano → tipos de cliente del CRM (lo decide un administrador): una o todas.
+  const loose = useMemo(() => lists.filter(isLooseList), [lists]);
+  const [converting, setConverting] = useState(false);
+  const runConvert = async (targets) => {
     setMenuOpen(null);
-    if (!window.confirm(`¿Convertir "${list.name}" en tipo de cliente del CRM?
-
-- Se crea el tipo de cliente "${list.name}".
-- Cada email de la lista queda como contacto del CRM con ese tipo (si no existe, se crea).
-- La lista sigue aquí y a partir de ahora va unida al CRM.`)) return;
+    if (!targets.length || converting) return;
+    const names = targets.map((l) => l.name || "Sin nombre");
+    const repeated = targets.filter((l) => types.some((t) => t.label.trim().toLowerCase() === String(l.name || "").trim().toLowerCase())).map((l) => l.name);
+    if (!window.confirm(`¿Convertir ${targets.length === 1 ? `"${names[0]}"` : `estas ${targets.length} listas`} en tipo de cliente del CRM?
+${targets.length > 1 ? `\n${names.map((x) => `· ${x}`).join("\n")}\n` : ""}
+- Cada lista pasa a ser un tipo de cliente con su mismo nombre y queda unida al CRM.
+- Cada email queda como contacto del CRM con ese tipo (si no existe, se crea). Nadie pierde los tipos que ya tenía.
+- No se borra nada. Las bajas y rebotes se respetan.${repeated.length ? `\n- Ya existe un tipo llamado igual que: ${repeated.join(", ")}. Su gente pasa a ese tipo (y a su lista); la lista repetida se queda como está para que decidas si la borras.` : ""}`)) return;
+    setConverting(true);
     try {
-      const r = await convertListToType(list, orgId, types);
-      window.alert(`Hecho. ${r.tagged + r.already} contactos ya existentes clasificados, ${r.created} contactos nuevos creados${r.invalid ? `, ${r.invalid} emails no válidos ignorados` : ""}.`);
+      const r = await convertListsToTypes(targets, orgId, types);
+      window.alert(`Hecho: ${r.lists} lista(s) unidas al CRM${r.newTypes ? `, ${r.newTypes} tipo(s) de cliente nuevos` : ""}. ${r.tagged} contactos ya existentes clasificados y ${r.created} contactos nuevos creados${r.invalid ? `; ${r.invalid} emails no válidos ignorados` : ""}.${r.merged.length ? `\n\nListas repetidas (su gente ya está en el tipo del mismo nombre): ${r.merged.join(", ")}.` : ""}`);
+      crmSync.sync();
     } catch (e) {
-      window.alert("No se pudo convertir: " + e.message);
+      window.alert(e.code === "permission-denied" ? "Sin permiso: solo un administrador puede crear tipos de cliente." : "No se pudo convertir: " + e.message);
+    } finally {
+      setConverting(false);
     }
   };
+  const handleConvert = (list) => runConvert([list]);
 
   // 🔹 Búsqueda avanzada
   const filteredLists = useMemo(() => {
@@ -179,6 +189,15 @@ Si la eliminas, se borra el tipo de cliente y se les quita a todos los contactos
         <button className="Lists__newButton" style={{ padding: "6px 12px", fontSize: 12.5 }} onClick={crmSync.sync} disabled={crmSync.busy}>Actualizar ahora</button>
       </div>
 
+      {isAdmin && loose.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#fff6e5", border: "1px solid #f1dcae", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13.5 }}>
+          <span>⚠ <b>{loose.length} {loose.length === 1 ? "lista no está unida" : "listas no están unidas"} al CRM</b> (se crearon antes de unir CRM y Email Marketing): {loose.slice(0, 4).map((l) => l.name).join(", ")}{loose.length > 4 ? "…" : ""}. Conviértelas en tipo de cliente para que todo quede sincronizado.</span>
+          <button className="Lists__newButton" style={{ marginLeft: "auto", padding: "6px 12px", fontSize: 12.5 }} onClick={() => runConvert(loose)} disabled={converting}>
+            {converting ? "Convirtiendo…" : `Convertir ${loose.length === 1 ? "en tipo de cliente" : `las ${loose.length} en tipos de cliente`}`}
+          </button>
+        </div>
+      )}
+
       {/* BUSCADOR */}
       <input
         type="text"
@@ -211,6 +230,7 @@ Si la eliminas, se borra el tipo de cliente y se les quita a todos los contactos
                   {list.bajas && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#b0304c", background: "#fdeef1", borderRadius: 10, padding: "2px 8px" }}>No reciben campañas</span>}
                   {isTypeList(list) && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>Tipo de cliente · CRM</span>}
                   {list.crm && !isTypeList(list) && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>CRM · automática</span>}
+                  {list.mergedTypeId && <span title="Su gente ya está en el tipo de cliente con este mismo nombre: puedes borrar esta lista" style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#8a5a00", background: "#fff6e5", borderRadius: 10, padding: "2px 8px" }}>Repetida · ya está en el CRM</span>}
                   {list.restaurants && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#1f5c46", background: "#e4ece6", borderRadius: 10, padding: "2px 8px" }}>Restaurantes · automática</span>}
                 </td>
 
@@ -237,7 +257,7 @@ Si la eliminas, se borra el tipo de cliente y se les quita a todos los contactos
                       openUpward={openUpward}
                       onView={() => navigate(`/dashboard/lists/${list.id}`)}
                       onDelete={() => handleDelete(list.id)}
-                      onConvert={isAdmin && !list.crm && !list.bajas && !list.restaurants ? () => handleConvert(list) : undefined}
+                      onConvert={isAdmin && isLooseList(list) && !converting ? () => handleConvert(list) : undefined}
                     />
                   )}
                 </td>
