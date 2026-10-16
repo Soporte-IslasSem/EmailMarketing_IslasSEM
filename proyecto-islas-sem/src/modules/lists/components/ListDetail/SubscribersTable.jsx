@@ -1,11 +1,13 @@
 // Suscriptores de una lista: búsqueda, selección y eliminación (uno o varios).
-// - En las listas automáticas del CRM, quitar a alguien lo apunta en list.excludedEmails
+// - En las listas de un tipo de cliente, quitar a alguien le quita ese tipo en el CRM.
+// - En las otras listas automáticas del CRM, quitar a alguien lo apunta en list.excludedEmails
 //   para que la sincronización no lo vuelva a añadir.
 // - En la lista "Bajas" se ve de qué lista venía cada uno y cuándo se dio de baja; quitarlo
 //   de aquí hace que vuelva a poder recibir campañas.
 import { useEffect, useMemo, useState } from "react";
 import { collection, query, where, onSnapshot, doc, getDoc, writeBatch, updateDoc, increment, arrayUnion } from "firebase/firestore";
 import { db, auth } from "../../../../config/firebaseConfig";
+import { isTypeList, removeFromTypeList } from "../../lib/crmLink";
 import "./SubscribersTable.styles.css";
 
 const STATUS_LABEL = {
@@ -62,10 +64,17 @@ export default function SubscribersTable({ listId }) {
     if (!victims.length) return;
     const msg = isBajas
       ? `¿Quitar ${victims.length} de la lista de bajas? Volverán a poder recibir campañas si están en alguna lista.`
-      : `¿Eliminar ${victims.length} suscriptor(es) de "${list?.name || "esta lista"}"?${list?.crm ? "\n\nEs una lista automática del CRM: no se volverán a añadir solos." : ""}`;
+      : isTypeList(list)
+        ? `¿Quitar ${victims.length} de "${list.name}"?\n\nEsta lista es un tipo de cliente del CRM: a esos contactos se les quita el tipo "${list.name}" (el contacto no se borra).`
+        : `¿Eliminar ${victims.length} suscriptor(es) de "${list?.name || "esta lista"}"?${list?.crm ? "\n\nEs una lista automática del CRM: no se volverán a añadir solos." : ""}`;
     if (!window.confirm(msg)) return;
     setBusy(true);
     try {
+      if (isTypeList(list)) {
+        await removeFromTypeList({ ...list, id: listId }, victims);
+        setSel(new Set());
+        return;
+      }
       for (let i = 0; i < victims.length; i += 400) {
         const b = writeBatch(db);
         victims.slice(i, i + 400).forEach((s) => b.delete(doc(db, "subscribers", s.id)));

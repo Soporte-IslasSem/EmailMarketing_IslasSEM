@@ -11,6 +11,8 @@ import {
   increment
 } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
+import { useOrg } from "../../crm/lib/useOrg";
+import { isTypeList, addEmailsToTypeList } from "../lib/crmLink";
 
 // --- Normalización y validación ---
 const normalizeEmail = (email) =>
@@ -33,10 +35,24 @@ export function useImportSubscribers(listId, list) {
   const [resetUploaderKey, setResetUploaderKey] = useState(0);
 
   const [pendingGoogleImport, setPendingGoogleImport] = useState(false);
+  const { orgId } = useOrg();
 
   // --- Guardar suscriptores en Firestore ---
   const saveSubscribersToFirestore = async (emails, shouldUpdateExisting) => {
     if (!list) return;
+
+    // Lista de un tipo de cliente: cada email queda como contacto del CRM con ese tipo (se crea
+    // si no existe) y la suscripción la pone useCrmLink al momento.
+    if (isTypeList(list)) {
+      const r = await addEmailsToTypeList({ ...list, id: listId }, emails.map((email) => ({ email })), orgId);
+      await updateDoc(doc(db, "lists", listId), {
+        lastImportAt: Timestamp.now(),
+        lastImportSource: method,
+        invalidEmailsCount: previewData.invalidEmails.length,
+        duplicateEmailsCount: previewData.duplicateEmails.length
+      });
+      return { createdCount: r.created + r.tagged + r.already, updatedCount: 0, crm: r };
+    }
 
     const subscribersRef = collection(db, "subscribers");
     let createdCount = 0;
@@ -149,13 +165,25 @@ export function useImportSubscribers(listId, list) {
       return;
     }
 
-    const result = await saveSubscribersToFirestore(
-      previewData.validEmails,
-      updateExisting
-    );
+    let result;
+    try {
+      result = await saveSubscribersToFirestore(
+        previewData.validEmails,
+        updateExisting
+      );
+    } catch (e) {
+      alert(
+        e.code === "permission-denied" && isTypeList(list)
+          ? "Esta lista es un tipo de cliente del CRM: solo un administrador puede añadir gente (al hacerlo se clasifica en el CRM)."
+          : "No se pudo importar: " + (e.code || e.message)
+      );
+      return;
+    }
 
     alert(
-      `Importación completada.\nNuevos: ${result.createdCount}\nActualizados: ${result.updatedCount}`
+      result.crm
+        ? `Importación completada.\nAñadidos a la lista: ${result.createdCount}\n(${result.crm.created} contactos nuevos creados en el CRM; ${result.crm.tagged + result.crm.already} ya existían y quedan con este tipo de cliente)`
+        : `Importación completada.\nNuevos: ${result.createdCount}\nActualizados: ${result.updatedCount}`
     );
 
     // Reset

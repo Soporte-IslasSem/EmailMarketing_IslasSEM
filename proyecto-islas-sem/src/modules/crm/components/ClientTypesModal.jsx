@@ -1,7 +1,11 @@
 // Gestionar los tipos de cliente: añadir, renombrar, icono, color, ordenar y quitar.
+// Cada tipo es también una lista de Email Marketing con su nombre: al añadir o renombrar, la lista
+// se crea o se renombra sola (useCrmLink); al quitar un tipo se borra su lista y se les quita a
+// los contactos y empresas que lo tenían (purgeTypes).
 import { useState } from "react";
 import CrmModal from "./CrmModal";
 import { saveClientTypes, newTypeId } from "../lib/clientTypes";
+import { purgeTypes } from "../../lists/lib/crmLink";
 
 export default function ClientTypesModal({ orgId, types, counts, onClose }) {
   const [list, setList] = useState(() => types.map((t) => ({ ...t })));
@@ -14,7 +18,9 @@ export default function ClientTypesModal({ orgId, types, counts, onClose }) {
   const remove = (i) => {
     const t = list[i];
     const n = counts[t.id] || 0;
-    if (n && !window.confirm(`"${t.label}" lo tienen ${n} clientes de esta lista. Si lo quitas, seguirán marcados con ese tipo hasta que les pongas otro. ¿Quitarlo de la lista?`)) return;
+    if (!window.confirm(`¿Quitar "${t.label}"?
+
+Al guardar se borra también su lista de Email Marketing${n ? ` y se les quita el tipo a ${n} clientes (no se borran)` : ""}.`)) return;
     setList((l) => l.filter((_, j) => j !== i));
   };
   const add = () => {
@@ -30,7 +36,12 @@ export default function ClientTypesModal({ orgId, types, counts, onClose }) {
     const names = clean.map((t) => t.label.toLowerCase());
     if (names.some((n, i) => names.indexOf(n) !== i)) return setError("Hay dos tipos con el mismo nombre.");
     setSaving(true);
-    try { await saveClientTypes(orgId, clean); onClose(); }
+    try {
+      const removed = types.filter((t) => !clean.some((c) => c.id === t.id)).map((t) => t.id);
+      await saveClientTypes(orgId, clean);
+      await purgeTypes(removed, orgId);
+      onClose();
+    }
     catch (e) { setError("No se pudo guardar: " + e.message); }
     finally { setSaving(false); }
   };
@@ -39,7 +50,7 @@ export default function ClientTypesModal({ orgId, types, counts, onClose }) {
     <CrmModal title="Tipos de cliente" onClose={onClose} maxWidth={620}
       footer={<><button className="crm-btn ghost" onClick={onClose}>Cancelar</button><button className="crm-btn" onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</button></>}>
       <p style={{ margin: "0 0 12px", fontSize: 13.5, color: "var(--crm-muted)" }}>
-        Crea los tipos que uses (p. ej. RGPD, Kit Digital, Asesoría…). La lista es la misma para contactos y empresas; el orden es el que se usa al ordenar por tipo.
+        Crea los tipos que uses (p. ej. RGPD, Kit Digital, Asesoría…). La lista es la misma para contactos y empresas; el orden es el que se usa al ordenar por tipo. Cada tipo es también una lista de Email Marketing con el mismo nombre.
       </p>
       {list.map((t, i) => (
         <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>

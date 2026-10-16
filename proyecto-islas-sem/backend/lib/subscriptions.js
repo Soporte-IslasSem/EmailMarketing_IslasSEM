@@ -64,6 +64,31 @@ function rateLimited(ip) {
   return arr.length > 10;
 }
 
+// Lista de un tipo de cliente (CRM y Email Marketing son una sola base): quien se apunta queda
+// como contacto del CRM con ese tipo (se crea si no existe). La app enlaza luego la suscripción.
+async function tagContactFromList(list, email, name) {
+  if (!list?.crm || !String(list.crmKey || "").startsWith("type:")) return;
+  const typeId = String(list.crmKey).slice(5);
+  const orgId = "islas-sem";
+  const snap = await db.collection("contacts").where("orgId", "==", orgId).select("email", "clientType", "clientTypes", "clientId").get();
+  const norm = (e) => String(e || "").trim().toLowerCase();
+  const typesOf = (d) => (Array.isArray(d.clientTypes) ? d.clientTypes.filter(Boolean) : d.clientType ? [d.clientType] : []);
+  const found = snap.docs.find((d) => norm(d.data().email) === email);
+  if (found) {
+    const cur = typesOf(found.data());
+    if (!cur.includes(typeId)) await found.ref.update({ clientTypes: [...cur, typeId], clientType: cur[0] || typeId, updatedAt: FV.serverTimestamp() });
+    return;
+  }
+  let n = 0;
+  snap.docs.forEach((d) => { const m = /^CLI-(\d+)$/.exec(d.data().clientId || ""); if (m) n = Math.max(n, parseInt(m[1], 10)); });
+  const [firstName, ...rest] = String(name || "").trim().split(/\s+/);
+  await db.collection("contacts").add({
+    firstName: firstName || "", lastName: rest.join(" "), email, clientTypes: [typeId], clientType: typeId,
+    clientId: "CLI-" + String(n + 1).padStart(4, "0"), relation: "nuevo", stage: "Lead", source: "Formulario",
+    orgId, createdAt: FV.serverTimestamp(), updatedAt: FV.serverTimestamp(),
+  });
+}
+
 // Alta de un email en una lista (formularios incrustados antiguos y formularios del
 // constructor con "lista destino"). Respeta la doble confirmación de la lista
 // (Notificaciones › Email de confirmación), avisa al dueño y dispara el webhook.
@@ -87,6 +112,8 @@ async function addSubscriber({ listId, email, name = "", userId, source = "form"
   let subRef = existing.empty ? null : existing.docs[0].ref;
   const prev = existing.empty ? null : existing.docs[0].data();
   if (prev?.status === "subscribed") return { status: "already", subscriberId: subRef.id };
+
+  await tagContactFromList(list, email, name).catch((e) => console.error("[forms] contacto CRM:", e.message));
 
   const token = crypto.randomBytes(16).toString("hex");
   const status = doubleOptIn ? "pending" : "subscribed";

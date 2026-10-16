@@ -6,11 +6,18 @@ import ListActionsMenu from "./ListActionsMenu"; // 🔹 Import del nuevo compon
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../../../../config/firebaseConfig";
 import { collection, doc, deleteDoc, getDocs, query, where, writeBatch } from "firebase/firestore";
+import { usePerms } from "../../../crm/lib/permissions";
+import { useClientTypes } from "../../../crm/lib/clientTypes";
+import { useOrg } from "../../../crm/lib/useOrg";
+import { isTypeList, typeIdOfList, deleteTypeEverywhere, convertListToType } from "../../lib/crmLink";
 import "./Lists.styles.css";
 
 export default function Lists() {
   const { lists: rawLists } = useLists();
   const crmSync = useCrmListsSync();
+  const { isAdmin } = usePerms();
+  const { types } = useClientTypes();
+  const { orgId } = useOrg();
   // Las listas automáticas del CRM primero (Todos, luego por tipo), después el resto.
   const lists = useMemo(
     () => [...rawLists].sort((a, b) => (a.bajas ? 1 : 0) - (b.bajas ? 1 : 0) || (b.crm ? 1 : 0) - (a.crm ? 1 : 0) || (a.crm && b.crm ? (a.crmKey === "all" ? -1 : b.crmKey === "all" ? 1 : a.name.localeCompare(b.name)) : 0)),
@@ -46,7 +53,23 @@ export default function Lists() {
       window.alert("Es la lista de bajas: aquí van solos quienes se dan de baja y nunca reciben campañas. No se puede eliminar.");
       return;
     }
-    if (lists.find((l) => l.id === id)?.crm) {
+    const target = lists.find((l) => l.id === id);
+    // Lista de un tipo de cliente: borrarla borra el tipo en el CRM (son lo mismo).
+    if (isTypeList(target)) {
+      if (!isAdmin) { window.alert("Esta lista es un tipo de cliente del CRM: solo un administrador puede borrarla."); return; }
+      if (!window.confirm(`"${target.name}" es también un tipo de cliente del CRM.
+
+Si la eliminas, se borra el tipo de cliente y se les quita a todos los contactos que lo tengan (los contactos NO se borran).
+
+¿Eliminar?`)) return;
+      try {
+        await deleteTypeEverywhere(typeIdOfList(target), orgId, types);
+      } catch (e) {
+        window.alert("No se pudo eliminar: " + e.message);
+      }
+      return;
+    }
+    if (target?.crm) {
       window.alert("Es una lista automática del CRM: se mantiene sola con tus contactos y no se puede eliminar.");
       return;
     }
@@ -69,6 +92,22 @@ export default function Lists() {
       await batch.commit();
     }
     await deleteDoc(doc(db, "lists", id));
+  };
+
+  // Lista hecha a mano → tipo de cliente del CRM (lo decide un administrador)
+  const handleConvert = async (list) => {
+    setMenuOpen(null);
+    if (!window.confirm(`¿Convertir "${list.name}" en tipo de cliente del CRM?
+
+- Se crea el tipo de cliente "${list.name}".
+- Cada email de la lista queda como contacto del CRM con ese tipo (si no existe, se crea).
+- La lista sigue aquí y a partir de ahora va unida al CRM.`)) return;
+    try {
+      const r = await convertListToType(list, orgId, types);
+      window.alert(`Hecho. ${r.tagged + r.already} contactos ya existentes clasificados, ${r.created} contactos nuevos creados${r.invalid ? `, ${r.invalid} emails no válidos ignorados` : ""}.`);
+    } catch (e) {
+      window.alert("No se pudo convertir: " + e.message);
+    }
   };
 
   // 🔹 Búsqueda avanzada
@@ -133,7 +172,7 @@ export default function Lists() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#eef6f5", border: "1px solid #d5e8e6", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13.5 }}>
-        <span>🔄 Las listas <b>CRM · …</b> se crean y actualizan solas con tus contactos del CRM (todos y por tipo de cliente), listas para usar en campañas. Las bajas se respetan.</span>
+        <span>🔄 <b>Cada tipo de cliente del CRM es una lista</b> con su mismo nombre, y se actualiza al momento. Crear, renombrar o borrar en un lado lo hace en el otro; añadir o quitar a alguien de esa lista le pone o quita el tipo en el CRM. Las bajas se respetan.</span>
         <span style={{ marginLeft: "auto", color: "#6b7d7d", fontSize: 12.5 }}>
           {crmSync.busy ? "Actualizando…" : crmSync.error ? `⚠ ${crmSync.error}` : crmSync.last ? `Actualizadas a las ${new Date(crmSync.last).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : ""}
         </span>
@@ -170,7 +209,8 @@ export default function Lists() {
                 >
                   {list.name}
                   {list.bajas && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#b0304c", background: "#fdeef1", borderRadius: 10, padding: "2px 8px" }}>No reciben campañas</span>}
-                  {list.crm && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>CRM · automática</span>}
+                  {isTypeList(list) && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>Tipo de cliente · CRM</span>}
+                  {list.crm && !isTypeList(list) && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#136b68", background: "#e6f4f1", borderRadius: 10, padding: "2px 8px" }}>CRM · automática</span>}
                   {list.restaurants && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#1f5c46", background: "#e4ece6", borderRadius: 10, padding: "2px 8px" }}>Restaurantes · automática</span>}
                 </td>
 
@@ -197,6 +237,7 @@ export default function Lists() {
                       openUpward={openUpward}
                       onView={() => navigate(`/dashboard/lists/${list.id}`)}
                       onDelete={() => handleDelete(list.id)}
+                      onConvert={isAdmin && !list.crm && !list.bajas && !list.restaurants ? () => handleConvert(list) : undefined}
                     />
                   )}
                 </td>

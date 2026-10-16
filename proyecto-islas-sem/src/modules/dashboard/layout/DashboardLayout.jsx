@@ -7,6 +7,7 @@ import TopNav from "../components/TopNav/TopNav.jsx";
 import NewVersionBanner from "../components/NewVersionBanner.jsx";
 import ProUpgradeModal from "../../lists/components/ListDetail/modals/ProUpgradeModal";
 import { useResponseWatcher } from "../../crm/lib/useResponseWatcher";
+import useCrmLink from "../../lists/hooks/useCrmLink";
 import { usePerms } from "../../crm/lib/permissions";
 import "./DashboardLayout.styles.css";
 
@@ -19,6 +20,7 @@ export default function DashboardLayout() {
   const wide = WIDE.some((r) => r.test(location.pathname));
 
   useResponseWatcher(); // reloj de respuesta (SLA): escala ofertas sin respuesta
+  useCrmLink(); // CRM ⇄ listas de Email Marketing al momento
 
   useEffect(() => {
     window.openProUpgradeModal = () => setShowUpgradeModal(true);

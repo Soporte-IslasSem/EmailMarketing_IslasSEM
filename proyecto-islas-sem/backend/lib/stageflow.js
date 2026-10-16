@@ -52,8 +52,9 @@ function matchesInterest(rule, text) {
 }
 // Filtros de la regla por cliente: tipo de cliente del contacto/empresa (RGPD, Kit Digital…)
 // y relación de la negociación (nuevo / recurrente / VIP). Vacío = cualquiera.
-function matchesClient(rule, clientType, relation) {
-  if (rule.clientType && rule.clientType !== clientType) return false;
+// Un contacto puede tener varios tipos (clientTypes); basta con que tenga el de la regla.
+function matchesClient(rule, clientTypes, relation) {
+  if (rule.clientType && !clientTypes.includes(rule.clientType)) return false;
   if (rule.relation && rule.relation !== relation) return false;
   return true;
 }
@@ -81,18 +82,19 @@ async function contactEmailOf(d) {
 async function runRules(pipeline, deal) {
   const stageName = findStage(getStages(pipeline, "pos"), deal.stage)?.name || deal.stage;
   const text = interestText(deal);
-  // Tipo de cliente: el del contacto o, si no tiene, el de su empresa.
-  let clientType = "";
+  // Tipos de cliente: los del contacto o, si no tiene, el de su empresa.
+  let clientTypes = [];
   if (deal.contactId) {
     const c = await db.collection("contacts").doc(deal.contactId).get().catch(() => null);
-    clientType = (c?.exists && c.data().clientType) || "";
-    if (!clientType && c?.exists && c.data().companyId) {
-      const co = await db.collection("companies").doc(c.data().companyId).get().catch(() => null);
-      clientType = (co?.exists && co.data().clientType) || "";
+    const cd = c?.exists ? c.data() : {};
+    clientTypes = Array.isArray(cd.clientTypes) ? cd.clientTypes.filter(Boolean) : cd.clientType ? [cd.clientType] : [];
+    if (!clientTypes.length && cd.companyId) {
+      const co = await db.collection("companies").doc(cd.companyId).get().catch(() => null);
+      if (co?.exists && co.data().clientType) clientTypes = [co.data().clientType];
     }
   }
   const relation = deal.clientType || "nuevo";
-  const rules = ((pipeline.automations || {})[deal.stage] || []).filter((r) => matchesInterest(r, text) && matchesClient(r, clientType, relation));
+  const rules = ((pipeline.automations || {})[deal.stage] || []).filter((r) => matchesInterest(r, text) && matchesClient(r, clientTypes, relation));
   if (!rules.length) return { ran: 0, waitH: 0 };
   const email = await contactEmailOf(deal);
   let waitH = 0;

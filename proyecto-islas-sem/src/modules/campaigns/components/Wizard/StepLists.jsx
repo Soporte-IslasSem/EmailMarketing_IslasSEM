@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import WizardSteps from "./WizardSteps";
 import { useAuth } from "../../../../shared/hooks/useAuth";
 import { useCrmCollection } from "../../../crm/lib/crm";
-import { useClientTypes, typeOf } from "../../../crm/lib/clientTypes";
+import { useClientTypes, typeOf, typesOf } from "../../../crm/lib/clientTypes";
 import { finalRecipients, loadSuppressed } from "../../lib/campaignSend";
 
 // Firestore
@@ -84,15 +84,15 @@ export default function StepLists() {
       const email = String(s.email).toLowerCase();
       const c = byContact.get(s.contactId) || byEmail.get(email);
       const co = byCompany.get(s.companyId);
-      const clientType = c?.clientType || co?.clientType || "";
+      const clientTypes = c ? typesOf(c) : typesOf(co);
       const name = s.name || (c ? `${c.firstName || ""} ${c.lastName || ""}`.trim() : co?.name) || "";
-      return { email, name, clientType, company: c?.company || (co ? co.name : "") };
+      return { email, name, clientType: clientTypes[0] || "", clientTypes, company: c?.company || (co ? co.name : "") };
     });
   }, [subs, selected, contacts, companies, suppressed]);
 
   const counts = useMemo(() => {
     const m = {};
-    people.forEach((p) => { const k = p.clientType || "__none"; m[k] = (m[k] || 0) + 1; });
+    people.forEach((p) => { (p.clientTypes.length ? p.clientTypes : ["__none"]).forEach((k) => { m[k] = (m[k] || 0) + 1; }); });
     return m;
   }, [people]);
 
@@ -100,7 +100,7 @@ export default function StepLists() {
     const t = term.trim().toLowerCase();
     const rank = Object.fromEntries(types.map((x, i) => [x.id, i]));
     return people
-      .filter((p) => !typeFilter || (typeFilter === "__none" ? !p.clientType : p.clientType === typeFilter))
+      .filter((p) => !typeFilter || (typeFilter === "__none" ? !p.clientTypes.length : p.clientTypes.includes(typeFilter)))
       .filter((p) => !t || [p.name, p.email, p.company].some((v) => String(v || "").toLowerCase().includes(t)))
       .sort((a, b) => (rank[a.clientType] ?? 999) - (rank[b.clientType] ?? 999) || (a.name || a.email).localeCompare(b.name || b.email));
   }, [people, term, typeFilter, types]);

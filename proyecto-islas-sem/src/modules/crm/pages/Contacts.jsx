@@ -7,12 +7,12 @@ import ClientTypesModal from "../components/ClientTypesModal";
 import ContactImportModal from "../components/ContactImportModal";
 import TypeChip from "../components/TypeChip";
 import { useCrmCollection, crmCreate, crmRemove, logActivity, fmtDate, tsToDate } from "../lib/crm";
-import { useClientTypes, typeOf, RELATIONS } from "../lib/clientTypes";
+import { useClientTypes, typeOf, typesOf, typeFields, hasType, RELATIONS } from "../lib/clientTypes";
 import { useTaskScope } from "../lib/tasks";
 import { ownerKey, ownerLabel, ownerFields } from "../lib/owners";
 import { usePerms } from "../lib/permissions";
 import { exportCsv } from "../lib/exportCsv";
-import { useManualLists, createManualList, addContactsToList } from "../../lists/lib/addToList";
+import { createTypeWithList } from "../../lists/lib/crmLink";
 import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
@@ -61,8 +61,6 @@ export default function Contacts() {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkType, setBulkType] = useState("");
   const [bulkOwner, setBulkOwner] = useState("");
-  const [bulkList, setBulkList] = useState("");
-  const manualLists = useManualLists();
   const [params] = useSearchParams();
   const [showImport, setShowImport] = useState(() => params.get("import") === "1"); // desde Integraciones
   const [ownerFilter, setOwnerFilter] = useState(""); // "" todos · "__none" sin responsable · "person:id" / "team:id"
@@ -74,7 +72,7 @@ export default function Contacts() {
 
   const counts = useMemo(() => {
     const c = {};
-    items.forEach((x) => { const k = x.clientType || "__none"; c[k] = (c[k] || 0) + 1; });
+    items.forEach((x) => { const ts = typesOf(x); (ts.length ? ts : ["__none"]).forEach((k) => { c[k] = (c[k] || 0) + 1; }); });
     return c;
   }, [items]);
 
@@ -85,17 +83,17 @@ export default function Contacts() {
     const t = term.trim().toLowerCase();
     let rows = [...items];
     if (stageFilter) rows = rows.filter((c) => (c.stage || "Lead") === stageFilter);
-    if (typeFilter) rows = rows.filter((c) => (typeFilter === "__none" ? !c.clientType : c.clientType === typeFilter));
+    if (typeFilter) rows = rows.filter((c) => hasType(c, typeFilter));
     if (ownerFilter) rows = rows.filter((c) => (ownerFilter === "__none" ? !ownerKey(c) && !c.responsable : ownerKey(c) === ownerFilter));
     if (t) rows = rows.filter((c) =>
-      [c.firstName, c.lastName, c.email, c.phone, c.company, c.role, c.responsable, c.clientId, (c.tags || []).join(" "), typeOf(types, c.clientType)?.label]
+      [c.firstName, c.lastName, c.email, c.phone, c.company, c.role, c.responsable, c.clientId, (c.tags || []).join(" "), ...typesOf(c).map((id) => typeOf(types, id)?.label)]
         .filter(Boolean).some((v) => String(v).toLowerCase().includes(t))
     );
     const val = {
       id: (c) => c.clientId || "",
       name: (c) => fullName(c).toLowerCase() || "~",
       company: (c) => String(c.company || "~").toLowerCase(),
-      type: (c) => (c.clientType ? typeRank[c.clientType] ?? 999 : 1000),
+      type: (c) => (typesOf(c).length ? Math.min(...typesOf(c).map((id) => typeRank[id] ?? 999)) : 1000),
       stage: (c) => STAGES.indexOf(c.stage || "Lead"),
       responsable: (c) => String(c.ownerName || c.responsable || "~").toLowerCase(),
       created: (c) => tsToDate(c.createdAt)?.getTime() || 0,
@@ -119,50 +117,35 @@ export default function Contacts() {
   const toggleAll = () => setSelected((s) => { const n = new Set(s); visible.forEach((c) => (allVisible ? n.delete(c.id) : n.add(c.id))); return n; });
   const selectAllFiltered = () => setSelected(new Set(filtered.map((c) => c.id)));
 
+  // Tipo de cliente en bloque (= lista de Email Marketing con ese nombre): añadir uno, quitar uno,
+  // quitar todos o crear uno nuevo y ponérselo. Los demás tipos de cada contacto se conservan.
   const applyBulkType = async () => {
     if (!isAdmin || !selected.size || bulkType === "") return;
-    const label = bulkType === "__none" ? "sin tipo" : typeOf(types, bulkType)?.label;
-    if (!window.confirm(`¿Poner "${label}" a ${selected.size} contactos?`)) return;
+    let [op, id] = bulkType === "__none" ? ["none", ""] : bulkType.split(":");
+    let label = id ? typeOf(types, id)?.label : "";
+    if (op === "new") {
+      label = (window.prompt("Nombre del nuevo tipo de cliente (se crea también su lista en Email Marketing):") || "").trim();
+      if (!label) return;
+    }
+    const msg = op === "rm" ? `¿Quitar "${label}" a ${selected.size} contactos?` : op === "none" ? `¿Quitar todos los tipos a ${selected.size} contactos?` : `¿Añadir "${label}" a ${selected.size} contactos?`;
+    if (!window.confirm(msg)) return;
     setBulkBusy(true);
     try {
-      const ids = [...selected];
-      for (let i = 0; i < ids.length; i += 400) {
+      if (op === "new") { id = (await createTypeWithList(label, orgId, types)).typeId; op = "add"; }
+      const rows = all.filter((c) => selected.has(c.id));
+      for (let i = 0; i < rows.length; i += 400) {
         const batch = writeBatch(db);
-        ids.slice(i, i + 400).forEach((id) => batch.update(doc(db, "contacts", id), { clientType: bulkType === "__none" ? "" : bulkType, updatedAt: serverTimestamp() }));
+        rows.slice(i, i + 400).forEach((c) => {
+          const cur = typesOf(c);
+          const next = op === "add" ? [...cur, id] : op === "rm" ? cur.filter((t) => t !== id) : [];
+          batch.update(doc(db, "contacts", c.id), { ...typeFields(next), updatedAt: serverTimestamp() });
+        });
         await batch.commit();
       }
       setSelected(new Set());
       setBulkType("");
     } catch (e) {
       alert("No se pudo cambiar el tipo: " + e.message);
-    } finally {
-      setBulkBusy(false);
-    }
-  };
-
-  // Añadir los seleccionados a una lista de Email Marketing (no cambia su tipo de cliente).
-  const applyBulkList = async () => {
-    if (!selected.size || bulkList === "") return;
-    let listId = bulkList;
-    let listName = manualLists.find((l) => l.id === listId)?.name;
-    if (bulkList === "__new") {
-      const name = (window.prompt("Nombre de la nueva lista:") || "").trim();
-      if (!name) return;
-      listName = name;
-    } else if (!window.confirm(`¿Añadir ${selected.size} contactos a la lista "${listName}"?`)) return;
-    setBulkBusy(true);
-    try {
-      if (bulkList === "__new") listId = await createManualList(listName);
-      const r = await addContactsToList(listId, all.filter((c) => selected.has(c.id)));
-      const parts = [`${r.added} añadidos a "${listName}"`];
-      if (r.already) parts.push(`${r.already} ya estaban`);
-      if (r.noEmail) parts.push(`${r.noEmail} sin email válido`);
-      if (r.suppressed) parts.push(`${r.suppressed} dados de baja (no se añaden)`);
-      alert(parts.join(" · "));
-      setSelected(new Set());
-      setBulkList("");
-    } catch (e) {
-      alert("No se pudo añadir a la lista: " + e.message);
     } finally {
       setBulkBusy(false);
     }
@@ -224,7 +207,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
     setSaving(true);
     try {
       const tags = form.tags.split(",").map((s) => s.trim()).filter(Boolean);
-      const ref = await crmCreate("contacts", orgId, { ...form, tags, clientId: nextClientId(all) });
+      const ref = await crmCreate("contacts", orgId, { ...form, tags, ...typeFields([form.clientType]), clientId: nextClientId(all) });
       await logActivity(orgId, { type: "Nota", title: `Contacto creado: ${form.firstName} ${form.lastName}`.trim(), entity: "contact", entityId: ref.id });
       setForm(emptyForm);
       setShowNew(false);
@@ -254,7 +237,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
             <button className="crm-btn ghost" onClick={() => exportCsv("contactos", filtered, [
               ["ID", (c) => c.clientId], ["Nombre", (c) => c.firstName], ["Apellidos", (c) => c.lastName], ["Email", (c) => c.email],
               ["Teléfono", (c) => c.phone || c.whatsapp], ["Empresa", (c) => c.company], ["Cargo", (c) => c.role],
-              ["Tipo de cliente", (c) => typeOf(types, c.clientType)?.label || ""], ["Relación", (c) => c.relation],
+              ["Tipo de cliente", (c) => typesOf(c).map((id) => typeOf(types, id)?.label).join(", ")], ["Relación", (c) => c.relation],
               ["Responsable", (c) => c.ownerName || c.responsable], ["Etapa", (c) => c.stage], ["Etiquetas", (c) => c.tags],
               ["Ciudad", (c) => c.city], ["Provincia", (c) => c.province], ["DNI/NIF", (c) => c.dni], ["Alta", (c) => fmtDate(c.createdAt)],
             ])}>⬇ Exportar ({filtered.length})</button>
@@ -289,18 +272,18 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
           <b>{selected.size} seleccionados</b>
           {selected.size < filtered.length && <button className="crm-btn ghost sm" onClick={selectAllFiltered}>Seleccionar los {filtered.length} del filtro</button>}
           <span style={{ flex: 1 }} />
-          <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkList} onChange={(e) => setBulkList(e.target.value)}>
-            <option value="">Añadir a lista…</option>
-            {manualLists.map((l) => <option key={l.id} value={l.id}>{l.name || "(sin nombre)"}</option>)}
-            <option value="__new">+ Nueva lista…</option>
-          </select>
-          <button className="crm-btn sm" onClick={applyBulkList} disabled={bulkList === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Añadir"}</button>
           {isAdmin && (
             <>
               <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkType} onChange={(e) => setBulkType(e.target.value)}>
-                <option value="">Cambiar tipo de cliente a…</option>
-                {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
-                <option value="__none">— Sin tipo —</option>
+                <option value="">Tipo de cliente / lista…</option>
+                <optgroup label="Añadir">
+                  {types.map((t) => <option key={t.id} value={`add:${t.id}`}>+ {t.icon} {t.label}</option>)}
+                  <option value="new:">+ Nuevo tipo de cliente…</option>
+                </optgroup>
+                <optgroup label="Quitar">
+                  {types.map((t) => <option key={t.id} value={`rm:${t.id}`}>− {t.icon} {t.label}</option>)}
+                  <option value="__none">− Quitar todos los tipos</option>
+                </optgroup>
               </select>
               <button className="crm-btn sm" onClick={applyBulkType} disabled={bulkType === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Aplicar"}</button>
               <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkOwner} onChange={(e) => setBulkOwner(e.target.value)}>
@@ -356,7 +339,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
                       <td>
                         {c.company ? <div><span className="crm-link" onClick={() => navigate(c.companyId ? `/dashboard/crm/companies/${c.companyId}` : "/dashboard/crm/companies")}>{c.company}</span>{c.area && <div style={{ fontSize: 12.5, color: "var(--crm-muted)" }}>{c.area}</div>}</div> : "—"}
                       </td>
-                      <td><TypeChip t={typeOf(types, c.clientType)} /></td>
+                      <td>{typesOf(c).length ? <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>{typesOf(c).map((id) => <TypeChip key={id} t={typeOf(types, id)} />)}</span> : <TypeChip t={null} />}</td>
                       <td>
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                           {(c.tags || []).length ? c.tags.map((t) => <span key={t} className="crm-chip">{t}</span>) : "—"}

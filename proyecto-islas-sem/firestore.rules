@@ -78,7 +78,7 @@ service cloud.firestore {
     // Tipo de cliente y responsable de contactos/empresas: solo administradores.
     function keepsAdminFields() {
       return isOrgAdmin() || !request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['clientType', 'ownerType', 'ownerId', 'ownerName', 'ownerEmail']);
+        .hasAny(['clientType', 'clientTypes', 'ownerType', 'ownerId', 'ownerName', 'ownerEmail']);
     }
 
     // Cada usuario solo puede leer/escribir su propio perfil

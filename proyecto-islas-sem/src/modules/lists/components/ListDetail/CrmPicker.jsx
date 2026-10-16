@@ -3,7 +3,7 @@
 // Devuelve los emails elegidos con onDataParsed (luego pasan por la vista previa normal).
 import { useEffect, useMemo, useState } from "react";
 import { useCrmCollection } from "../../../crm/lib/crm";
-import { useClientTypes, typeOf, RELATIONS } from "../../../crm/lib/clientTypes";
+import { useClientTypes, typeOf, typesOf, hasType, RELATIONS } from "../../../crm/lib/clientTypes";
 import { usePerms } from "../../../crm/lib/permissions";
 import { useTaskScope } from "../../../crm/lib/tasks";
 import { ownerKey } from "../../../crm/lib/owners";
@@ -28,7 +28,7 @@ export default function CrmPicker({ onDataParsed }) {
   const withEmail = useMemo(() => all.filter((x) => EMAIL_RE.test(String(x.email || "").trim())), [all]);
   const counts = useMemo(() => {
     const c = {};
-    withEmail.forEach((x) => { const k = x.clientType || "__none"; c[k] = (c[k] || 0) + 1; });
+    withEmail.forEach((x) => { const ts = typesOf(x); (ts.length ? ts : ["__none"]).forEach((k) => { c[k] = (c[k] || 0) + 1; }); });
     return c;
   }, [withEmail]);
 
@@ -36,7 +36,7 @@ export default function CrmPicker({ onDataParsed }) {
     const t = term.trim().toLowerCase();
     const rank = Object.fromEntries(types.map((x, i) => [x.id, i]));
     return withEmail
-      .filter((x) => !type || (type === "__none" ? !x.clientType : x.clientType === type))
+      .filter((x) => !type || hasType(x, type))
       .filter((x) => kind !== "contacts" || !relation || (x.relation || "") === relation)
       .filter((x) => !owner || (owner === "__none" ? !ownerKey(x) && !x.responsable : ownerKey(x) === owner))
       .filter((x) => !t || [nameOf(x, kind), x.email, x.company].filter(Boolean).some((v) => String(v).toLowerCase().includes(t)))

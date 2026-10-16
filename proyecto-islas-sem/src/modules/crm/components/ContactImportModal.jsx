@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "../../../config/firebaseConfig";
 import CrmModal from "./CrmModal";
+import { typesOf, typeFields } from "../lib/clientTypes";
 
 const FIELDS = {
   firstName: /^(nombre|first ?name|name)$/i,
@@ -75,14 +76,17 @@ export default function ContactImportModal({ orgId, existing, types, canSetType,
       rows.forEach((r) => {
         const get = (k) => (map[k] ? norm(r[map[k]]) : "");
         const email = get("email").toLowerCase();
-        const typeRaw = get("clientType");
-        const clientType = typeRaw ? typeByName.get(plain(typeRaw)) || "" : "";
-        if (typeRaw && !clientType) unknownTypes.add(typeRaw);
+        // Puede traer varios tipos separados por coma, punto y coma o barra.
+        const typeIds = [];
+        get("clientType").split(/[,;|]/).map(norm).filter(Boolean).forEach((raw) => {
+          const id = typeByName.get(plain(raw));
+          if (id) { if (!typeIds.includes(id)) typeIds.push(id); } else unknownTypes.add(raw);
+        });
         const c = {
           firstName: get("firstName"), lastName: get("lastName"), email, phone: get("phone"), whatsapp: "",
           company: get("company"), role: get("role"), dni: get("dni"), address: get("address"), city: get("city"),
           province: get("province"), notes: get("notes"), tags: get("tags").split(/[,;]/).map(norm).filter(Boolean),
-          ...(canSetType && clientType ? { clientType } : {}),
+          ...(canSetType && typeIds.length ? { clientTypes: typeIds } : {}),
         };
         if (!c.firstName && !email) return invalid.push(r);
         if (email && !EMAIL_RE.test(email)) return invalid.push(r);
@@ -110,7 +114,7 @@ export default function ContactImportModal({ orgId, existing, types, canSetType,
       preview.ok.forEach((c) => {
         const clientId = "CLI-" + String(n++).padStart(4, "0");
         ops.push((b) => b.set(doc(collection(db, "contacts")), {
-          ...c, clientId, clientType: c.clientType || "", relation: "nuevo", stage: "Lead", source: "Importado CSV",
+          ...c, clientId, ...typeFields(c.clientTypes), relation: "nuevo", stage: "Lead", source: "Importado CSV",
           responsable: "", custom: {}, orgId, createdByEmail: me, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), importedAt: Date.now(),
         }));
       });
@@ -121,6 +125,7 @@ export default function ContactImportModal({ orgId, existing, types, canSetType,
           for (const [k, v] of Object.entries(c)) {
             if (k === "email" || k === "whatsapp") continue;
             if (k === "tags") { const t = [...new Set([...(prev.tags || []), ...v])]; if (t.length !== (prev.tags || []).length) patch.tags = t; continue; }
+            if (k === "clientTypes") { const t = [...new Set([...typesOf(prev), ...v])]; if (t.length !== typesOf(prev).length) Object.assign(patch, typeFields(t)); continue; }
             if (v && !prev[k]) patch[k] = v;
           }
           if (Object.keys(patch).length) ops.push((b) => b.update(doc(db, "contacts", prev.id), { ...patch, updatedAt: serverTimestamp() }));

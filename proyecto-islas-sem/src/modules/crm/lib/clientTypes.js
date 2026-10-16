@@ -1,8 +1,11 @@
 // Tipo de cliente = el servicio del que es cliente (el campo "Tipo Cliente" de Bitrix:
 // RGPD, Subvención Kit Digital, Asesoría…). La empresa define la lista en
 // CRM › Contactos › "Tipos de cliente" (organizations/{orgId}.clientTypes) y solo los
-// administradores la editan o cambian el tipo de un contacto. Cada contacto guarda el id
-// en `clientType`.
+// administradores la editan o cambian el tipo de un contacto.
+// Un contacto puede tener varios tipos: `clientTypes` (ids) y `clientType` = el primero
+// (lo que leen las partes que solo usan uno, como las reglas de etapas). Las empresas
+// siguen con un solo tipo en `clientType`.
+// Cada tipo de cliente ES una lista de Email Marketing con su mismo nombre (lists/lib/crmLink.js).
 // Aparte, `relation` es la relación con la empresa (nuevo / recurrente / VIP).
 import { useEffect, useState } from "react";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
@@ -37,6 +40,20 @@ export function useClientTypes() {
 }
 
 export const saveClientTypes = (orgId, list) => updateDoc(doc(db, "organizations", orgId), { clientTypes: list });
+
+// Tipos de un contacto (o empresa): ids, sin repetidos.
+export function typesOf(x) {
+  const ids = Array.isArray(x?.clientTypes) ? x.clientTypes : x?.clientType ? [x.clientType] : [];
+  return [...new Set(ids.filter(Boolean))];
+}
+
+// Campos a guardar para dejar un contacto con estos tipos.
+export const typeFields = (ids) => {
+  const list = [...new Set((ids || []).filter(Boolean))];
+  return { clientTypes: list, clientType: list[0] || "" };
+};
+
+export const hasType = (x, id) => (id === "__none" ? typesOf(x).length === 0 : typesOf(x).includes(id));
 
 // Tipo de un contacto (si se borró el tipo, se muestra su id tal cual).
 export function typeOf(types, id) {
