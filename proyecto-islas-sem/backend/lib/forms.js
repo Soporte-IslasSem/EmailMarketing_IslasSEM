@@ -17,6 +17,9 @@
 //    abierta de esa persona en el embudo o se crea una nueva en la primera etapa
 //    (el formulario puede elegir el embudo o "no crear negociación").
 //    Cubre también envíos antiguos escritos directamente desde el navegador.
+//    Si el formulario tiene "tipo de cliente" (o su lista destino es la de un tipo), quien lo
+//    rellena queda como contacto con ese tipo: si era prospecto se convierte en contacto.
+//    Se lee la versión del formulario al procesar el envío: lo que se cambie en el CRM vale ya.
 const { db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 const { addSubscriber } = require("./subscriptions");
@@ -29,6 +32,7 @@ const FIELD_TYPES = new Set(["text", "email", "tel", "number", "date", "textarea
 const MAPS = new Set(["email", "firstName", "lastName", "phone", "company"]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const HEX = /^#[0-9a-f]{6}$/i;
+const TYPE_ID = /^[a-z0-9-]{1,64}$/;
 
 async function verifyRecaptcha(token, ip) {
   const secret = process.env.RECAPTCHA_SECRET;
@@ -72,6 +76,7 @@ async function loadCustomForm(id) {
     successMessage: String(f.successMessage || "").slice(0, 500),
     listId: String(f.listId || "").slice(0, 64),
     dealPipelineId: String(f.dealPipelineId || "").slice(0, 64),
+    clientType: TYPE_ID.test(f.clientType || "") ? f.clientType : "",
     fields,
   };
 }
@@ -81,7 +86,7 @@ async function formDefinition(req, res) {
   try {
     const f = await loadCustomForm(String(req.params.id || ""));
     if (!f || !f.active) return res.status(404).json({ ok: false, error: "Formulario no encontrado" });
-    const { orgId: _o, id: _i, listId: _l, active: _a, dealPipelineId: _d, ...pub } = f;
+    const { orgId: _o, id: _i, listId: _l, active: _a, dealPipelineId: _d, clientType: _t, ...pub } = f;
     res.set("Cache-Control", "no-store").json({ ok: true, form: pub });
   } catch (e) {
     console.error("[forms/def]", e);
@@ -284,6 +289,57 @@ async function ensureDeal(orgId, s, { contactId, leadId, person, label }) {
   return { dealId: ref.id, created: true };
 }
 
+// Tipo de cliente que da el formulario: el elegido en él o, si no, el de su lista destino
+// (cada tipo de cliente es una lista de Email Marketing).
+async function formClientType(formType) {
+  const f = await loadCustomForm(String(formType || "")).catch(() => null);
+  if (!f) return "";
+  if (f.clientType) return f.clientType;
+  if (!f.listId) return "";
+  const l = await db.collection("lists").doc(f.listId).get().catch(() => null);
+  const key = String(l?.data()?.crmKey || "");
+  return l?.data()?.crm && key.startsWith("type:") ? key.slice(5) : "";
+}
+
+const typesOf = (d) => (Array.isArray(d.clientTypes) ? d.clientTypes.filter(Boolean) : d.clientType ? [d.clientType] : []);
+
+// Le pone el tipo al contacto. Si la persona solo era prospecto, se convierte en contacto con
+// ese tipo (como "Convertir" en Prospectos) y sus negociaciones pasan al contacto.
+async function applyClientType(orgId, typeId, { contactId, leadId, person, label }) {
+  if (!contactId && leadId) {
+    const leadRef = db.collection("leads").doc(leadId);
+    const lead = (await leadRef.get()).data();
+    if (!lead) return { contactId, leadId };
+    const prev = lead.convertedContactId ? await db.collection("contacts").doc(lead.convertedContactId).get() : null;
+    if (prev?.exists) {
+      contactId = prev.id;
+    } else {
+      const all = await db.collection("contacts").where("orgId", "==", orgId).select("clientId").get();
+      let n = 0;
+      all.docs.forEach((d) => { const m = /^CLI-(\d+)$/.exec(d.data().clientId || ""); if (m) n = Math.max(n, parseInt(m[1], 10)); });
+      const ref = await db.collection("contacts").add({
+        orgId, firstName: lead.firstName || person.firstName || "", lastName: lead.lastName || person.lastName || "",
+        email: norm(lead.email || person.email), phone: lead.phone || person.phone || "", whatsapp: lead.whatsapp || "",
+        company: lead.company || person.company || "", clientTypes: [typeId], clientType: typeId,
+        clientId: "CLI-" + String(n + 1).padStart(4, "0"), relation: "nuevo", stage: "Lead", source: lead.source || "Formulario web",
+        notes: lead.notes || "", responsable: lead.responsable || "", custom: lead.custom || {}, fromLeadId: leadId,
+        createdAt: new Date(), updatedAt: new Date(),
+      });
+      await leadRef.update({ status: "Convertido", convertedContactId: ref.id, updatedAt: new Date() });
+      const deals = await db.collection("deals").where("orgId", "==", orgId).where("leadId", "==", leadId).get();
+      for (const d of deals.docs) if (!d.data().contactId) await d.ref.update({ contactId: ref.id, updatedAt: new Date() });
+      await addActivity(orgId, { type: "Nota", title: `Prospecto convertido en contacto al rellenar "${label}"`, entity: "contact", entityId: ref.id, contactId: ref.id, leadId });
+      return { contactId: ref.id, leadId };
+    }
+  }
+  if (!contactId) return { contactId, leadId };
+  const ref = db.collection("contacts").doc(contactId);
+  const c = await ref.get();
+  const cur = c.exists ? typesOf(c.data()) : [];
+  if (c.exists && !cur.includes(typeId)) await ref.update({ clientTypes: [...cur, typeId], clientType: cur[0] || typeId, updatedAt: new Date() });
+  return { contactId, leadId };
+}
+
 async function processFormSubmissions() {
   const snap = await db.collection("formSubmissions").where("status", "==", "recibido").limit(50).get();
   let linked = 0;
@@ -303,6 +359,11 @@ async function processFormSubmissions() {
     if (!contactId) {
       const r = await resolvePerson(orgId, { ...person, source: "Formulario web", notes: `Creado por el formulario "${label}"` });
       contactId = r.contactId; leadId = r.leadId;
+    }
+    const typeId = await formClientType(s.formType);
+    if (typeId) {
+      ({ contactId, leadId } = await applyClientType(orgId, typeId, { contactId, leadId, person, label })
+        .catch((e) => { console.warn("[forms] tipo de cliente:", e.message); return { contactId, leadId }; }));
     }
     let dealCreated = false;
     if (!dealId) {

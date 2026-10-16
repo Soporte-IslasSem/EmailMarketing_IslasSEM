@@ -395,3 +395,27 @@
 .conv-opt{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--crm-line,#e3eaea);border-radius:9px;margin-top:8px;font-size:14px;cursor:pointer}
 .conv-opt input{width:16px;height:16px}
 .conv-opt small{color:var(--crm-muted,#6b7d7d);font-weight:400}
+
+/* Selector de tipos de cliente (tabla de Contactos y ficha) */
+.crm-typepick{position:relative;display:inline-block}
+.crm-typepick__btn{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;border:1px dashed transparent;background:none;padding:2px 4px;border-radius:8px;cursor:pointer;font:inherit;text-align:left}
+.crm-typepick__btn:hover{border-color:#bcd6d4;background:#f6fbfa}
+.crm-typepick__edit{color:#8a9a9a;font-size:12px;margin-left:2px}
+.crm-typepick__menu{position:fixed;z-index:1000;min-width:230px;max-height:290px;overflow:auto;background:#fff;border:1px solid #dfe7e7;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:10px}
+.crm-typepick__menu label{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;cursor:pointer;font-weight:400}
+.crm-typepick__menu label:hover{background:#f3f8f8}
+.crm-typepick__menu input{width:16px;height:16px;margin:0}
+.crm-typepick__t{font-size:12px;font-weight:700;color:var(--crm-muted,#6b7d7d);text-transform:uppercase;margin-bottom:4px}
+.crm-typepick__t span{text-transform:none;font-weight:400}
+.crm-typepick__hint{font-size:11.5px;color:var(--crm-muted,#6b7d7d);margin-top:6px}
+.crm-typepick__err{font-size:12px;color:#b0304c;margin-top:4px}
+
+/* Tipos de cliente de los contactos seleccionados (clic = poner / quitar al momento) */
+.crm-bulktypes{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-top:1px solid #e3eaea;padding-top:10px;margin-top:2px}
+.crm-bulktypes__t{font-size:13px;font-weight:600;color:var(--crm-muted,#6b7d7d);margin-right:4px}
+.crm-bulktype{display:inline-flex;align-items:center;gap:6px;border:1px solid #dfe7e7;background:#fff;border-radius:999px;padding:4px 11px 4px 6px;font:inherit;font-size:13px;cursor:pointer;color:#2a3a3a}
+.crm-bulktype .box{width:16px;height:16px;border:1.5px solid #b9c9c9;border-radius:4px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
+.crm-bulktype.all{border-color:var(--tc);background:color-mix(in srgb,var(--tc) 12%,#fff);color:var(--tc);font-weight:600}
+.crm-bulktype.all .box,.crm-bulktype.some .box{background:var(--tc);border-color:var(--tc)}
+.crm-bulktype.some{border-color:var(--tc)}
+.crm-bulktype:disabled{opacity:.6;cursor:wait}

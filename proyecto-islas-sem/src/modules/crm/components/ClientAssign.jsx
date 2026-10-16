@@ -2,8 +2,9 @@
 // Filas para la <dl> de la ficha; solo los administradores pueden cambiarlos.
 // Un contacto puede tener varios tipos (cada uno es una lista de Email Marketing); una empresa, uno.
 import TypeChip from "./TypeChip";
+import TypePicker from "./TypePicker";
 import { crmUpdate } from "../lib/crm";
-import { useClientTypes, typeOf, typesOf, typeFields } from "../lib/clientTypes";
+import { useClientTypes, typeOf } from "../lib/clientTypes";
 import { useTaskScope } from "../lib/tasks";
 import { ownerKey, ownerLabel, ownerFields } from "../lib/owners";
 
@@ -20,20 +21,7 @@ export default function ClientAssignRows({ collection, item, onChange }) {
   return (
     <>
       {collection === "contacts" ? (
-        <div className="row"><dt>Tipo de cliente</dt><dd style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          {typesOf(item).length ? typesOf(item).map((id) => (
-            <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
-              <TypeChip t={typeOf(types, id)} />
-              {scope.isAdmin && <button type="button" onClick={() => save(typeFields(typesOf(item).filter((t) => t !== id)))} title="Quitar este tipo (sale de su lista)" style={{ border: 0, background: "none", cursor: "pointer", color: "#8a9a9a", fontSize: 14, padding: "0 2px" }}>×</button>}
-            </span>
-          )) : <TypeChip t={null} />}
-          {scope.isAdmin && types.some((t) => !typesOf(item).includes(t.id)) && (
-            <select value="" onChange={(e) => e.target.value && save(typeFields([...typesOf(item), e.target.value]))} style={SEL} title="Añadir tipo (entra en su lista de Email Marketing)">
-              <option value="">+ Añadir tipo…</option>
-              {types.filter((t) => !typesOf(item).includes(t.id)).map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
-            </select>
-          )}
-        </dd></div>
+        <div className="row"><dt>Tipo de cliente</dt><dd><TypePicker item={item} canEdit={scope.isAdmin} onChange={onChange} /></dd></div>
       ) : (
       <div className="row"><dt>Tipo de cliente</dt><dd style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <TypeChip t={typeOf(types, item.clientType)} />

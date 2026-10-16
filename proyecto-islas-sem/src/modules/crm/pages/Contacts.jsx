@@ -5,7 +5,7 @@ import { db } from "../../../config/firebaseConfig";
 import CrmModal from "../components/CrmModal";
 import ClientTypesModal from "../components/ClientTypesModal";
 import ContactImportModal from "../components/ContactImportModal";
-import TypeChip from "../components/TypeChip";
+import TypePicker from "../components/TypePicker";
 import { useCrmCollection, crmCreate, crmRemove, logActivity, fmtDate, tsToDate } from "../lib/crm";
 import { useClientTypes, typeOf, typesOf, typeFields, hasType, RELATIONS } from "../lib/clientTypes";
 import { useTaskScope } from "../lib/tasks";
@@ -59,7 +59,6 @@ export default function Contacts() {
   const [sort, setSort] = useState({ key: "id", dir: 1 });
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(() => new Set());
-  const [bulkType, setBulkType] = useState("");
   const [bulkOwner, setBulkOwner] = useState("");
   const [params] = useSearchParams();
   const [showImport, setShowImport] = useState(() => params.get("import") === "1"); // desde Integraciones
@@ -117,35 +116,42 @@ export default function Contacts() {
   const toggleAll = () => setSelected((s) => { const n = new Set(s); visible.forEach((c) => (allVisible ? n.delete(c.id) : n.add(c.id))); return n; });
   const selectAllFiltered = () => setSelected(new Set(filtered.map((c) => c.id)));
 
-  // Tipo de cliente en bloque (= lista de Email Marketing con ese nombre): añadir uno, quitar uno,
-  // quitar todos o crear uno nuevo y ponérselo. Los demás tipos de cada contacto se conservan.
-  const applyBulkType = async () => {
-    if (!isAdmin || !selected.size || bulkType === "") return;
-    let [op, id] = bulkType === "__none" ? ["none", ""] : bulkType.split(":");
-    let label = id ? typeOf(types, id)?.label : "";
-    if (op === "new") {
-      label = (window.prompt("Nombre del nuevo tipo de cliente (se crea también su lista en Email Marketing):") || "").trim();
-      if (!label) return;
+  // Tipo de cliente de los seleccionados (= lista de Email Marketing con ese nombre): al marcar la
+  // casilla de un contacto salen todos los tipos; un clic pone o quita ese tipo al momento a los
+  // seleccionados (los demás tipos de cada uno se conservan) y la lista se actualiza sola.
+  const selRows = useMemo(() => all.filter((c) => selected.has(c.id)), [all, selected]);
+  const typeState = (id) => {
+    const n = selRows.filter((c) => typesOf(c).includes(id)).length;
+    return n === 0 ? "none" : n === selRows.length ? "all" : "some";
+  };
+  const writeTypes = async (rows, next) => {
+    for (let i = 0; i < rows.length; i += 400) {
+      const batch = writeBatch(db);
+      rows.slice(i, i + 400).forEach((c) => batch.update(doc(db, "contacts", c.id), { ...typeFields(next(typesOf(c))), updatedAt: serverTimestamp() }));
+      await batch.commit();
     }
-    const msg = op === "rm" ? `¿Quitar "${label}" a ${selected.size} contactos?` : op === "none" ? `¿Quitar todos los tipos a ${selected.size} contactos?` : `¿Añadir "${label}" a ${selected.size} contactos?`;
-    if (!window.confirm(msg)) return;
+  };
+  const toggleType = async (id) => {
+    if (!isAdmin || !selRows.length) return;
+    const add = typeState(id) !== "all"; // ninguno o algunos → se lo pone a todos; todos → se lo quita
     setBulkBusy(true);
     try {
-      if (op === "new") { id = (await createTypeWithList(label, orgId, types)).typeId; op = "add"; }
-      const rows = all.filter((c) => selected.has(c.id));
-      for (let i = 0; i < rows.length; i += 400) {
-        const batch = writeBatch(db);
-        rows.slice(i, i + 400).forEach((c) => {
-          const cur = typesOf(c);
-          const next = op === "add" ? [...cur, id] : op === "rm" ? cur.filter((t) => t !== id) : [];
-          batch.update(doc(db, "contacts", c.id), { ...typeFields(next), updatedAt: serverTimestamp() });
-        });
-        await batch.commit();
-      }
-      setSelected(new Set());
-      setBulkType("");
+      await writeTypes(selRows, (cur) => (add ? [...cur, id] : cur.filter((t) => t !== id)));
     } catch (e) {
       alert("No se pudo cambiar el tipo: " + e.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const newTypeForSelected = async () => {
+    const label = (window.prompt("Nombre del nuevo tipo de cliente (se crea también su lista en Email Marketing):") || "").trim();
+    if (!label) return;
+    setBulkBusy(true);
+    try {
+      const { typeId } = await createTypeWithList(label, orgId, types);
+      await writeTypes(selRows, (cur) => [...cur, typeId]);
+    } catch (e) {
+      alert("No se pudo crear el tipo: " + e.message);
     } finally {
       setBulkBusy(false);
     }
@@ -274,18 +280,6 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
           <span style={{ flex: 1 }} />
           {isAdmin && (
             <>
-              <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkType} onChange={(e) => setBulkType(e.target.value)}>
-                <option value="">Tipo de cliente / lista…</option>
-                <optgroup label="Añadir">
-                  {types.map((t) => <option key={t.id} value={`add:${t.id}`}>+ {t.icon} {t.label}</option>)}
-                  <option value="new:">+ Nuevo tipo de cliente…</option>
-                </optgroup>
-                <optgroup label="Quitar">
-                  {types.map((t) => <option key={t.id} value={`rm:${t.id}`}>− {t.icon} {t.label}</option>)}
-                  <option value="__none">− Quitar todos los tipos</option>
-                </optgroup>
-              </select>
-              <button className="crm-btn sm" onClick={applyBulkType} disabled={bulkType === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Aplicar"}</button>
               <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkOwner} onChange={(e) => setBulkOwner(e.target.value)}>
                 <option value="">Asignar responsable…</option>
                 {scope.options.map((o) => <option key={o.key} value={o.key}>{o.type === "team" ? "👥 " : ""}{o.name}</option>)}
@@ -298,6 +292,22 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
             <button className="crm-btn ghost sm" style={{ color: "#b0304c", borderColor: "#f0c9d2" }} onClick={bulkDelete} disabled={bulkBusy}>🗑 Eliminar ({deletable.length})</button>
           )}
           <button className="crm-btn ghost sm" onClick={() => setSelected(new Set())}>Quitar selección</button>
+          {isAdmin && (
+            <div className="crm-bulktypes">
+              <span className="crm-bulktypes__t">Tipo de cliente{bulkBusy ? " · guardando…" : ":"}</span>
+              {types.map((t) => {
+                const st = typeState(t.id);
+                return (
+                  <button key={t.id} type="button" disabled={bulkBusy} className={`crm-bulktype ${st}`} style={{ "--tc": t.color }}
+                    onClick={() => toggleType(t.id)}
+                    title={st === "all" ? "Clic para quitar este tipo" : st === "some" ? "Lo tienen algunos: clic para ponérselo a todos" : "Clic para poner este tipo"}>
+                    <span className="box">{st === "all" ? "✓" : st === "some" ? "–" : ""}</span>{t.icon ? `${t.icon} ` : ""}{t.label}
+                  </button>
+                );
+              })}
+              <button type="button" className="crm-btn ghost sm" disabled={bulkBusy} onClick={newTypeForSelected}>+ Nuevo tipo</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -339,7 +349,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
                       <td>
                         {c.company ? <div><span className="crm-link" onClick={() => navigate(c.companyId ? `/dashboard/crm/companies/${c.companyId}` : "/dashboard/crm/companies")}>{c.company}</span>{c.area && <div style={{ fontSize: 12.5, color: "var(--crm-muted)" }}>{c.area}</div>}</div> : "—"}
                       </td>
-                      <td>{typesOf(c).length ? <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>{typesOf(c).map((id) => <TypeChip key={id} t={typeOf(types, id)} />)}</span> : <TypeChip t={null} />}</td>
+                      <td><TypePicker item={c} canEdit={isAdmin} /></td>
                       <td>
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                           {(c.tags || []).length ? c.tags.map((t) => <span key={t} className="crm-chip">{t}</span>) : "—"}

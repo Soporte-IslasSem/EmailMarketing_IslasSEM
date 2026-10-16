@@ -1,7 +1,7 @@
 // Constructor de formularios del CRM (réplica del prototipo ISLAS SEM).
 //
 // Un formulario (crmForms/{id}) tiene la forma:
-//   { name, title, desc, btn, color, bg, consentTitle, listId, listName, dealPipelineId, active,
+//   { name, title, desc, btn, color, bg, consentTitle, listId, listName, dealPipelineId, clientType, active,
 //     fields: [{ k, type, ph, req, options?, maps? }] }
 // - type: text | email | tel | textarea | select | check (casilla de consentimiento RGPD)
 // - maps: dónde se copia el valor en la ficha del cliente (email, firstName, lastName,
@@ -44,7 +44,7 @@ export const libField = (key) => {
   return { ...f, ...(f.options ? { options: [...f.options] } : {}) };
 };
 
-const BASE = { desc: "Déjanos tus datos y te contactamos.", btn: "Enviar", color: "#1A9190", bg: "#FFFFFF", consentTitle: "", listId: "", listName: "", dealPipelineId: "", active: true };
+const BASE = { desc: "Déjanos tus datos y te contactamos.", btn: "Enviar", color: "#1A9190", bg: "#FFFFFF", consentTitle: "", listId: "", listName: "", dealPipelineId: "", clientType: "", active: true };
 
 // Nuevo formulario desde una plantilla de la galería.
 export function draftFromTemplate(name) {
@@ -128,6 +128,7 @@ export function toDoc(d) {
       listId: d.listId || "",
       listName: d.listName || "",
       dealPipelineId: d.dealPipelineId || "", // "" = primer embudo, "none" = no crear negociación
+      clientType: String(d.clientType || ""), // quien lo rellena queda con este tipo de cliente
       active: d.active !== false,
       fields,
     },

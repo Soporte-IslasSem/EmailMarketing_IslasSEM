@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useCrmCollection, crmGet, crmCreate, crmUpdate, logActivity, money, fmtDate, ACTIVITY_TYPES } from "../lib/crm";
+import { useCrmCollection, crmGet, crmCreate, crmUpdate, money, fmtDate, ACTIVITY_TYPES } from "../lib/crm";
 import { RELATIONS } from "../lib/clientTypes";
 import ClientAssignRows from "../components/ClientAssign";
 import { usePerms } from "../lib/permissions";
 import { useOrg } from "../lib/useOrg";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
+import { CreateFieldModal, ExtraFieldsEditor } from "../components/DealFields";
 import "../crm.styles.css";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
+
+// Datos de la ficha que se pueden editar: [campo, etiqueta, tipo de input].
+const EDIT_FIELDS = [
+  ["firstName", "Nombre"], ["lastName", "Apellidos"], ["email", "Email", "email"], ["phone", "Teléfono", "tel"],
+  ["whatsapp", "WhatsApp", "tel"], ["dni", "DNI / NIF"], ["company", "Empresa"], ["role", "Cargo"], ["area", "Área / departamento"],
+  ["address", "Dirección"], ["city", "Ciudad"], ["province", "Provincia"], ["notes", "Notas"],
+];
 
 export default function ContactDetail() {
   const { id } = useParams();
@@ -23,12 +31,40 @@ export default function ContactDetail() {
 
   const [note, setNote] = useState("");
   const [noteType, setNoteType] = useState("Nota");
-  const [editCustom, setEditCustom] = useState(null); // null | objeto en edición
-
-  const saveCustom = async () => {
-    await crmUpdate("contacts", id, { custom: editCustom });
-    setContact((c) => ({ ...c, custom: editCustom }));
-    setEditCustom(null);
+  // Edición de la ficha: datos, campos personalizados y campos solo de este contacto.
+  const [edit, setEdit] = useState(null); // null | borrador
+  const [newField, setNewField] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const draftOf = (c) => ({
+    ...Object.fromEntries(EDIT_FIELDS.map(([k]) => [k, c[k] || ""])),
+    tags: (c.tags || []).join(", "),
+    custom: { ...(c.custom || {}) },
+    extraFields: (c.extraFields || []).map((f) => ({ ...f })),
+  });
+  const startEdit = () => { setEditError(""); setEdit(draftOf(contact)); };
+  const setE = (k) => (e) => setEdit((x) => ({ ...x, [k]: e.target.value }));
+  const saveEdit = async () => {
+    const email = edit.email.trim().toLowerCase();
+    if (email && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) return setEditError("El email no es válido.");
+    if (!edit.firstName.trim() && !email) return setEditError("Pon al menos el nombre o el email.");
+    const patch = {
+      ...Object.fromEntries(EDIT_FIELDS.map(([k]) => [k, String(edit[k] || "").trim()])),
+      email,
+      tags: edit.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      custom: edit.custom,
+      extraFields: edit.extraFields.filter((f) => String(f.label || "").trim()),
+    };
+    setSavingEdit(true);
+    try {
+      await crmUpdate("contacts", id, patch);
+      setContact((c) => ({ ...c, ...patch }));
+      setEdit(null);
+    } catch (e) {
+      setEditError(e.code === "permission-denied" ? "Tu rol no permite editar este contacto." : "No se pudo guardar: " + e.message);
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   useEffect(() => {
@@ -123,15 +159,47 @@ export default function ContactDetail() {
       <div className="crm-detail">
         <div>
           <div className="crm-panel">
-            <h4>Información</h4>
-            {ro && <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "0 0 8px" }}>🔒 Solo lectura: tu rol no permite editar este registro.</p>}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <h4 style={{ margin: 0 }}>Información</h4>
+              {!ro && !edit && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="crm-btn ghost sm" onClick={() => setNewField(true)}>+ Añadir campo</button>
+                  <button className="crm-btn sm" onClick={startEdit}>✏️ Editar datos</button>
+                </div>
+              )}
+            </div>
+            {ro && <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "8px 0" }}>🔒 Solo lectura: tu rol no permite editar este registro.</p>}
+            {edit ? (
+              <div style={{ marginTop: 10 }}>
+                <div className="crm-two" style={{ flexWrap: "wrap" }}>
+                  {EDIT_FIELDS.filter(([k]) => k !== "notes").map(([k, label, type]) => (
+                    <div className="crm-field" key={k} style={{ minWidth: 200, flex: "1 1 45%" }}>
+                      <label>{label}</label>
+                      <input type={type || "text"} value={edit[k]} onChange={setE(k)} />
+                    </div>
+                  ))}
+                </div>
+                <div className="crm-field"><label>Etiquetas (separadas por coma)</label><input value={edit.tags} onChange={setE("tags")} /></div>
+                <div className="crm-field"><label>Notas</label><textarea rows="2" value={edit.notes} onChange={setE("notes")} /></div>
+                <CustomFieldsForm entity="contacts" values={edit.custom} onChange={(custom) => setEdit((x) => ({ ...x, custom }))} />
+                <ExtraFieldsEditor entity="contacts" value={edit.extraFields} onChange={(extraFields) => setEdit((x) => ({ ...x, extraFields }))} />
+                {editError && <p style={{ color: "#b0304c", margin: "8px 0 0" }}>{editError}</p>}
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <button className="crm-btn sm" onClick={saveEdit} disabled={savingEdit}>{savingEdit ? "Guardando…" : "Guardar"}</button>
+                  <button className="crm-btn ghost sm" onClick={() => setNewField(true)}>+ Añadir campo</button>
+                  <button className="crm-btn ghost sm" onClick={() => setEdit(null)}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
             <fieldset disabled={ro} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <dl className="crm-dl">
               <div className="row"><dt>ID cliente</dt><dd>{contact.clientId || "—"}</dd></div>
               <div className="row"><dt>Email</dt><dd>{contact.email || "—"}</dd></div>
               <div className="row"><dt>Teléfono</dt><dd>{contact.phone || "—"}</dd></div>
+              {contact.whatsapp && contact.whatsapp !== contact.phone && <div className="row"><dt>WhatsApp</dt><dd>{contact.whatsapp}</dd></div>}
               <div className="row"><dt>DNI/NIF</dt><dd>{contact.dni || "—"}</dd></div>
               <div className="row"><dt>Empresa</dt><dd>{contact.companyId ? <span className="crm-link" onClick={() => navigate(`/dashboard/crm/companies/${contact.companyId}`)}>{contact.company || "Ver empresa"}</span> : contact.company || "—"}</dd></div>
+              {(contact.role || contact.area) && <div className="row"><dt>Cargo / área</dt><dd>{[contact.role, contact.area].filter(Boolean).join(" · ")}</dd></div>}
               <div className="row"><dt>Dirección</dt><dd>{contact.address || "—"}</dd></div>
               <div className="row"><dt>Ciudad</dt><dd>{contact.city || "—"}{contact.province ? ` · ${contact.province}` : ""}</dd></div>
               <ClientAssignRows collection="contacts" item={contact} onChange={(patch) => setContact((c) => ({ ...c, ...patch }))} />
@@ -141,24 +209,16 @@ export default function ContactDetail() {
                   {RELATIONS.map((r) => <option key={r.id} value={r.id}>{r.icon} {r.label}</option>)}
                 </select>
               </dd></div>
+              {(contact.tags || []).length > 0 && <div className="row"><dt>Etiquetas</dt><dd style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>{contact.tags.map((t) => <span key={t} className="crm-chip">{t}</span>)}</dd></div>}
               <div className="row"><dt>Alta</dt><dd>{fmtDate(contact.createdAt)}</dd></div>
               <CustomFieldsView entity="contacts" values={contact.custom} />
+              {(contact.extraFields || []).filter((f) => f.value !== "" && f.value !== undefined && f.value !== null).map((f, i) => (
+                <div className="row" key={`x${i}`}><dt>{f.label}</dt><dd>{f.type === "checkbox" ? (f.value ? "Sí" : "No") : String(f.value)}</dd></div>
+              ))}
             </dl>
-            {editCustom ? (
-              <>
-                <CustomFieldsForm entity="contacts" values={editCustom} onChange={setEditCustom} />
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button className="crm-btn sm" onClick={saveCustom}>Guardar</button>
-                  <button className="crm-btn ghost sm" onClick={() => setEditCustom(null)}>Cancelar</button>
-                </div>
-              </>
-            ) : (
-              <button className="crm-btn ghost sm" style={{ marginTop: 8 }} onClick={() => setEditCustom({ ...(contact.custom || {}) })}>
-                ✏️ Campos personalizados
-              </button>
-            )}
             </fieldset>
-            {contact.notes && (
+            )}
+            {!edit && contact.notes && (
               <p style={{ marginTop: 12, color: "var(--crm-muted)", fontSize: 14 }}>{contact.notes}</p>
             )}
           </div>
@@ -250,6 +310,14 @@ export default function ContactDetail() {
           </div>
         </div>
       </div>
+      {newField && (
+        <CreateFieldModal
+          entity="contacts"
+          orgId={orgId}
+          onClose={() => setNewField(false)}
+          onAddExtra={(f) => setEdit((x) => { const d = x || draftOf(contact); return { ...d, extraFields: [...d.extraFields, f] }; })}
+        />
+      )}
     </div>
   );
 }

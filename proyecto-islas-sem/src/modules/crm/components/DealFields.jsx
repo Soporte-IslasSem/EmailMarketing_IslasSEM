@@ -1,8 +1,8 @@
-// "+ Crear campo" de las negociaciones (como el prototipo / Bitrix).
+// "+ Crear campo" de las negociaciones y de los contactos (como el prototipo / Bitrix).
 // Un campo nuevo puede ser:
-// - Para todas las negociaciones: se guarda como campo personalizado (customFields,
-//   entidad "deals") y aparece en todas las fichas.
-// - Solo para esta negociación: se guarda dentro del documento en `extraFields`
+// - Para todas las fichas: se guarda como campo personalizado (customFields, entidad
+//   "deals" o "contacts") y aparece en todas las fichas.
+// - Solo para esta ficha: se guarda dentro del documento en `extraFields`
 //   ([{ label, type, value }]), sin tocar al resto.
 import { useState } from "react";
 import CrmModal from "./CrmModal";
@@ -10,9 +10,14 @@ import { crmCreate } from "../lib/crm";
 import { CF_TYPES, slugKey, useCustomFields } from "../lib/customFields";
 
 const EXTRA_TYPES = CF_TYPES.filter((t) => t.id !== "select");
+const SCOPE_TEXT = {
+  deals: ["En todas las negociaciones", "Solo en esta negociación", "CAMPOS DE ESTA NEGOCIACIÓN"],
+  contacts: ["En todos los contactos", "Solo en este contacto", "CAMPOS DE ESTE CONTACTO"],
+};
 
-export function CreateFieldModal({ orgId, onClose, onAddExtra }) {
-  const { fields } = useCustomFields("deals");
+export function CreateFieldModal({ orgId, onClose, onAddExtra, entity = "deals" }) {
+  const { fields } = useCustomFields(entity);
+  const text = SCOPE_TEXT[entity] || SCOPE_TEXT.deals;
   const [form, setForm] = useState({ label: "", type: "text", options: "", scope: "all" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -33,7 +38,7 @@ export function CreateFieldModal({ orgId, onClose, onAddExtra }) {
       let key = slugKey(label);
       const taken = new Set(fields.map((f) => f.key));
       for (let i = 2; taken.has(key); i++) key = `${slugKey(label)}_${i}`;
-      await crmCreate("customFields", orgId, { entity: "deals", label, key, type: form.type, options, sort: fields.length });
+      await crmCreate("customFields", orgId, { entity, label, key, type: form.type, options, sort: fields.length });
       onClose();
     } catch (e) {
       setError("No se pudo crear el campo: " + e.message);
@@ -62,12 +67,12 @@ export function CreateFieldModal({ orgId, onClose, onAddExtra }) {
       <div className="crm-field"><label>¿Dónde se usa?</label>
         <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
           <input type="radio" style={{ width: "auto" }} checked={form.scope === "all"} onChange={() => setForm((f) => ({ ...f, scope: "all" }))} />
-          En todas las negociaciones
+          {text[0]}
         </label>
         {onAddExtra && (
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
             <input type="radio" style={{ width: "auto" }} checked={form.scope === "one"} onChange={() => setForm((f) => ({ ...f, scope: "one", type: f.type === "select" ? "text" : f.type }))} />
-            Solo en esta negociación
+            {text[1]}
           </label>
         )}
       </div>
@@ -77,13 +82,13 @@ export function CreateFieldModal({ orgId, onClose, onAddExtra }) {
 }
 
 // Campos extra de una sola negociación: valor editable y botón para quitarlos.
-export function ExtraFieldsEditor({ value, onChange }) {
+export function ExtraFieldsEditor({ value, onChange, entity = "deals" }) {
   const list = value || [];
   if (!list.length) return null;
   const setAt = (i, patch) => onChange(list.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   return (
     <div style={{ borderTop: "1px dashed #d8e4e4", marginTop: 10, paddingTop: 10 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-muted)", marginBottom: 6 }}>CAMPOS DE ESTA NEGOCIACIÓN</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-muted)", marginBottom: 6 }}>{(SCOPE_TEXT[entity] || SCOPE_TEXT.deals)[2]}</div>
       {list.map((f, i) => (
         <div className="crm-field" key={i}>
           <label style={{ display: "flex", justifyContent: "space-between" }}>

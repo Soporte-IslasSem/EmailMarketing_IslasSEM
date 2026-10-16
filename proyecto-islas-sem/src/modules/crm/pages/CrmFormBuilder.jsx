@@ -9,6 +9,7 @@ import CrmModal from "../components/CrmModal";
 import { useCrmCollection, crmCreate, crmUpdate } from "../lib/crm";
 import { useOrg } from "../lib/useOrg";
 import { usePipelines } from "../lib/pipelines";
+import { useClientTypes, typeOf } from "../lib/clientTypes";
 import { BUILTIN_FORMS, BUILTIN_LIST } from "../../forms/public/builtinForms";
 import { FIELD_LIB, TYPES, libField, draftFromTemplate, draftFromBuiltin, draftFromDoc, toDoc } from "../lib/formBuilder";
 import ShareFormModal from "../components/ShareFormModal";
@@ -24,6 +25,7 @@ export default function CrmFormBuilder() {
   const { user, orgId } = useOrg();
   const { items: forms, loading } = useCrmCollection("crmForms");
   const { pipelines } = usePipelines();
+  const { types } = useClientTypes();
   const isBuiltin = !!(id && BUILTIN_FORMS[id]);
   const saved = id ? forms.find((f) => f.id === id) : null;
 
@@ -47,12 +49,15 @@ export default function CrmFormBuilder() {
     return false;
   }, [id, tpl, presetList, loading, saved, isBuiltin]);
   const fb = edited || initial;
+  // Tipo de cliente que da el formulario: el elegido o, si no, el de la lista destino.
+  const listKey = fb ? lists.find((l) => l.id === fb.listId)?.crmKey || "" : "";
+  const effType = fb ? fb.clientType || (listKey.startsWith("type:") ? listKey.slice(5) : "") : "";
 
   // Listas de Email Marketing del usuario (Lista destino).
   useEffect(() => {
     if (!user) return;
     getDocs(query(collection(db, "lists"), where("userId", "==", user.uid)))
-      .then((s) => setLists(s.docs.map((d) => ({ id: d.id, name: d.data().name || "Lista" })).sort((a, b) => a.name.localeCompare(b.name))))
+      .then((s) => setLists(s.docs.map((d) => ({ id: d.id, name: d.data().name || "Lista", crmKey: d.data().crm ? String(d.data().crmKey || "") : "" })).sort((a, b) => a.name.localeCompare(b.name))))
       .catch(() => setLists([]));
   }, [user]);
 
@@ -199,7 +204,11 @@ export default function CrmFormBuilder() {
               )}
               <div className="crm-field">
                 <label>Lista destino (Email Marketing)</label>
-                <select value={fb.listId || ""} onChange={(e) => setForm({ listId: e.target.value, listName: lists.find((l) => l.id === e.target.value)?.name || "" })}>
+                <select value={fb.listId || ""} onChange={(e) => {
+                  const l = lists.find((x) => x.id === e.target.value);
+                  // Lista de un tipo de cliente: el formulario da ese tipo.
+                  setForm({ listId: e.target.value, listName: l?.name || "", ...(l?.crmKey.startsWith("type:") ? { clientType: l.crmKey.slice(5) } : {}) });
+                }}>
                   <option value="">— Ninguna —</option>
                   {lists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                   {fb.listId && !lists.some((l) => l.id === fb.listId) && <option value={fb.listId}>{fb.listName || "Lista"}</option>}
@@ -212,9 +221,18 @@ export default function CrmFormBuilder() {
                   <option value="none">No crear negociación</option>
                 </select>
               </div>
+              <div className="crm-field">
+                <label>Tipo de cliente de quien lo rellene</label>
+                <select value={fb.clientType || ""} onChange={(e) => setForm({ clientType: e.target.value })}>
+                  <option value="">{listKey.startsWith("type:") ? `El de la lista destino (${typeOf(types, listKey.slice(5))?.label})` : "— No cambiar su tipo —"}</option>
+                  {types.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+                  {fb.clientType && !types.some((t) => t.id === fb.clientType) && <option value={fb.clientType}>{fb.clientType}</option>}
+                </select>
+              </div>
               <div className="cf-note">
                 Cada envío entra <b>solo</b> en el CRM: crea el <b>prospecto</b> (o se guarda en la ficha si el email ya existe)
                 {fb.dealPipelineId !== "none" && <>, y cae como <b>negociación</b> en la primera etapa del embudo <b>{(pipelines.find((p) => p.id === fb.dealPipelineId) || pipelines[0])?.name || ""}</b> (si esa persona ya tiene una abierta allí, se añade a esa)</>}
+                {effType && <>; queda como <b>contacto</b> con el tipo de cliente <b>{typeOf(types, effType)?.label}</b> (si ya tenía otros, los conserva)</>}
                 {fb.listId ? <> y suscribe el email a la lista <b>{lists.find((l) => l.id === fb.listId)?.name || fb.listName}</b> (con doble confirmación si la lista la tiene activada).</> : "."}
               </div>
               <label className="cf-switch"><input type="checkbox" checked={fb.active !== false} onChange={(e) => setForm({ active: e.target.checked })} /> Publicado (si lo desactivas, el enlace deja de funcionar)</label>
