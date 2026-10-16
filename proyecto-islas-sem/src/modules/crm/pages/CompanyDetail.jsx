@@ -139,7 +139,7 @@ export default function CompanyDetail() {
                   </div>
                 </div>
                 <div className="crm-field"><label>Notas</label><textarea rows={3} value={edit.notes || ""} onChange={set("notes")} /></div>
-                <CustomFieldsForm entity="companies" values={edit.custom || {}} onChange={(custom) => setEdit((x) => ({ ...x, custom }))} />
+                <CustomFieldsForm onlyFilled entity="companies" values={edit.custom || {}} onChange={(custom) => setEdit((x) => ({ ...x, custom }))} />
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                   <button className="crm-btn" onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</button>
                   <button className="crm-btn ghost" onClick={() => setEdit(null)}>Cancelar</button>

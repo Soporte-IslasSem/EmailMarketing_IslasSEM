@@ -18,7 +18,8 @@ const SCOPE_TEXT = {
 export function CreateFieldModal({ orgId, onClose, onAddExtra, entity = "deals" }) {
   const { fields } = useCustomFields(entity);
   const text = SCOPE_TEXT[entity] || SCOPE_TEXT.deals;
-  const [form, setForm] = useState({ label: "", type: "text", options: "", scope: "all" });
+  // Fuera de negociaciones, los campos nuevos son solo de esa ficha (los campos generales vacíos no se muestran).
+  const [form, setForm] = useState({ label: "", type: "text", options: "", scope: entity === "deals" || !onAddExtra ? "all" : "one" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -64,18 +65,22 @@ export function CreateFieldModal({ orgId, onClose, onAddExtra, entity = "deals" 
       {form.scope === "all" && form.type === "select" && (
         <div className="crm-field"><label>Opciones (una por línea)</label><textarea rows="4" value={form.options} onChange={set("options")} /></div>
       )}
-      <div className="crm-field"><label>¿Dónde se usa?</label>
-        <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
-          <input type="radio" style={{ width: "auto" }} checked={form.scope === "all"} onChange={() => setForm((f) => ({ ...f, scope: "all" }))} />
-          {text[0]}
-        </label>
-        {onAddExtra && (
+      {entity === "deals" || !onAddExtra ? (
+        <div className="crm-field"><label>¿Dónde se usa?</label>
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
-            <input type="radio" style={{ width: "auto" }} checked={form.scope === "one"} onChange={() => setForm((f) => ({ ...f, scope: "one", type: f.type === "select" ? "text" : f.type }))} />
-            {text[1]}
+            <input type="radio" style={{ width: "auto" }} checked={form.scope === "all"} onChange={() => setForm((f) => ({ ...f, scope: "all" }))} />
+            {text[0]}
           </label>
-        )}
-      </div>
+          {onAddExtra && (
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
+              <input type="radio" style={{ width: "auto" }} checked={form.scope === "one"} onChange={() => setForm((f) => ({ ...f, scope: "one", type: f.type === "select" ? "text" : f.type }))} />
+              {text[1]}
+            </label>
+          )}
+        </div>
+      ) : (
+        <p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--crm-muted)" }}>El campo se añade solo a esta ficha.</p>
+      )}
       {error && <p style={{ color: "#b0304c", margin: 0 }}>{error}</p>}
     </CrmModal>
   );

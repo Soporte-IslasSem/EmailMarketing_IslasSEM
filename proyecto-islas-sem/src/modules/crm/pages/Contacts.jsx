@@ -430,7 +430,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
             <div className="crm-field"><label>Ciudad / Provincia</label><input value={form.city} onChange={set("city")} /></div>
           </div>
           <div className="crm-field"><label>Notas</label><textarea rows="2" value={form.notes} onChange={set("notes")} /></div>
-          <CustomFieldsForm entity="contacts" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
+          <CustomFieldsForm onlyFilled entity="contacts" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
         </CrmModal>
       )}
     </div>

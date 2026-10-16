@@ -181,7 +181,7 @@ export default function ContactDetail() {
                 </div>
                 <div className="crm-field"><label>Etiquetas (separadas por coma)</label><input value={edit.tags} onChange={setE("tags")} /></div>
                 <div className="crm-field"><label>Notas</label><textarea rows="2" value={edit.notes} onChange={setE("notes")} /></div>
-                <CustomFieldsForm entity="contacts" values={edit.custom} onChange={(custom) => setEdit((x) => ({ ...x, custom }))} />
+                <CustomFieldsForm onlyFilled entity="contacts" values={edit.custom} onChange={(custom) => setEdit((x) => ({ ...x, custom }))} />
                 <ExtraFieldsEditor entity="contacts" value={edit.extraFields} onChange={(extraFields) => setEdit((x) => ({ ...x, extraFields }))} />
                 {editError && <p style={{ color: "#b0304c", margin: "8px 0 0" }}>{editError}</p>}
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>

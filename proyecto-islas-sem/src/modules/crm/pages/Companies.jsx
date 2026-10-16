@@ -186,7 +186,7 @@ export default function Companies() {
             </div>
           </div>
           <div className="crm-field"><label>Notas</label><textarea rows="2" value={form.notes} onChange={set("notes")} /></div>
-          <CustomFieldsForm entity="companies" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
+          <CustomFieldsForm onlyFilled entity="companies" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
         </CrmModal>
       )}
     </div>

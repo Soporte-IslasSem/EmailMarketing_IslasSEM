@@ -290,7 +290,7 @@ export default function Leads() {
             <div className="crm-field"><label>Valor estimado (€)</label><input type="number" value={form.estimatedValue} onChange={set("estimatedValue")} /></div>
           </div>
           <div className="crm-field"><label>Notas</label><textarea rows="2" value={form.notes} onChange={set("notes")} /></div>
-          <CustomFieldsForm entity="leads" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
+          <CustomFieldsForm onlyFilled entity="leads" values={form.custom} onChange={(c) => setForm((f) => ({ ...f, custom: c }))} />
         </CrmModal>
       )}
 

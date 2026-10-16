@@ -1,9 +1,15 @@
 // Componentes de campos personalizados (definiciones y helpers en ../lib/customFields.js).
+import { useState } from "react";
 import { useCustomFields, formatCustom } from "../lib/customFields";
 
 // Inputs para formularios de alta/edición. `values` = objeto custom; onChange(nuevoObjeto).
-export function CustomFieldsForm({ entity, values, onChange }) {
-  const { fields } = useCustomFields(entity);
+// onlyFilled: solo los campos que ya tenían dato al abrir (los vacíos, que vienen casi todos del
+// Bitrix antiguo, no se muestran; los datos guardados se siguen viendo y editando).
+const hasValue = (x) => x !== undefined && x !== null && x !== "" && x !== false;
+export function CustomFieldsForm({ entity, values, onChange, onlyFilled = false }) {
+  const { fields: all } = useCustomFields(entity);
+  const [filled] = useState(() => new Set(Object.keys(values || {}).filter((k) => hasValue(values[k]))));
+  const fields = onlyFilled ? all.filter((f) => filled.has(f.key)) : all;
   if (!fields.length) return null;
   const v = values || {};
   const set = (key, val) => onChange({ ...v, [key]: val });
