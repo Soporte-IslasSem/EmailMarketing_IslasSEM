@@ -12,6 +12,7 @@ import { useTaskScope } from "../lib/tasks";
 import { ownerKey, ownerLabel, ownerFields } from "../lib/owners";
 import { usePerms } from "../lib/permissions";
 import { exportCsv } from "../lib/exportCsv";
+import { useManualLists, createManualList, addContactsToList } from "../../lists/lib/addToList";
 import { CustomFieldsForm } from "../components/CustomFields";
 import "../crm.styles.css";
 
@@ -60,6 +61,8 @@ export default function Contacts() {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkType, setBulkType] = useState("");
   const [bulkOwner, setBulkOwner] = useState("");
+  const [bulkList, setBulkList] = useState("");
+  const manualLists = useManualLists();
   const [params] = useSearchParams();
   const [showImport, setShowImport] = useState(() => params.get("import") === "1"); // desde Integraciones
   const [ownerFilter, setOwnerFilter] = useState(""); // "" todos · "__none" sin responsable · "person:id" / "team:id"
@@ -132,6 +135,34 @@ export default function Contacts() {
       setBulkType("");
     } catch (e) {
       alert("No se pudo cambiar el tipo: " + e.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  // Añadir los seleccionados a una lista de Email Marketing (no cambia su tipo de cliente).
+  const applyBulkList = async () => {
+    if (!selected.size || bulkList === "") return;
+    let listId = bulkList;
+    let listName = manualLists.find((l) => l.id === listId)?.name;
+    if (bulkList === "__new") {
+      const name = (window.prompt("Nombre de la nueva lista:") || "").trim();
+      if (!name) return;
+      listName = name;
+    } else if (!window.confirm(`¿Añadir ${selected.size} contactos a la lista "${listName}"?`)) return;
+    setBulkBusy(true);
+    try {
+      if (bulkList === "__new") listId = await createManualList(listName);
+      const r = await addContactsToList(listId, all.filter((c) => selected.has(c.id)));
+      const parts = [`${r.added} añadidos a "${listName}"`];
+      if (r.already) parts.push(`${r.already} ya estaban`);
+      if (r.noEmail) parts.push(`${r.noEmail} sin email válido`);
+      if (r.suppressed) parts.push(`${r.suppressed} dados de baja (no se añaden)`);
+      alert(parts.join(" · "));
+      setSelected(new Set());
+      setBulkList("");
+    } catch (e) {
+      alert("No se pudo añadir a la lista: " + e.message);
     } finally {
       setBulkBusy(false);
     }
@@ -258,6 +289,12 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
           <b>{selected.size} seleccionados</b>
           {selected.size < filtered.length && <button className="crm-btn ghost sm" onClick={selectAllFiltered}>Seleccionar los {filtered.length} del filtro</button>}
           <span style={{ flex: 1 }} />
+          <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkList} onChange={(e) => setBulkList(e.target.value)}>
+            <option value="">Añadir a lista…</option>
+            {manualLists.map((l) => <option key={l.id} value={l.id}>{l.name || "(sin nombre)"}</option>)}
+            <option value="__new">+ Nueva lista…</option>
+          </select>
+          <button className="crm-btn sm" onClick={applyBulkList} disabled={bulkList === "" || bulkBusy}>{bulkBusy ? "Aplicando…" : "Añadir"}</button>
           {isAdmin && (
             <>
               <select className="crm-search" style={{ margin: 0, maxWidth: 220 }} value={bulkType} onChange={(e) => setBulkType(e.target.value)}>
