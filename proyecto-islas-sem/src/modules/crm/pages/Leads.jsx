@@ -85,7 +85,7 @@ export default function Leads() {
     if (!form.firstName.trim() && !form.email.trim()) return;
     setSaving(true);
     try {
-      await crmCreate("leads", orgId, { ...form, estimatedValue: Number(form.estimatedValue) || 0, ownerEmail: employeeEmailByName(employees, form.responsable) });
+      await crmCreate("leads", orgId, { ...form, email: String(form.email || "").trim().toLowerCase(), estimatedValue: Number(form.estimatedValue) || 0, ownerEmail: employeeEmailByName(employees, form.responsable) });
       setForm(empty);
       setShowNew(false);
     } catch (e) {
@@ -102,7 +102,7 @@ export default function Leads() {
     if (opts.company && lead.company) {
       const cref = await crmCreate("companies", orgId, {
         name: lead.company,
-        email: lead.email || "",
+        email: String(lead.email || "").trim().toLowerCase(),
         phone: lead.phone || lead.whatsapp || "",
         fromLeadId: lead.id,
       });
@@ -111,7 +111,7 @@ export default function Leads() {
     const contactRef = await crmCreate("contacts", orgId, {
       firstName: lead.firstName || "",
       lastName: lead.lastName || "",
-      email: lead.email || "",
+      email: String(lead.email || "").trim().toLowerCase(),
       phone: lead.phone || lead.whatsapp || "",
       company: lead.company || "",
       companyId,

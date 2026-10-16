@@ -213,7 +213,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
     setSaving(true);
     try {
       const tags = form.tags.split(",").map((s) => s.trim()).filter(Boolean);
-      const ref = await crmCreate("contacts", orgId, { ...form, tags, ...typeFields([form.clientType]), clientId: nextClientId(all) });
+      const ref = await crmCreate("contacts", orgId, { ...form, email: form.email.trim().toLowerCase(), tags, ...typeFields([form.clientType]), clientId: nextClientId(all) });
       await logActivity(orgId, { type: "Nota", title: `Contacto creado: ${form.firstName} ${form.lastName}`.trim(), entity: "contact", entityId: ref.id });
       setForm(emptyForm);
       setShowNew(false);

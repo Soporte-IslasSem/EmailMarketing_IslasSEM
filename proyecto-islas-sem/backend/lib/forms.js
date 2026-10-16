@@ -340,6 +340,25 @@ async function applyClientType(orgId, typeId, { contactId, leadId, person, label
   return { contactId, leadId };
 }
 
+// Datos del formulario que faltan en la ficha (nombre, apellidos, teléfono, empresa): se rellenan
+// SOLO los vacíos, nunca se sobrescribe nada, y solo si el email del formulario es el de esa
+// ficha (si alguien rellena por otra persona, no se le cambian los datos a nadie).
+async function fillEmptyFields(col, id, person) {
+  const email = norm(person.email);
+  if (!id || !email) return;
+  const ref = db.collection(col).doc(id);
+  const d = (await ref.get()).data();
+  if (!d || norm(d.email) !== email) return;
+  const patch = {};
+  for (const k of ["firstName", "lastName", "phone", "company"]) {
+    const cur = String(d[k] || "").trim();
+    // Prospecto creado sin nombre: se le puso la parte del email antes de la @.
+    const blank = !cur || (k === "firstName" && cur === email.split("@")[0]);
+    if (blank && String(person[k] || "").trim()) patch[k] = String(person[k]).trim().slice(0, 200);
+  }
+  if (Object.keys(patch).length) await ref.update({ ...patch, updatedAt: new Date() });
+}
+
 async function processFormSubmissions() {
   const snap = await db.collection("formSubmissions").where("status", "==", "recibido").limit(50).get();
   let linked = 0;
@@ -365,6 +384,8 @@ async function processFormSubmissions() {
       ({ contactId, leadId } = await applyClientType(orgId, typeId, { contactId, leadId, person, label })
         .catch((e) => { console.warn("[forms] tipo de cliente:", e.message); return { contactId, leadId }; }));
     }
+    await fillEmptyFields(contactId ? "contacts" : "leads", contactId || leadId, person)
+      .catch((e) => console.warn("[forms] completar ficha:", e.message));
     let dealCreated = false;
     if (!dealId) {
       const r = await ensureDeal(orgId, { ...s, id: doc.id }, { contactId, leadId, person, label })
