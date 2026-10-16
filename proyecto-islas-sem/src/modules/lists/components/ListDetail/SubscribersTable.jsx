@@ -4,10 +4,13 @@
 //   para que la sincronización no lo vuelva a añadir.
 // - En la lista "Bajas" se ve de qué lista venía cada uno y cuándo se dio de baja; quitarlo
 //   de aquí hace que vuelva a poder recibir campañas.
-import { useEffect, useMemo, useState } from "react";
-import { collection, query, where, onSnapshot, doc, getDoc, writeBatch, updateDoc, increment, arrayUnion } from "firebase/firestore";
+// - El nombre se puede poner o corregir con un clic. Si ese email es un contacto del CRM, se
+//   cambia en su ficha (y de ahí en todas sus listas); si no, en todas las listas donde esté.
+import { useEffect, useMemo, useRef, useState } from "react";
+import { collection, query, where, onSnapshot, doc, getDoc, getDocs, writeBatch, updateDoc, increment, arrayUnion, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../../../config/firebaseConfig";
-import { isTypeList, removeFromTypeList } from "../../lib/crmLink";
+import { isTypeList, removeFromTypeList, normEmail } from "../../lib/crmLink";
+import { useOrg } from "../../../crm/lib/useOrg";
 import "./SubscribersTable.styles.css";
 
 const STATUS_LABEL = {
@@ -31,6 +34,9 @@ export default function SubscribersTable({ listId }) {
   const [term, setTerm] = useState("");
   const [sel, setSel] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(null); // { id, value } del nombre que se está escribiendo
+  const { orgId } = useOrg();
+  const cancelEdit = useRef(false); // Esc: no guardar al perder el foco
 
   useEffect(() => {
     getDoc(doc(db, "lists", listId)).then((s) => setList(s.exists() ? { id: s.id, ...s.data() } : null)).catch(() => {});
@@ -58,6 +64,39 @@ export default function SubscribersTable({ listId }) {
   const allPage = items.length > 0 && items.every((s) => sel.has(s.id));
   const toggle = (id) => setSel((x) => { const n = new Set(x); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const togglePage = () => setSel((x) => { const n = new Set(x); items.forEach((s) => (allPage ? n.delete(s.id) : n.add(s.id))); return n; });
+
+  // Nombre: en la ficha del CRM si el email es un contacto (la sincronización lo pasa a sus
+  // listas del CRM) y, además, en todas las suscripciones de ese email en sus listas.
+  const saveName = async (s, raw) => {
+    setEditing(null);
+    const name = String(raw || "").trim().replace(/\s+/g, " ");
+    if (name === (s.name || "")) return;
+    const email = normEmail(s.email);
+    const uid = auth.currentUser.uid;
+    try {
+      let contactRef = null;
+      if (s.contactId) {
+        const c = await getDoc(doc(db, "contacts", s.contactId)).catch(() => null);
+        if (c?.exists()) contactRef = c.ref;
+      }
+      if (!contactRef && orgId && email) {
+        const found = await getDocs(query(collection(db, "contacts"), where("orgId", "==", orgId), where("email", "==", email))).catch(() => null);
+        contactRef = found?.docs[0]?.ref || null;
+      }
+      if (contactRef) {
+        const [firstName, ...rest] = name.split(" ");
+        await updateDoc(contactRef, { firstName: firstName || "", lastName: rest.join(" "), updatedAt: serverTimestamp() });
+      }
+      const subs = email ? (await getDocs(query(collection(db, "subscribers"), where("userId", "==", uid), where("email", "==", email)))).docs : [];
+      const b = writeBatch(db);
+      const refs = new Map(subs.map((d) => [d.id, d.ref]));
+      refs.set(s.id, doc(db, "subscribers", s.id));
+      refs.forEach((ref) => b.update(ref, { name }));
+      await b.commit();
+    } catch (e) {
+      alert(e.code === "permission-denied" ? "Tu rol no permite cambiar el nombre de este contacto." : "No se pudo guardar el nombre: " + e.message);
+    }
+  };
 
   const remove = async (ids) => {
     const victims = subscribers.filter((s) => ids.includes(s.id));
@@ -128,7 +167,21 @@ export default function SubscribersTable({ listId }) {
             <tr key={s.id} style={sel.has(s.id) ? { background: "#f1f9f8" } : undefined}>
               <td><input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} /></td>
               <td>{s.email}</td>
-              <td>{s.name || "—"}</td>
+              <td>
+                {editing?.id === s.id ? (
+                  <input
+                    autoFocus value={editing.value} placeholder="Nombre y apellidos"
+                    onChange={(e) => setEditing({ id: s.id, value: e.target.value })}
+                    onBlur={() => { if (cancelEdit.current) { cancelEdit.current = false; return; } saveName(s, editing.value); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") { cancelEdit.current = true; setEditing(null); } }}
+                    style={{ width: "100%", minWidth: 140, border: "1px solid #bcd6d4", borderRadius: 6, padding: "4px 7px", fontSize: 13.5 }}
+                  />
+                ) : (
+                  <button type="button" className="SubscribersTable__name" onClick={() => { cancelEdit.current = false; setEditing({ id: s.id, value: s.name || "" }); }} title="Poner o cambiar el nombre (se guarda también en el CRM)">
+                    {s.name || <span className="SubscribersTable__noname">+ Añadir nombre</span>} <span className="SubscribersTable__pen">✎</span>
+                  </button>
+                )}
+              </td>
               <td>{STATUS_LABEL[s.status] || s.status}</td>
               {isBajas && <td>{s.fromListName || "—"}</td>}
               <td>{fmt(isBajas ? s.unsubscribedAt : s.createdAt)}</td>

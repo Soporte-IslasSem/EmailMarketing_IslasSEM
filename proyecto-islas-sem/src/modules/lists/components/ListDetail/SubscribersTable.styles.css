@@ -104,3 +104,10 @@
   font-size: 14px;
   color: #333;
 }
+
+/* Nombre editable con un clic */
+.SubscribersTable__name{border:1px dashed transparent;background:none;padding:3px 6px;border-radius:6px;cursor:pointer;font:inherit;color:inherit;text-align:left}
+.SubscribersTable__name:hover{border-color:#bcd6d4;background:#f6fbfa}
+.SubscribersTable__noname{color:#1a9190;font-size:13px}
+.SubscribersTable__pen{color:#8a9a9a;font-size:12px;opacity:0}
+.SubscribersTable__name:hover .SubscribersTable__pen{opacity:1}
