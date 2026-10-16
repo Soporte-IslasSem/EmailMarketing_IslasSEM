@@ -57,7 +57,6 @@ import TemplateEditor from "../modules/templates/components/TemplateEditor/Templ
 import TemplateTagsPage from "../modules/templates/pages/TemplateTagsPage.jsx";
 
 // Subscribers
-import AddSubscriber from "../modules/subscribers/components/AddSubscriber/AddSubscriber.jsx";
 
 // FORMS WIZARD
 
@@ -283,7 +282,7 @@ const router = createBrowserRouter([
       { path: "templates/tags", element: <TemplateTagsPage /> },
 
       // SUBSCRIBERS
-      { path: "subscribers/add", element: <AddSubscriber /> },
+      { path: "subscribers/add", element: <Navigate to="/dashboard/lists" replace /> }, // se añaden desde cada lista (así entran también en el CRM)
 
       // FORMULARIOS: el mismo módulo que CRM › Formularios (constructor unificado)
       { path: "forms", element: <CrmForms /> },
