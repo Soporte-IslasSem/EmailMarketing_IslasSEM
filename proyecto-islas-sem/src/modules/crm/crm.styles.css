@@ -79,14 +79,29 @@
 }
 
 /* ---- tabla ---- */
+/* Sin overflow:hidden (impediría que la cabecera se quede fija al bajar): las esquinas
+   redondeadas van en las celdas de las esquinas. */
 .crm-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: #fff;
   border: 1px solid var(--crm-line);
   border-radius: 12px;
-  overflow: hidden;
 }
+.crm-table thead tr:first-child th:first-child { border-top-left-radius: 12px; }
+.crm-table thead tr:first-child th:last-child { border-top-right-radius: 12px; }
+.crm-table tr:last-child td:first-child { border-bottom-left-radius: 12px; }
+.crm-table tr:last-child td:last-child { border-bottom-right-radius: 12px; }
+/* Cabecera fija arriba mientras se baja por la tabla */
+.crm-table thead th {
+  position: sticky;
+  top: -28px; /* el contenedor que se desplaza tiene 28px de margen interior */
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--crm-line);
+}
+/* Dentro de ventanas (modales) el margen es otro: ahí la cabecera no se fija. */
+.crm-modal .crm-table thead th { position: static; box-shadow: none; }
 .crm-table th,
 .crm-table td {
   text-align: left;
