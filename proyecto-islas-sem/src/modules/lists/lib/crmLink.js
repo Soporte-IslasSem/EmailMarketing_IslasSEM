@@ -31,9 +31,27 @@ export async function commitOps(ops) {
 }
 
 // Listas del CRM del usuario: crmKey → { id, ref, data }
+// Id fijo de la lista del CRM de un usuario para una clave ("all", "type:<id>"…): si dos pestañas
+// (o dos equipos) la crean a la vez, escriben la misma lista en vez de crear copias repetidas.
+export const crmListId = (uid, key) => `crm_${uid}_${String(key).replace(/[^A-Za-z0-9_-]/g, "-")}`;
+
+// Si aún quedara alguna lista repetida para la misma clave, se usa siempre la misma: la que tenga
+// más suscriptores (y, a igualdad, la de id fijo o la más antigua).
+const ms = (t) => (t?.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : 0);
 async function myCrmLists(uid) {
   const snap = await getDocs(query(collection(db, "lists"), where("userId", "==", uid)));
-  return new Map(snap.docs.filter((d) => d.data().crm).map((d) => [d.data().crmKey, { id: d.id, ref: d.ref, data: d.data() }]));
+  const out = new Map();
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (!data.crm) continue;
+    const cur = out.get(data.crmKey);
+    const better = !cur
+      || (data.subscribersCount || 0) > (cur.data.subscribersCount || 0)
+      || ((data.subscribersCount || 0) === (cur.data.subscribersCount || 0)
+        && (d.id === crmListId(uid, data.crmKey) || (cur.id !== crmListId(uid, data.crmKey) && ms(data.createdAt) < ms(cur.data.createdAt))));
+    if (better) out.set(data.crmKey, { id: d.id, ref: d.ref, data });
+  }
+  return out;
 }
 
 // Una sincronización a la vez por pestaña (evita altas dobles si llegan cambios seguidos).
@@ -124,7 +142,7 @@ export function syncAll({ orgId, types, visible, create }) {
 
     for (const w of wanted) {
       const cur = crmLists.get(w.key); // si falta, se crea (quien ya tiene listas del CRM, o al abrir Listas)
-      const ref = cur?.ref || doc(collection(db, "lists"));
+      const ref = cur?.ref || doc(db, "lists", crmListId(uid, w.key));
       const ops = [];
       if (!cur) ops.push((b) => b.set(ref, { name: w.name, crm: true, crmKey: w.key, userId: uid, senderEmail: sender, language: "es", subscribersCount: 0, createdAt: new Date() }));
       else if (cur.data.name !== w.name) ops.push((b) => b.update(ref, { name: w.name }));
@@ -238,11 +256,12 @@ export async function createTypeWithList(label, orgId, types, { language = "es" 
   if (!name) throw new Error("Falta el nombre");
   if (types.some((t) => t.label.trim().toLowerCase() === name.toLowerCase())) throw new Error(`Ya existe "${name}"`);
   const id = newTypeId(name, types);
-  await saveClientTypes(orgId, [...types, { id, label: name, icon: "", color: "#1a9190" }]);
-  const ref = doc(collection(db, "lists"));
+  // Primero la lista y después el tipo: si el tipo apareciera antes, otra pestaña crearía su lista.
+  const ref = doc(db, "lists", crmListId(auth.currentUser.uid, `type:${id}`));
   const b = writeBatch(db);
   b.set(ref, { name, crm: true, crmKey: `type:${id}`, userId: auth.currentUser.uid, senderEmail: SENDER_EMAIL, language, subscribersCount: 0, createdAt: new Date() });
   await b.commit();
+  await saveClientTypes(orgId, [...types, { id, label: name, icon: "", color: "#1a9190" }]);
   return { typeId: id, listId: ref.id };
 }
 
@@ -253,8 +272,8 @@ export async function convertListToType(list, orgId, types) {
   const name = String(list.name || "").trim() || "Sin nombre";
   const id = newTypeId(name, types);
   if (types.some((t) => t.label.trim().toLowerCase() === name.toLowerCase())) throw new Error(`Ya existe el tipo "${name}": cambia el nombre de la lista antes`);
-  await saveClientTypes(orgId, [...types, { id, label: name, icon: "", color: "#1a9190" }]);
   await updateDoc(doc(db, "lists", list.id), { crm: true, crmKey: `type:${id}`, name, convertedAt: serverTimestamp() });
+  await saveClientTypes(orgId, [...types, { id, label: name, icon: "", color: "#1a9190" }]);
   const subs = (await getDocs(query(collection(db, "subscribers"), where("listId", "==", list.id), where("userId", "==", auth.currentUser.uid)))).docs.map((d) => d.data());
   return addEmailsToTypeList({ ...list, crm: true, crmKey: `type:${id}` }, subs.map((s) => ({ email: s.email, name: s.name })), orgId);
 }
@@ -290,11 +309,12 @@ export async function convertListsToTypes(lists, orgId, types) {
   const out = { lists: plan.length, newTypes: allTypes.length - types.length, merged: plan.filter((p) => p.merged).map((p) => p.name), created: 0, tagged: 0, invalid: 0 };
   if (!plan.length) return out;
 
-  // 1) Tipos nuevos (una sola escritura) y listas que pasan a ser la de su tipo.
-  if (out.newTypes) await saveClientTypes(orgId, allTypes);
+  // 1) Listas que pasan a ser la de su tipo y, después, los tipos nuevos (en ese orden: si el tipo
+  //    apareciera antes que su lista, otra pestaña abierta crearía una lista repetida).
   await commitOps(plan.map((p) => (b) => b.update(doc(db, "lists", p.list.id), p.merged
     ? { mergedTypeId: p.typeId, convertedAt: serverTimestamp() }
     : { crm: true, crmKey: `type:${p.typeId}`, name: p.name, convertedAt: serverTimestamp() })));
+  if (out.newTypes) await saveClientTypes(orgId, allTypes);
 
   // 2) Personas de cada lista → contacto con ese tipo (se crea si no existe).
   const contacts = (await getDocs(query(collection(db, "contacts"), where("orgId", "==", orgId)))).docs.map((d) => ({ id: d.id, ...d.data() }));

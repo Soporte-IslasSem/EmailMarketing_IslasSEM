@@ -100,10 +100,11 @@ async function commit(ops) {
   console.log(`\nTipos nuevos: ${allTypes.length - types.length} · contactos ya existentes que reciben tipo: ${tagged} · contactos nuevos: ${created}${invalid ? ` · emails no válidos ignorados: ${invalid}` : ""}`);
 
   if (!APPLY) { console.log("\nNo se ha cambiado nada. Para hacerlo: --apply"); return process.exit(0); }
-  if (allTypes.length > types.length) await orgRef.update({ clientTypes: allTypes });
+  // Listas antes que tipos: si el tipo apareciera antes, la app abierta crearía listas repetidas.
   await commit(plan.map((p) => (b) => b.update(p.ref, p.merged
     ? { mergedTypeId: p.typeId, convertedAt: new Date() }
     : { crm: true, crmKey: `type:${p.typeId}`, name: p.name, convertedAt: new Date() })));
+  if (allTypes.length > types.length) await orgRef.update({ clientTypes: allTypes });
   await commit(ops);
   console.log("✓ Hecho. Abre Listas en la app para que cuadre las suscripciones.");
   process.exit(0);
