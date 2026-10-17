@@ -9,10 +9,12 @@ import { cleanEmailHtml } from "../../../utils/emailHtml";
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || "https://email-marketing.islassem.com/api";
 const BATCH = 400; // Firestore admite 500 escrituras/lote; dejamos margen.
 
-// ¿Este suscriptor puede recibir? (no dado de baja, no rebotado, con email)
+// ¿Este suscriptor puede recibir? (no dado de baja, no rebotado, con un email bien escrito;
+// uno mal escrito se salta en vez de fallar al enviarlo)
+const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const emailable = (s) => {
   const st = String(s.status || "").toLowerCase();
-  return !!s.email && !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid", "pending"].includes(st);
+  return EMAIL_OK.test(String(s.email || "").trim()) && !["unsubscribed", "baja", "bounced", "rebotado", "blocked", "invalid", "pending"].includes(st);
 };
 
 // Destinatarios finales de una campaña: solo los que pueden recibir, UNA vez por email
