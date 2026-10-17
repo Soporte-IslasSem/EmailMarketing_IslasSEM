@@ -55,12 +55,14 @@ export default function Contacts() {
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState(""); // "" todos · "__none" sin tipo · id
+  const [params] = useSearchParams();
+  const [typeFilter, setTypeFilter] = useState(() => params.get("tipo") || ""); // "" todos · "__none" sin tipo · id
+  // Desde una lista ("Ver y completar"): solo los que no tienen email.
+  const [noEmailOnly, setNoEmailOnly] = useState(() => params.get("sinEmail") === "1");
   const [sort, setSort] = useState({ key: "id", dir: 1 });
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkOwner, setBulkOwner] = useState("");
-  const [params] = useSearchParams();
   const [showImport, setShowImport] = useState(() => params.get("import") === "1"); // desde Integraciones
   const [ownerFilter, setOwnerFilter] = useState(""); // "" todos · "__none" sin responsable · "person:id" / "team:id"
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -83,6 +85,7 @@ export default function Contacts() {
     let rows = [...items];
     if (stageFilter) rows = rows.filter((c) => (c.stage || "Lead") === stageFilter);
     if (typeFilter) rows = rows.filter((c) => hasType(c, typeFilter));
+    if (noEmailOnly) rows = rows.filter((c) => !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(String(c.email || "").trim()));
     if (ownerFilter) rows = rows.filter((c) => (ownerFilter === "__none" ? !ownerKey(c) && !c.responsable : ownerKey(c) === ownerFilter));
     if (t) rows = rows.filter((c) =>
       [c.firstName, c.lastName, c.email, c.phone, c.company, c.role, c.responsable, c.clientId, (c.tags || []).join(" "), ...typesOf(c).map((id) => typeOf(types, id)?.label)]
@@ -103,7 +106,7 @@ export default function Contacts() {
       return r * sort.dir || (a.clientId || "").localeCompare(b.clientId || "", "es", { numeric: true });
     });
     return rows;
-  }, [items, term, stageFilter, typeFilter, ownerFilter, sort, types, typeRank]);
+  }, [items, term, stageFilter, typeFilter, noEmailOnly, ownerFilter, sort, types, typeRank]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE));
   const current = Math.min(page, pages);
@@ -270,6 +273,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
           <option value="__none">— Sin responsable —</option>
           {scope.options.map((o) => <option key={o.key} value={o.key}>{o.type === "team" ? "👥 " : ""}{o.name}</option>)}
         </select>
+        {noEmailOnly && <button className="crm-btn sm" onClick={() => setNoEmailOnly(false)} title="Quitar este filtro">Solo sin email ✕</button>}
         <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>{filtered.length} resultados</span>
       </div>
 
