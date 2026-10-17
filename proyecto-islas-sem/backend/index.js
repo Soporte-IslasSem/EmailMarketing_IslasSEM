@@ -45,29 +45,36 @@ api.use("/forms", (req, res, next) => {
   next();
 });
 
+// Express 4 no captura los errores de las rutas async: sin esto, un fallo (p. ej. la base de datos
+// sin cuota) deja la petición colgada y el servidor web acaba respondiendo 502.
+const safe = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch((e) => {
+  console.error(`[api] ${req.method} ${req.path}:`, e.message || e);
+  if (!res.headersSent) res.status(500).json({ ok: false, error: "Error interno" });
+});
+
 // --- Listas: comprobar dominios de email (Depurar), solo con sesión de la app ---
-api.post("/lists/check-domains", checkDomains);
-api.post("/lists/:id/webhook-test", testWebhook);
+api.post("/lists/check-domains", safe(checkDomains));
+api.post("/lists/:id/webhook-test", safe(testWebhook));
 
 // --- Email marketing: alta desde formularios incrustados + doble opt-in ---
-api.post("/forms/subscribe", subscribe);
-api.get("/forms/confirm/:sid", confirm);
+api.post("/forms/subscribe", safe(subscribe));
+api.get("/forms/confirm/:sid", safe(confirm));
 
 // --- Formularios públicos (SEPA / Datos Jurídicos / creados en CRM) con reCAPTCHA v3 ---
-api.get("/forms/def/:id", formDefinition);
-api.get("/forms/public", publicForms);
-api.post("/forms/submit", submitForm);
+api.get("/forms/def/:id", safe(formDefinition));
+api.get("/forms/public", safe(publicForms));
+api.post("/forms/submit", safe(submitForm));
 
 // --- Google Calendar (grupo@) ⇄ Tareas ---
-api.post("/google/connect", gcal.connect);
-api.get("/google/callback", gcal.callback);
-api.get("/google/status", gcal.status);
-api.post("/google/settings", gcal.settings);
-api.post("/google/disconnect", gcal.disconnect);
-api.post("/google/events", gcal.pushEvent);
+api.post("/google/connect", safe(gcal.connect));
+api.get("/google/callback", safe(gcal.callback));
+api.get("/google/status", safe(gcal.status));
+api.post("/google/settings", safe(gcal.settings));
+api.post("/google/disconnect", safe(gcal.disconnect));
+api.post("/google/events", safe(gcal.pushEvent));
 
 // --- Acceso: tras registrarse/entrar, ¿este email puede usar la app? ---
-api.post("/access/check", checkAccess);
+api.post("/access/check", safe(checkAccess));
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
@@ -76,7 +83,7 @@ api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 // porque antivirus y gestores de correo abren los enlaces. POST da de baja (botón de la
 // página o "List-Unsubscribe=One-Click" de Gmail/Yahoo).
 api.get("/u/:subscriberId", (req, res) => unsubscribePage(req, res, false).catch(() => res.sendStatus(500)));
-api.post("/u/:subscriberId", doUnsubscribe);
+api.post("/u/:subscriberId", safe(doUnsubscribe));
 
 async function subscriberEmail(sid) {
   if (!sid) return "";
