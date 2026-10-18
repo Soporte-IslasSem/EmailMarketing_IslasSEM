@@ -29,7 +29,8 @@ export default function CrmAutomation() {
   const { items: customForms } = useCrmCollection("crmForms");
   const formOpts = [
     ...BUILTIN_LIST.map((f) => [f.type, f.name]),
-    ...customForms.filter((f) => f.active !== false).map((f) => [f.id, f.name]),
+    // (SEPA / Jurídicos editados se guardan con su mismo id: ya están arriba)
+    ...customForms.filter((f) => f.active !== false && !BUILTIN_LIST.some((b) => b.type === f.id)).map((f) => [f.id, f.name]),
   ];
   // Al elegir formulario, el título por defecto pasa a ser su nombre (es el asunto del correo).
   const pickForm = (stageId, r, formId) => {
@@ -115,6 +116,11 @@ export default function CrmAutomation() {
                           {TO_OPTS.map((t) => <option key={t[0]} value={t[0]}>→ {t[1]}</option>)}
                         </select>
                       )}
+                      <select value={r.sourceForm || ""} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { sourceForm: e.target.value })} style={ruleSel} title="Solo para negociaciones que llegaron por este formulario">
+                        <option value="">Llegó por: cualquier vía</option>
+                        {formOpts.map((o) => <option key={o[0]} value={o[0]}>Solo si llegó por: {o[1]}</option>)}
+                        {r.sourceForm && !formOpts.some((o) => o[0] === r.sourceForm) && <option value={r.sourceForm}>Solo si llegó por: {r.sourceForm}</option>}
+                      </select>
                       <select value={r.clientType || ""} onChange={(e) => updateStageRule(pipeline, s.id, r.id, { clientType: e.target.value })} style={ruleSel} title="Solo para clientes de este tipo">
                         <option value="">Tipo de cliente: todos</option>
                         {types.map((t) => <option key={t.id} value={t.id}>Solo tipo: {t.label}</option>)}

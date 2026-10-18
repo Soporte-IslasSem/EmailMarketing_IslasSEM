@@ -284,7 +284,8 @@ async function ensureDeal(orgId, s, { contactId, leadId, person, label }) {
     contactEmail: person.email || "", company, clientType: "nuevo", priceType: "producto",
     type: "Sales", source: "Formulario web", responsable: "", notes: items.length ? "" : interest,
     ...(items.length ? { items, subtotal, itemsCount: items.length } : {}),
-    formSubmissionId: s.id, custom: {}, createdAt: new Date(), updatedAt: new Date(),
+    formSubmissionId: s.id, sourceFormId: String(s.formType || ""), sourceFormName: label,
+    custom: {}, createdAt: new Date(), updatedAt: new Date(),
   });
   return { dealId: ref.id, created: true };
 }

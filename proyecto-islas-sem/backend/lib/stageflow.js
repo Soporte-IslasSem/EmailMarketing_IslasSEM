@@ -58,6 +58,18 @@ function matchesClient(rule, clientTypes, relation) {
   if (rule.relation && rule.relation !== relation) return false;
   return true;
 }
+// Formulario por el que llegó la negociación (p. ej. "juridicos", "sepa" o un formulario del
+// constructor): la regla solo se aplica si coincide. Vacío = venga de donde venga.
+function matchesSource(rule, sourceFormId) {
+  return !rule.sourceForm || rule.sourceForm === sourceFormId;
+}
+// Las negociaciones creadas por un formulario antes de guardar sourceFormId: se mira el envío.
+async function sourceFormOf(d) {
+  if (d.sourceFormId) return d.sourceFormId;
+  if (!d.formSubmissionId) return "";
+  const s = await db.collection("formSubmissions").doc(d.formSubmissionId).get().catch(() => null);
+  return s?.exists ? String(s.data().formType || "") : "";
+}
 
 function emailHtml({ title, body, cta, ctaUrl }) {
   return `<div style="font-family:Arial,Helvetica,sans-serif;color:#2a3a3a;max-width:560px;margin:auto">
@@ -94,7 +106,9 @@ async function runRules(pipeline, deal) {
     }
   }
   const relation = deal.clientType || "nuevo";
-  const rules = ((pipeline.automations || {})[deal.stage] || []).filter((r) => matchesInterest(r, text) && matchesClient(r, clientTypes, relation));
+  const stageRules = (pipeline.automations || {})[deal.stage] || [];
+  const sourceForm = stageRules.some((r) => r.sourceForm) ? await sourceFormOf(deal) : "";
+  const rules = stageRules.filter((r) => matchesInterest(r, text) && matchesClient(r, clientTypes, relation) && matchesSource(r, sourceForm));
   if (!rules.length) return { ran: 0, waitH: 0 };
   const email = await contactEmailOf(deal);
   let waitH = 0;
