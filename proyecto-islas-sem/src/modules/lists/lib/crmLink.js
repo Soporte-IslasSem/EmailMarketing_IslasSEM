@@ -155,7 +155,13 @@ export function syncAll({ orgId, types, visible, create }) {
         const s = have.get(email);
         const idField = w.key === "companies" ? "companyId" : "contactId";
         if (s) {
-          if (s.data()[idField] !== c.id || s.data().source !== "crm") ops.push((b) => b.update(s.ref, { [idField]: c.id, source: "crm" }));
+          // También el nombre: el de la ficha del CRM manda (si la ficha tiene uno).
+          const crmName = (w.key === "companies" ? c.name : nameOf(c)) || "";
+          const fix = {
+            ...(s.data()[idField] !== c.id || s.data().source !== "crm" ? { [idField]: c.id, source: "crm" } : {}),
+            ...(crmName && (s.data().name || "") !== crmName ? { name: crmName } : {}),
+          };
+          if (Object.keys(fix).length) ops.push((b) => b.update(s.ref, fix));
           continue;
         }
         const name = (w.key === "companies" ? c.name : nameOf(c)) || "";
