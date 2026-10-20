@@ -5,7 +5,7 @@ import "../crm.styles.css";
 
 const KIND_LABEL = {
   offer: "Presupuesto", sepa: "SEPA", contract: "Contrato",
-  form: "Formulario", campaign: "Campaña", notification: "Aviso", email: "Correo",
+  form: "Formulario", campaign: "Campaña", notification: "Aviso", email: "Correo", "talento-digital": "Talento Digital",
 };
 
 export default function Outbox() {

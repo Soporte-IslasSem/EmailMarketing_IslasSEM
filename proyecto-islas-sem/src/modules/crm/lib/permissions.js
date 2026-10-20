@@ -99,6 +99,8 @@ export function usePerms() {
     const canSeeRoute = (path) => {
       if (/^\/dashboard\/admin/.test(path)) return isAdmin;
       if (/^\/dashboard\/campaigns\/create/.test(path)) return level("campaigns", "add") > 0;
+      // Talento Digital: redactar y enviar correos, como crear campañas.
+      if (/^\/dashboard\/talento-digital/.test(path)) return level("campaigns", "add") > 0;
       if (/^\/dashboard\/campaigns\/edit/.test(path)) return level("campaigns", "edit") > 0;
       if (/^\/dashboard\/crm\/newdeal/.test(path)) return level("deals", "add") > 0;
       const hit = ROUTE_ENTITY.find(([re]) => re.test(path));

@@ -23,6 +23,7 @@ const { subscribe, confirm, unsubscribePage, doUnsubscribe } = require("./lib/su
 const { testWebhook } = require("./lib/webhooks");
 const { checkAccess } = require("./lib/access");
 const gcal = require("./lib/gcal");
+const talento = require("./lib/talentoDigital");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -76,6 +77,14 @@ api.post("/google/events", safe(gcal.pushEvent));
 
 // --- Acceso: tras registrarse/entrar, ¿este email puede usar la app? ---
 api.post("/access/check", safe(checkAccess));
+
+// --- Talento Digital: altas que llegan del directorio (clave compartida) y su correo ---
+api.post("/talento-digital/empresa", safe(talento.recibirEmpresa));
+api.get("/talento-digital/empresas", safe(talento.listarEmpresas));
+api.post("/talento-digital/plantilla", safe(talento.guardarPlantilla));
+api.post("/talento-digital/vista-previa", safe(talento.vistaPrevia));
+api.post("/talento-digital/enviar", safe(talento.enviar));
+api.post("/talento-digital/archivar", safe(talento.archivar));
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

@@ -45,6 +45,12 @@ export const AREAS = [
     ],
   },
   {
+    id: "talento",
+    label: "Talento Digital",
+    icon: "talento",
+    tabs: [["/dashboard/talento-digital", "Altas de empresas"]],
+  },
+  {
     id: "tasks",
     label: "Tareas",
     icon: "task",
@@ -80,6 +86,7 @@ const SECTION = [
   ["/dashboard/crm", "crm"],
   ["/dashboard/admin", "admin"],
   ["/dashboard/tasks", "tasks"],
+  ["/dashboard/talento-digital", "talento"],
   ["/dashboard/campaigns", "marketing"],
   ["/dashboard/lists", "marketing"],
   ["/dashboard/templates", "marketing"],
@@ -126,6 +133,7 @@ const CRUMB = {
   "/dashboard/restaurantes/campanas": "Restaurantes · Campañas",
   "/dashboard/restaurantes/equipo": "Restaurantes · Equipo y fichajes",
   "/dashboard/restaurantes/ajustes": "Restaurantes · Ajustes",
+  "/dashboard/talento-digital": "Talento Digital · Altas de empresas",
   "/dashboard/campaigns": "Campañas",
   "/dashboard/automations": "Automatizaciones",
   "/dashboard/lists": "Listas",

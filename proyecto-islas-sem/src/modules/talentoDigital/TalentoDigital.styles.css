@@ -1,0 +1,28 @@
+/* Sección Talento Digital (usa las clases de crm.styles.css) */
+.td__acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.td__filtros { display: flex; gap: 8px; margin: 4px 0 14px; flex-wrap: wrap; align-items: center; }
+.td__filtros .crm-chip { cursor: pointer; border: 1px solid var(--crm-line, #e3eaea); }
+.td__filtros .crm-chip.info { border-color: transparent; }
+.td__archivar { margin-left: auto; }
+.td__aviso { background: #eef7f7; border-color: #cfe5e5; font-size: 14px; }
+.td__error { background: #fde8ee; border-color: #f4c3cf; font-size: 14px; }
+.td .crm-table tbody tr { cursor: pointer; }
+.td__fila-on { background: #f3f8ff; }
+.td__sub { font-size: 12px; color: var(--crm-muted, #7a8a8a); }
+.td__prueba { margin-left: 8px; background: #f2f2f2; color: #666; font-size: 11px; }
+
+.crm-modal.td__modal { width: min(1100px, 96vw); max-width: 1100px; }
+.crm-modal__body.td__editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; overflow: auto; }
+.td__form textarea { font-family: inherit; line-height: 1.5; resize: vertical; }
+.td__ayuda { font-size: 12px; color: var(--crm-muted, #7a8a8a); margin: -4px 0 12px; line-height: 1.5; }
+.td__ayuda code { background: #f1f5f5; padding: 1px 5px; border-radius: 4px; color: #0f6e6e; }
+.td__prueba-envio { display: flex; gap: 10px; align-items: flex-end; }
+.td__prueba-envio .crm-field { flex: 1; margin-bottom: 0; }
+.td__vista { display: flex; flex-direction: column; border: 1px solid var(--crm-line, #e3eaea); border-radius: 10px; overflow: hidden; min-height: 420px; background: #fff; }
+.td__vista-cab { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--crm-muted, #7a8a8a); padding: 10px 14px; background: #f7fafa; border-bottom: 1px solid var(--crm-line, #e3eaea); }
+.td__vista-asunto { font-size: 13px; padding: 10px 14px; border-bottom: 1px solid var(--crm-line, #e3eaea); }
+.td__vista iframe { flex: 1; width: 100%; border: 0; min-height: 360px; }
+
+@media (max-width: 860px) {
+  .crm-modal__body.td__editor { grid-template-columns: 1fr; }
+}

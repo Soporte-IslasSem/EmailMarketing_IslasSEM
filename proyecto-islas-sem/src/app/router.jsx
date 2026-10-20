@@ -88,6 +88,7 @@ import Leads from "../modules/crm/pages/Leads.jsx";
 import Pipeline from "../modules/crm/pages/Pipeline.jsx";
 import Activities from "../modules/crm/pages/Activities.jsx";
 import Outbox from "../modules/crm/pages/Outbox.jsx";
+import TalentoDigital from "../modules/talentoDigital/TalentoDigital.jsx";
 import CrmForms from "../modules/crm/pages/CrmForms.jsx";
 import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
@@ -214,6 +215,7 @@ const router = createBrowserRouter([
       // CRM · pestañas en construcción (mismo nav que el prototipo)
       { path: "crm/analytics", element: <Analytics /> },
       { path: "crm/outbox", element: <Outbox /> },
+      { path: "talento-digital", element: <TalentoDigital /> },
       { path: "crm/forms", element: <CrmForms /> },
       { path: "crm/forms/new", element: <CrmFormBuilder /> },
       { path: "crm/forms/edit/:id", element: <CrmFormBuilder /> },
