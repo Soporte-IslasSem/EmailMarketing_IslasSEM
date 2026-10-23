@@ -6,6 +6,9 @@ import CrmModal from "../../crm/components/CrmModal";
 import ContractView from "../components/ContractView";
 import TemplateFields from "../components/TemplateFields";
 import SignaturePad from "../components/SignaturePad";
+import SendContractModal from "../components/SendContractModal";
+import { useCrmCollection } from "../../crm/lib/crm";
+import { usePerms } from "../../crm/lib/permissions";
 import { contractsApi, toBase64, STATUS, fmtDate, openContractFile } from "../lib/api";
 import { blocksFromDocx, holesOf, holeCounts, guessSource } from "../lib/docx";
 import "../../crm/crm.styles.css";
@@ -41,7 +44,10 @@ function AllContracts() {
   const [status, setStatus] = useState("");
   const [term, setTerm] = useState("");
   const [error, setError] = useState("");
-  useEffect(() => { contractsApi("list").then((r) => setItems(r.contracts)).catch((e) => { setItems([]); setError(e.message); }); }, []);
+  const [picking, setPicking] = useState(false); // elegir cliente para enviar un contrato
+  const [sendTo, setSendTo] = useState(null); // { contactId, dealId }
+  const load = useCallback(() => contractsApi("list").then((r) => setItems(r.contracts)).catch((e) => { setItems([]); setError(e.message); }), []);
+  useEffect(() => { load(); }, [load]);
   const rows = useMemo(() => (items || []).filter((c) => (!status || c.status === status)
     && (!term || [c.title, c.clientName, c.clientEmail, c.code].join(" ").toLowerCase().includes(term.toLowerCase()))), [items, status, term]);
   return (
@@ -52,7 +58,10 @@ function AllContracts() {
           <option value="">Todos los estados</option>
           {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
+        <button className="crm-btn" onClick={() => setPicking(true)}>✍️ Enviar contrato</button>
       </div>
+      {picking && <ClientPicker onClose={() => setPicking(false)} onPick={(x) => { setPicking(false); setSendTo(x); }} />}
+      {sendTo && <SendContractModal contactId={sendTo.contactId} dealId={sendTo.dealId} onClose={() => setSendTo(null)} onSent={load} />}
       {error && <div className="cf-err">{error}</div>}
       <table className="crm-table">
         <thead><tr><th>Documento</th><th>Cliente</th><th>Estado</th><th>Enviado</th><th>Firmado</th><th>ID</th></tr></thead>
@@ -76,6 +85,56 @@ function AllContracts() {
         </tbody>
       </table>
     </>
+  );
+}
+
+// Elegir a quién se envía: el cliente (buscador) y, si se quiere, una de sus negociaciones abiertas
+// (así, al firmar, queda en esa negociación).
+function ClientPicker({ onClose, onPick }) {
+  const perms = usePerms();
+  const { items: allContacts, loading } = useCrmCollection("contacts");
+  const { items: deals } = useCrmCollection("deals");
+  const contacts = useMemo(() => perms.visible("contacts", allContacts), [perms, allContacts]);
+  const [term, setTerm] = useState("");
+  const [contact, setContact] = useState(null);
+  const [dealId, setDealId] = useState("");
+  const name = (c) => `${c.firstName || ""} ${c.lastName || ""}`.trim();
+  const found = useMemo(() => {
+    const t = term.trim().toLowerCase();
+    if (!t) return [];
+    return contacts.filter((c) => [name(c), c.email, c.company, c.clientId, c.dni].filter(Boolean).some((v) => String(v).toLowerCase().includes(t))).slice(0, 30);
+  }, [contacts, term]);
+  const open = contact ? deals.filter((d) => d.contactId === contact.id && d.status !== "ganado" && d.status !== "perdido") : [];
+  return (
+    <CrmModal title="Enviar contrato · elegir cliente" onClose={onClose} maxWidth={620}
+      footer={<><button className="crm-btn ghost" onClick={contact ? () => setContact(null) : onClose}>{contact ? "← Otro cliente" : "Cancelar"}</button>
+        {contact && <button className="crm-btn" onClick={() => onPick({ contactId: contact.id, dealId })}>Continuar →</button>}</>}>
+      {!contact ? (
+        <>
+          <input autoFocus className="crm-search" style={{ margin: "0 0 10px", width: "100%", maxWidth: "none" }} placeholder="Busca por nombre, email, empresa, ID o DNI…" value={term} onChange={(e) => setTerm(e.target.value)} />
+          {loading ? <p>Cargando clientes…</p> : !term.trim() ? <p style={{ color: "var(--crm-muted)", fontSize: 13 }}>Escribe para buscar el cliente.</p> : found.length ? found.map((c) => (
+            <div key={c.id} onClick={() => { setContact(c); setDealId(""); }} style={{ padding: "8px 6px", borderBottom: "1px solid var(--crm-line,#eef3f3)", cursor: "pointer" }}>
+              <b>{name(c) || "(sin nombre)"}</b> <span style={{ color: "var(--crm-muted)", fontSize: 12.5 }}>{c.clientId || ""}</span>
+              <div style={{ fontSize: 12.5, color: c.email ? "var(--crm-muted)" : "#b0304c" }}>{c.email || "Sin email: no se le puede enviar"}{c.company ? ` · ${c.company}` : ""}</div>
+            </div>
+          )) : <p style={{ color: "var(--crm-muted)", fontSize: 13 }}>Ningún cliente coincide.</p>}
+        </>
+      ) : (
+        <>
+          <p style={{ margin: "0 0 10px" }}><b>{name(contact) || "(sin nombre)"}</b> · {contact.email || <span style={{ color: "#b0304c" }}>sin email (añádelo en su ficha antes de enviar)</span>}</p>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>¿Va ligado a una negociación?</div>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", cursor: "pointer" }}>
+            <input type="radio" style={{ width: "auto" }} checked={!dealId} onChange={() => setDealId("")} /> No, solo al cliente
+          </label>
+          {open.map((d) => (
+            <label key={d.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", cursor: "pointer" }}>
+              <input type="radio" style={{ width: "auto" }} checked={dealId === d.id} onChange={() => setDealId(d.id)} /> {d.title}
+            </label>
+          ))}
+          {!open.length && <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "4px 0 0" }}>Este cliente no tiene negociaciones abiertas.</p>}
+        </>
+      )}
+    </CrmModal>
   );
 }
 

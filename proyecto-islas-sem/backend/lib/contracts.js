@@ -181,7 +181,11 @@ function signerBox(title, s, img) {
   return {
     width: "*", stack: [
       { text: title, bold: true, color: TEAL, margin: [0, 0, 0, 4] },
-      img ? { image: img, fit: [190, 70], margin: [0, 0, 0, 2] } : { text: "(pendiente de firma)", color: "#999", margin: [0, 25, 0, 25] },
+      // Recuadro de altura fija: así las dos líneas de firma quedan siempre a la misma altura.
+      {
+        table: { widths: [220], heights: [74], body: [[img ? { image: img, fit: [200, 70] } : { text: "(pendiente de firma)", color: "#999", margin: [0, 28, 0, 0] }]] },
+        layout: "noBorders",
+      },
       { canvas: [{ type: "line", x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 0.7, lineColor: "#555" }] },
       { text: [s.name, s.dni && `· ${s.dni}`].filter(Boolean).join(" "), fontSize: 9, margin: [0, 3, 0, 0] },
       ...(s.company ? [{ text: `En representación de: ${s.company}${s.cif ? ` · CIF ${s.cif}` : ""}`, fontSize: 8.5 }] : []),
@@ -556,7 +560,8 @@ async function publicSign(req, res) {
     const files = [];
     for (const [i, d] of (c.docs || []).entries()) {
       const { pdf, contentHash } = await buildSignedPdf(c, d);
-      const base = String(d.name).replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 80) || `Documento ${i + 1}`;
+      // Nombre de archivo limpio: sin caracteres que los sistemas de archivos no admiten, sin espacios dobles.
+      const base = String(d.name).replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || `Documento ${i + 1}`;
       const signedPath = `contracts/${DEFAULT_ORG_ID}/signed/${doc.id}-${i}.pdf`;
       await bucket().file(signedPath).save(pdf, { contentType: "application/pdf", resumable: false });
       docs.push({ ...d, signedPath, contentHash, signedHash: sha256(pdf) });
