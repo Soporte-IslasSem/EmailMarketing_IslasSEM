@@ -16,6 +16,7 @@ export const ACTION_OPTS = [
   ["control", "Control"],
   ["form", "Enviar formulario/documento"],
   ["email", "Enviar correo"],
+  ["contract", "Enviar contrato a firmar"],
 ];
 export const TO_OPTS = [
   ["responsible", "Persona responsable"],

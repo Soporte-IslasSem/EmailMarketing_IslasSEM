@@ -7,6 +7,7 @@ import { usePerms } from "../lib/permissions";
 import { useOrg } from "../lib/useOrg";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
 import { CreateFieldModal, ExtraFieldsEditor } from "../components/DealFields";
+import ContractsPanel from "../../contracts/components/ContractsPanel";
 import "../crm.styles.css";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
 
@@ -222,6 +223,8 @@ export default function ContactDetail() {
               <p style={{ marginTop: 12, color: "var(--crm-muted)", fontSize: 14 }}>{contact.notes}</p>
             )}
           </div>
+
+          <ContractsPanel contactId={id} canSend={!ro} />
 
           <div className="crm-panel">
             <h4>Negocios relacionados ({relatedDeals.length})</h4>

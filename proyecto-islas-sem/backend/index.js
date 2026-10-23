@@ -25,6 +25,7 @@ const { checkAccess } = require("./lib/access");
 const gcal = require("./lib/gcal");
 const talento = require("./lib/talentoDigital");
 const adjuntos = require("./lib/attachments");
+const contratos = require("./lib/contracts");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -35,6 +36,8 @@ api.post("/automations/adjunto", express.json({ limit: "15mb" }), (req, res) => 
   console.error("[api] POST /automations/adjunto:", e.message || e);
   if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar el archivo" });
 }));
+// Contratos: plantillas (.DOCX convertido / PDF), documentos subidos y firmas dibujadas → 15 MB.
+api.use("/contracts", express.json({ limit: "15mb" }));
 api.use(express.json({ limit: "100kb" }));
 api.use(express.urlencoded({ extended: false, limit: "20kb" })); // formulario de baja y one-click de Gmail
 
@@ -94,6 +97,22 @@ api.post("/talento-digital/enviar", safe(talento.enviar));
 api.post("/talento-digital/archivar", safe(talento.archivar));
 api.post("/automations/adjunto-url", safe(adjuntos.link));
 api.post("/automations/adjunto-borrar", safe(adjuntos.remove));
+
+// --- Contratos con firma electrónica (CRM › Ventas › Contratos) ---
+api.get("/contracts/settings", safe(contratos.getSettings));
+api.post("/contracts/settings", safe(contratos.saveSettings));
+api.get("/contracts/templates", safe(contratos.listTemplates));
+api.post("/contracts/templates", safe(contratos.saveTemplate));
+api.post("/contracts/templates/archive", safe(contratos.archiveTemplate));
+api.post("/contracts/prepare", safe(contratos.prepare));
+api.post("/contracts/send", safe(contratos.send));
+api.get("/contracts/list", safe(contratos.list));
+api.post("/contracts/file-url", safe(contratos.fileUrl));
+api.post("/contracts/cancel", safe(contratos.cancel));
+// Públicas: el enlace personal del cliente y la verificación por código.
+api.get("/contracts/public/:token", safe(contratos.publicView));
+api.post("/contracts/public/:token/sign", safe(contratos.publicSign));
+api.get("/contracts/verify/:code", safe(contratos.verify));
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

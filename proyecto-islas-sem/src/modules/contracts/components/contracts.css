@@ -1,0 +1,29 @@
+/* Contratos: documento, huecos, firma */
+.ctr-doc { font-size: 14px; line-height: 1.55; color: #24302f; }
+.ctr-doc p { margin: 0 0 9px; }
+.ctr-doc table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 13px; }
+.ctr-doc td { border: 1px solid #cfdcdc; padding: 6px 8px; vertical-align: top; }
+.ctr-h { color: #136B68; font-weight: 700; margin: 14px 0 6px; }
+.ctr-h1 { font-size: 19px; margin-top: 2px; }
+.ctr-h2 { font-size: 16px; }
+.ctr-h3 { font-size: 14.5px; }
+.ctr-li { display: flex; gap: 8px; margin: 0 0 5px 10px; }
+.ctr-hole { background: #fff1d6; color: #8a5a00; border-radius: 4px; padding: 0 3px; font-weight: 600; }
+.ctr-filled { background: #e8f5f3; border-radius: 4px; padding: 0 2px; }
+
+.ctr-pad { position: relative; border: 1.5px dashed #9cc3bf; border-radius: 10px; background: #fff; }
+.ctr-pad canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; border-radius: 10px; }
+.ctr-pad__hint { position: absolute; inset: 0; display: grid; place-items: center; color: #9aa8a8; font-size: 14px; pointer-events: none; text-align: center; padding: 0 12px; }
+.ctr-pad__clear { position: absolute; top: 6px; right: 8px; border: 0; background: #f1f6f6; color: #5b6b6a; border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; }
+
+.ctr-public { min-height: 100vh; background: #f4f7f7; padding: 24px 12px 60px; }
+.ctr-public__box { max-width: 820px; margin: 0 auto; }
+.ctr-public__head { background: #136B68; color: #fff; border-radius: 12px 12px 0 0; padding: 16px 20px; font-weight: 700; font-size: 18px; }
+.ctr-public__card { background: #fff; border: 1px solid #e3eaea; border-top: 0; border-radius: 0 0 12px 12px; padding: 20px; }
+.ctr-public__docname { font-size: 13px; font-weight: 700; color: #5b6b6a; text-transform: uppercase; letter-spacing: .03em; margin: 18px 0 8px; }
+.ctr-public__paper { border: 1px solid #e3eaea; border-radius: 10px; padding: 22px; max-height: 60vh; overflow: auto; background: #fff; }
+.ctr-public__pdf { width: 100%; height: 65vh; border: 1px solid #e3eaea; border-radius: 10px; }
+.ctr-public .crm-field input { width: 100%; }
+.ctr-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12.5px; color: #6b7d7d; }
+.ctr-ok { text-align: center; padding: 30px 10px; }
+.ctr-ok h2 { color: #136B68; }

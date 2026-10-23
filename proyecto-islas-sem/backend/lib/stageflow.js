@@ -117,6 +117,13 @@ async function runRules(pipeline, deal) {
     const due = new Date(Date.now() + days * 864e5);
     const assignee = r.to === "supervisor" ? "Supervisor" : deal.responsable || "Responsable";
     const owner = r.to === "supervisor" ? {} : { assigneeType: "person", assigneeId: "", assigneeName: deal.responsable || "", assigneeEmail: deal.ownerEmail || "" };
+    // Enviar contrato a firmar (CRM › Ventas › Contratos): se envía al momento; al firmarlo, la
+    // negociación avanza (contracts.publicSign → respond). Si faltan datos, tarea al responsable.
+    if (r.action === "contract") {
+      const { sent } = await require("./contracts").sendFromRule(deal, r, stageName);
+      if (sent) waitH = Math.max(waitH, r.waitH === 0 || r.waitH === "0" ? 0 : Number(r.waitH) || DEFAULT_WAIT_H);
+      continue;
+    }
     if (!isSend(r)) {
       const type = r.action === "task" ? "Tarea" : r.action === "control" ? "Seguimiento" : "Nota";
       await addActivity(deal.orgId, {

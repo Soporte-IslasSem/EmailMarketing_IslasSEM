@@ -111,6 +111,9 @@ import HerramientasGratuitas from "../pages/HerramientasGratuitas.jsx";
 
 // FORMULARIOS PÚBLICOS (SEPA / Datos Jurídicos)
 import PublicForm from "../modules/forms/public/PublicForm.jsx";
+import Contracts from "../modules/contracts/pages/Contracts.jsx";
+import SignContract from "../modules/contracts/pages/SignContract.jsx";
+import VerifyContract from "../modules/contracts/pages/VerifyContract.jsx";
 import ClientArea from "../modules/forms/public/ClientArea.jsx";
 
 // NUEVAS PÁGINAS PÚBLICAS
@@ -135,6 +138,10 @@ const router = createBrowserRouter([
   // FORMULARIOS PÚBLICOS RELLENABLES (sin login): /f/sepa/:dealId , /f/juridicos/:dealId
   { path: "/f/:formType", element: <PublicForm /> },
   { path: "/f/:formType/:dealId", element: <PublicForm /> },
+  // CONTRATOS (sin login): enlace personal de firma y verificación por código.
+  { path: "/firmar/:token", element: <SignContract /> },
+  { path: "/verificar", element: <VerifyContract /> },
+  { path: "/verificar/:code", element: <VerifyContract /> },
   // Página pública de clientela: un botón por cada formulario publicado.
   { path: "/clientela", element: <ClientArea /> },
 
@@ -221,6 +228,7 @@ const router = createBrowserRouter([
       { path: "crm/forms/edit/:id", element: <CrmFormBuilder /> },
       { path: "crm/quotes", element: <SalesDocs type="quotes" /> },
       { path: "crm/invoices", element: <SalesDocs type="invoices" /> },
+      { path: "crm/contracts", element: <Contracts /> },
       { path: "crm/products", element: <Products /> },
       { path: "crm/history", element: <History /> },
       { path: "crm/recyclebin", element: <RecycleBin /> },

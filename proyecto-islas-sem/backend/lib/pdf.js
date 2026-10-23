@@ -88,4 +88,18 @@ function renderDocPDF(doc, { isInvoice = false } = {}) {
   });
 }
 
-module.exports = { renderDocPDF };
+// PDF a partir de cualquier definición de pdfmake (contratos firmados, certificados…).
+function renderPdf(definition) {
+  return new Promise((resolve, reject) => {
+    try {
+      const pdfDoc = getPrinter().createPdfKitDocument(definition);
+      const chunks = [];
+      pdfDoc.on("data", (c) => chunks.push(c));
+      pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on("error", reject);
+      pdfDoc.end();
+    } catch (e) { reject(e); }
+  });
+}
+
+module.exports = { renderDocPDF, renderPdf };

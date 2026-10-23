@@ -14,6 +14,7 @@ import { employeeEmailByName } from "../lib/owners";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
+import ContractsPanel from "../../contracts/components/ContractsPanel";
 
 const TABS = ["General", "Productos", "Cotizaciones", "Facturas", "Automatización", "Historial"];
 const OFFER_STATE = { enviada: { t: "Esperando respuesta", c: "info" }, respondio: { t: "Cliente respondió", c: "ok" }, aceptada: { t: "Oferta aceptada", c: "ok" }, perdida: { t: "Oferta perdida", c: "bad" }, seguimiento: { t: "Seguimiento activo", c: "warn" } };
@@ -414,6 +415,8 @@ export default function DealDetail() {
                 ))}
               </div>
             )}
+
+            <ContractsPanel dealId={deal.id} contactId={deal.contactId || ""} canSend={!ro} />
 
             <div className="crm-panel">
               <h4 className="cd-h">Actividad / Historial</h4>

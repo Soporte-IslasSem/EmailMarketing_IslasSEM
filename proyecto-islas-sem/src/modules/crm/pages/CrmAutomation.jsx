@@ -16,6 +16,7 @@ import { BUILTIN_LIST } from "../../forms/public/builtinForms";
 import { usePerms } from "../lib/permissions";
 import { useClientTypes, RELATIONS } from "../lib/clientTypes";
 import RuleAttachments from "../components/RuleAttachments";
+import { contractsApi } from "../../contracts/lib/api";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -28,6 +29,9 @@ export default function CrmAutomation() {
   const { types } = useClientTypes();
   const stages = pipeline ? flattenStages(getStages(pipeline, "pos")) : [];
   const { items: customForms } = useCrmCollection("crmForms");
+  // Plantillas de contrato (para la acción "Enviar contrato a firmar").
+  const [contractTemplates, setContractTemplates] = useState([]);
+  useEffect(() => { contractsApi("templates").then((r) => setContractTemplates(r.templates)).catch(() => setContractTemplates([])); }, []);
   const formOpts = [
     ...BUILTIN_LIST.map((f) => [f.type, f.name]),
     // (SEPA / Jurídicos editados se guardan con su mismo id: ya están arriba)
@@ -102,7 +106,27 @@ export default function CrmAutomation() {
                           {formOpts.map((o) => <option key={o[0]} value={o[0]}>📄 {o[1]}</option>)}
                         </select>
                       )}
-                      {(r.action === "form" || r.action === "email") ? (
+                      {r.action === "contract" ? (
+                        <div style={{ margin: "4px 0 6px" }}>
+                          {contractTemplates.length ? contractTemplates.map((t) => {
+                            const ids = r.templateIds || [];
+                            return (
+                              <label key={t.id} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12.5, padding: "2px 0", cursor: "pointer" }}>
+                                <input type="checkbox" style={{ width: "auto" }} checked={ids.includes(t.id)}
+                                  onChange={(e) => updateStageRule(pipeline, s.id, r.id, { templateIds: e.target.checked ? [...ids, t.id] : ids.filter((x) => x !== t.id) })} />
+                                {t.kind === "pdf" ? "📄" : "📝"} {t.name}
+                              </label>
+                            );
+                          }) : <div style={{ fontSize: 12, color: "#8a5a00" }}>No hay plantillas de contrato: créalas en Ventas › Contratos › Plantillas.</div>}
+                          {(r.templateIds || []).some((id) => !contractTemplates.some((t) => t.id === id)) && contractTemplates.length > 0 && <div style={{ fontSize: 12, color: "#b0304c" }}>⚠ Alguna plantilla elegida ya no existe.</div>}
+                          <label style={ruleLbl}>
+                            Si no firma en
+                            <input type="number" min="0" defaultValue={r.waitH ?? 72} onBlur={(e) => updateStageRule(pipeline, s.id, r.id, { waitH: Math.max(0, Number(e.target.value) || 0) })} style={{ ...ruleIn, width: 70, margin: "0 6px" }} />
+                            h → Negativo <span style={{ color: "#9aa8a8" }}>(0 = no esperar)</span>
+                          </label>
+                          <div style={{ fontSize: 11.5, color: "#9aa8a8" }}>Se envía al entrar en la etapa (sin espera). Si faltan datos del cliente, el responsable recibe una tarea. Al firmar, la negociación pasa a la siguiente etapa.</div>
+                        </div>
+                      ) : (r.action === "form" || r.action === "email") ? (
                         <>
                           <input defaultValue={r.subject || ""} placeholder={`Asunto (por defecto: ${r.title || "Documento"} · ISLAS SEM)`} onBlur={(e) => e.target.value !== (r.subject || "") && updateStageRule(pipeline, s.id, r.id, { subject: e.target.value })} style={ruleIn} />
                           <textarea defaultValue={r.message || ""} rows={4} placeholder="Mensaje al cliente (si lo dejas vacío se usa un texto estándar). Empieza solo con «Hola <nombre>,»." onBlur={(e) => e.target.value !== (r.message || "") && updateStageRule(pipeline, s.id, r.id, { message: e.target.value })} style={{ ...ruleIn, resize: "vertical" }} />

@@ -32,7 +32,10 @@ const TYPES = {
 };
 const extOf = (name) => (String(name || "").toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1] || "";
 const safeName = (name) => String(name || "archivo").normalize("NFC").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 120);
+// Para subir/ver/borrar desde la app, solo adjuntos de automatizaciones.
 const validPath = (p) => typeof p === "string" && p.startsWith(PREFIX) && !p.includes("..") && p.length < 400;
+// Para enviar por correo: también los contratos firmados (los pone el propio servidor).
+const mailPath = (p) => validPath(p) || (typeof p === "string" && p.startsWith("contracts/") && !p.includes("..") && p.length < 400);
 
 // POST /api/automations/adjunto { name, data: base64 } → { ok, file: { path, name, size, type } }
 async function upload(req, res) {
@@ -70,7 +73,7 @@ async function remove(req, res) {
 // Para la cola de correos: los adjuntos de la regla (los que caben) y, para el resto, una lista
 // HTML de enlaces de descarga que se pone donde el correo tiene <!--ADJUNTOS-->.
 async function forMail(list) {
-  const files = (Array.isArray(list) ? list : []).filter((a) => a && validPath(a.path));
+  const files = (Array.isArray(list) ? list : []).filter((a) => a && mailPath(a.path));
   if (!files.length) return { attachments: [], linksHtml: "" };
   const total = files.reduce((s, a) => s + (Number(a.size) || 0), 0);
   const attachments = [];
