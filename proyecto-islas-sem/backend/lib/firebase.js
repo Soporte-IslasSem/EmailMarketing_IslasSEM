@@ -19,5 +19,8 @@ function init() {
 
 const adminSdk = init();
 const db = adminSdk.firestore();
+// Almacenamiento de archivos (adjuntos de las automatizaciones).
+const BUCKET = process.env.STORAGE_BUCKET || "email-marketing-islassem.firebasestorage.app";
+const bucket = () => adminSdk.storage().bucket(BUCKET);
 
-module.exports = { admin: adminSdk, db };
+module.exports = { admin: adminSdk, db, bucket };

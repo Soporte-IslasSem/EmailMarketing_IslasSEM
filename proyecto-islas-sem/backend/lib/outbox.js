@@ -5,6 +5,7 @@ const { admin, db } = require("./firebase");
 const { sendMail, mailDomain } = require("./mailer");
 const { renderDocPDF } = require("./pdf");
 const { recordSend, closeReport } = require("./reports");
+const adjuntos = require("./attachments");
 
 const MAX_PER_RUN = Number(process.env.MAX_PER_RUN) || 30;      // por ejecución (cada minuto)
 const DAILY_LIMIT = Number(process.env.SMTP_DAILY_LIMIT) || 1800; // margen bajo el tope de Gmail
@@ -110,10 +111,13 @@ async function drainOutbox() {
     const item = d.data();
     if (!item.to) { await d.ref.update({ status: "skipped", error: "Sin email del destinatario" }); continue; }
     try {
-      const attachments = await buildAttachments(item);
+      // Adjuntos: el PDF de la cotización (si lo hay) + los archivos de la regla de automatización.
+      const files = await adjuntos.forMail(item.attachments);
+      const attachments = [...(await buildAttachments(item)), ...files.attachments];
+      const html = String(item.html || "").replace("<!--ADJUNTOS-->", files.linksHtml);
       // Message-ID determinista por envío: permite emparejar la respuesta por hilo.
       const messageId = `<obx-${d.id}@${mailDomain()}>`;
-      const { messageId: sentId } = await sendMail({ to: item.to, fromName: item.fromName, subject: item.subject, html: item.html, text: item.text, attachments, messageId, unsubscribeUrl: item.unsubscribeUrl });
+      const { messageId: sentId } = await sendMail({ to: item.to, fromName: item.fromName, subject: item.subject, html, text: item.text, attachments, messageId, unsubscribeUrl: item.unsubscribeUrl });
       await d.ref.update({ status: "sent", sentAt: Date.now(), attempts: (item.attempts || 0) + 1, error: "", messageId: sentId });
       today++;
       // En ofertas, guarda el messageId en la negociación (respaldo para emparejar respuestas).

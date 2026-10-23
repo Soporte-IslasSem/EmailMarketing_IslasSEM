@@ -15,6 +15,7 @@ import { useCrmCollection } from "../lib/crm";
 import { BUILTIN_LIST } from "../../forms/public/builtinForms";
 import { usePerms } from "../lib/permissions";
 import { useClientTypes, RELATIONS } from "../lib/clientTypes";
+import RuleAttachments from "../components/RuleAttachments";
 import "../crm.styles.css";
 import "../pipeline.styles.css";
 
@@ -105,6 +106,7 @@ export default function CrmAutomation() {
                         <>
                           <input defaultValue={r.subject || ""} placeholder={`Asunto (por defecto: ${r.title || "Documento"} · ISLAS SEM)`} onBlur={(e) => e.target.value !== (r.subject || "") && updateStageRule(pipeline, s.id, r.id, { subject: e.target.value })} style={ruleIn} />
                           <textarea defaultValue={r.message || ""} rows={4} placeholder="Mensaje al cliente (si lo dejas vacío se usa un texto estándar). Empieza solo con «Hola <nombre>,»." onBlur={(e) => e.target.value !== (r.message || "") && updateStageRule(pipeline, s.id, r.id, { message: e.target.value })} style={{ ...ruleIn, resize: "vertical" }} />
+                          <RuleAttachments value={r.attachments} onChange={(attachments) => updateStageRule(pipeline, s.id, r.id, { attachments })} />
                           <label style={ruleLbl}>
                             Si no responde en
                             <input type="number" min="0" defaultValue={r.waitH ?? 72} onBlur={(e) => updateStageRule(pipeline, s.id, r.id, { waitH: Math.max(0, Number(e.target.value) || 0) })} style={{ ...ruleIn, width: 70, margin: "0 6px" }} />

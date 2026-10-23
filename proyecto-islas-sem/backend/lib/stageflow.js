@@ -131,22 +131,27 @@ async function runRules(pipeline, deal) {
       : r.action === "form" && /sepa/.test(t) ? "sepa" : r.action === "form" && /jur[íi]dic/.test(t) ? "juridicos" : "";
     const ctaUrl = formId ? `${PUBLIC_URL}/f/${formId}/${deal.id}` : "";
     const greeting = `Hola ${esc(deal.contact || "")},<br><br>`;
-    const body = r.message
+    // Archivos de la regla (CRM › Automatización): adjuntos al correo o, si pesan mucho, enlaces.
+    const files = (Array.isArray(r.attachments) ? r.attachments : [])
+      .filter((a) => a && typeof a.path === "string" && a.path.startsWith("automations/"))
+      .slice(0, 10).map((a) => ({ path: a.path, name: String(a.name || "archivo").slice(0, 120), size: Number(a.size) || 0, type: String(a.type || "") }));
+    const body = (r.message
       ? greeting + esc(r.message).replace(/\n/g, "<br>")
-      : `${greeting}En relación con <b>${esc(deal.title)}</b>, ${ctaUrl ? "necesitamos que completes el siguiente formulario" : "te escribimos sobre"}: <b>${esc(r.title || "documento")}</b>.`;
+      : `${greeting}En relación con <b>${esc(deal.title)}</b>, ${ctaUrl ? "necesitamos que completes el siguiente formulario" : "te escribimos sobre"}: <b>${esc(r.title || "documento")}</b>.`)
+      + (files.length ? `<p style="margin-top:14px">Te adjuntamos: ${files.map((a) => esc(a.name)).join(", ")}.</p><!--ADJUNTOS-->` : "");
     await db.collection("outbox").add({
       orgId: deal.orgId, to: email, toName: deal.contact || "",
       subject: r.subject || `${r.title || "Documento"} · ISLAS SEM`,
       html: emailHtml({ title: r.title || "ISLAS SEM", body, cta: ctaUrl ? "Rellenar formulario" : "", ctaUrl }),
       text: "", kind: formId === "sepa" ? "sepa" : formId === "juridicos" ? "juridicos" : r.action === "form" ? "form" : "email",
       status: !email ? "skipped" : days ? "scheduled" : "pending", ...(days ? { sendAfter: due.getTime() } : {}),
-      dealId: deal.id, contactId: deal.contactId || "", attachment: null, attempts: 0,
+      dealId: deal.id, contactId: deal.contactId || "", attachment: null, attachments: files, attempts: 0,
       error: email ? "" : "Sin email del destinatario", sentAt: null, source: "stageflow", createdAt: new Date(), updatedAt: new Date(),
     });
     await addActivity(deal.orgId, {
       type: r.action === "form" ? "Documento" : "Email",
       title: email
-        ? `${r.action === "form" ? "📄 Enviado" : "✉️ Correo"}: ${r.title || "Documento"} → ${deal.contact || email} (${stageName})${days ? ` · en ${days} día(s)` : ""}`
+        ? `${r.action === "form" ? "📄 Enviado" : "✉️ Correo"}: ${r.title || "Documento"} → ${deal.contact || email} (${stageName})${files.length ? ` · 📎 ${files.length} archivo(s)` : ""}${days ? ` · en ${days} día(s)` : ""}`
         : `⚠ No se pudo enviar "${r.title || "Documento"}": la negociación no tiene email del cliente`,
       entity: "deal", entityId: deal.id, contactId: deal.contactId || "", done: !!email,
     });

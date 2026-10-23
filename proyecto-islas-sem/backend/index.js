@@ -24,10 +24,17 @@ const { testWebhook } = require("./lib/webhooks");
 const { checkAccess } = require("./lib/access");
 const gcal = require("./lib/gcal");
 const talento = require("./lib/talentoDigital");
+const adjuntos = require("./lib/attachments");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
 const api = express.Router();
+// Subida de adjuntos de las automatizaciones: el archivo viaja en base64 (hasta 10 MB → ~14 MB),
+// así que esta ruta lleva su propio límite y va ANTES del límite general de 100 KB.
+api.post("/automations/adjunto", express.json({ limit: "15mb" }), (req, res) => adjuntos.upload(req, res).catch((e) => {
+  console.error("[api] POST /automations/adjunto:", e.message || e);
+  if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar el archivo" });
+}));
 api.use(express.json({ limit: "100kb" }));
 api.use(express.urlencoded({ extended: false, limit: "20kb" })); // formulario de baja y one-click de Gmail
 
@@ -85,6 +92,8 @@ api.post("/talento-digital/plantilla", safe(talento.guardarPlantilla));
 api.post("/talento-digital/vista-previa", safe(talento.vistaPrevia));
 api.post("/talento-digital/enviar", safe(talento.enviar));
 api.post("/talento-digital/archivar", safe(talento.archivar));
+api.post("/automations/adjunto-url", safe(adjuntos.link));
+api.post("/automations/adjunto-borrar", safe(adjuntos.remove));
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
