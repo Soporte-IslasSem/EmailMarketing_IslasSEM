@@ -89,6 +89,8 @@ import Pipeline from "../modules/crm/pages/Pipeline.jsx";
 import Activities from "../modules/crm/pages/Activities.jsx";
 import Outbox from "../modules/crm/pages/Outbox.jsx";
 import TalentoDigital from "../modules/talentoDigital/TalentoDigital.jsx";
+import WhatsApp from "../modules/whatsapp/pages/WhatsApp.jsx";
+import WhatsAppSettings from "../modules/whatsapp/pages/WhatsAppSettings.jsx";
 import CrmForms from "../modules/crm/pages/CrmForms.jsx";
 import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
@@ -223,6 +225,8 @@ const router = createBrowserRouter([
       { path: "crm/analytics", element: <Analytics /> },
       { path: "crm/outbox", element: <Outbox /> },
       { path: "talento-digital", element: <TalentoDigital /> },
+      { path: "whatsapp", element: <WhatsApp /> },
+      { path: "whatsapp/ajustes", element: <WhatsAppSettings /> },
       { path: "crm/forms", element: <CrmForms /> },
       { path: "crm/forms/new", element: <CrmFormBuilder /> },
       { path: "crm/forms/edit/:id", element: <CrmFormBuilder /> },

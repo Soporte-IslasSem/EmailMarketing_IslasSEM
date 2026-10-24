@@ -101,6 +101,9 @@ export function usePerms() {
       if (/^\/dashboard\/campaigns\/create/.test(path)) return level("campaigns", "add") > 0;
       // Talento Digital: redactar y enviar correos, como crear campañas.
       if (/^\/dashboard\/talento-digital/.test(path)) return level("campaigns", "add") > 0;
+      // WhatsApp: los chats son de los contactos; los ajustes de la conexión, solo administradores.
+      if (/^\/dashboard\/whatsapp\/ajustes/.test(path)) return isAdmin;
+      if (/^\/dashboard\/whatsapp/.test(path)) return level("contacts", "read") > 0;
       if (/^\/dashboard\/campaigns\/edit/.test(path)) return level("campaigns", "edit") > 0;
       if (/^\/dashboard\/crm\/newdeal/.test(path)) return level("deals", "add") > 0;
       const hit = ROUTE_ENTITY.find(([re]) => re.test(path));

@@ -277,6 +277,18 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ===== WhatsApp =====
+    // La app solo LEE (en tiempo real) los chats y sus mensajes, quien puede ver contactos.
+    // Escribir (enviar, asignar, archivar, ligar al contacto) lo hace el servidor.
+    match /waChats/{chatId} {
+      allow read: if staff() && lvl('contacts', 'read') > 0;
+      allow write: if false;
+      match /messages/{msgId} {
+        allow read: if staff() && lvl('contacts', 'read') > 0;
+        allow write: if false;
+      }
+    }
+
     // Todo lo demás, bloqueado por defecto
     match /{document=**} {
       allow read, write: if false;

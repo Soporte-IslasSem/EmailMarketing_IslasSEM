@@ -30,6 +30,12 @@ export const AREAS = [
     ],
   },
   {
+    id: "whatsapp",
+    label: "WhatsApp",
+    icon: "whatsapp",
+    tabs: [["/dashboard/whatsapp", "Chats"], ["/dashboard/whatsapp/ajustes", "Ajustes"]],
+  },
+  {
     id: "restaurants",
     label: "Restaurantes",
     icon: "restaurant",

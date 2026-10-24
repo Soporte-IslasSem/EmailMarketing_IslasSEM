@@ -26,6 +26,7 @@ const gcal = require("./lib/gcal");
 const talento = require("./lib/talentoDigital");
 const adjuntos = require("./lib/attachments");
 const contratos = require("./lib/contracts");
+const whatsapp = require("./lib/whatsapp");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -38,6 +39,11 @@ api.post("/automations/adjunto", express.json({ limit: "15mb" }), (req, res) => 
 }));
 // Contratos: plantillas (.DOCX convertido / PDF), documentos subidos y firmas dibujadas → 15 MB.
 api.use("/contracts", express.json({ limit: "15mb" }));
+// WhatsApp: el webhook de Meta necesita el cuerpo SIN procesar para comprobar su firma, y los
+// archivos que se envían viajan en base64 (hasta 16 MB → ~22 MB).
+api.get("/whatsapp/webhook", whatsapp.verifyWebhook);
+api.post("/whatsapp/webhook", express.raw({ type: "*/*", limit: "3mb" }), whatsapp.receiveWebhook);
+api.post("/whatsapp/send-media", express.json({ limit: "25mb" }), whatsapp.sendMedia);
 api.use(express.json({ limit: "100kb" }));
 api.use(express.urlencoded({ extended: false, limit: "20kb" })); // formulario de baja y one-click de Gmail
 
@@ -113,6 +119,13 @@ api.post("/contracts/cancel", safe(contratos.cancel));
 api.get("/contracts/public/:token", safe(contratos.publicView));
 api.post("/contracts/public/:token/sign", safe(contratos.publicSign));
 api.get("/contracts/verify/:code", safe(contratos.verify));
+
+// --- WhatsApp (API oficial de Meta): enviar, gestionar chats y ajustes de la conexión ---
+api.post("/whatsapp/send", whatsapp.send);
+api.post("/whatsapp/file-url", whatsapp.fileUrl);
+api.post("/whatsapp/chat", whatsapp.updateChat);
+api.get("/whatsapp/settings", whatsapp.getSettings);
+api.post("/whatsapp/settings", whatsapp.saveSettings);
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

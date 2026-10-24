@@ -18,6 +18,9 @@ const ICONS = {
   restaurant: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 3v7a3 3 0 0 0 6 0V3" /><path d="M7 3v18" /><path d="M17 21V3c-2.5 1-4 3.5-4 7v3h4" /></svg>
   ),
+  whatsapp: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21l1.65-4.95A8.5 8.5 0 1 1 7.9 19.4L3 21Z" /><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1.2-1.4-2-1-.9.8a4 4 0 0 1-2.2-2.2l.8-.9-1-2L9 9.5Z" /></svg>
+  ),
   task: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="m8 12 3 3 5-6" /></svg>
   ),
