@@ -27,6 +27,8 @@ const talento = require("./lib/talentoDigital");
 const adjuntos = require("./lib/attachments");
 const contratos = require("./lib/contracts");
 const whatsapp = require("./lib/whatsapp");
+const waTemplates = require("./lib/waTemplates");
+const waAuto = require("./lib/waAuto");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -44,6 +46,10 @@ api.use("/contracts", express.json({ limit: "15mb" }));
 api.get("/whatsapp/webhook", whatsapp.verifyWebhook);
 api.post("/whatsapp/webhook", express.raw({ type: "*/*", limit: "3mb" }), whatsapp.receiveWebhook);
 api.post("/whatsapp/send-media", express.json({ limit: "25mb" }), whatsapp.sendMedia);
+// Plantillas y difusiones pueden llevar un archivo de cabecera (imagen, vídeo, PDF).
+api.post("/whatsapp/send-template", express.json({ limit: "25mb" }), waTemplates.sendTemplate);
+api.post("/whatsapp/templates/create", express.json({ limit: "25mb" }), waTemplates.createTemplate);
+api.post("/whatsapp/broadcasts/create", express.json({ limit: "25mb" }), waTemplates.createBroadcast);
 api.use(express.json({ limit: "100kb" }));
 api.use(express.urlencoded({ extended: false, limit: "20kb" })); // formulario de baja y one-click de Gmail
 
@@ -126,6 +132,13 @@ api.post("/whatsapp/file-url", whatsapp.fileUrl);
 api.post("/whatsapp/chat", whatsapp.updateChat);
 api.get("/whatsapp/settings", whatsapp.getSettings);
 api.post("/whatsapp/settings", whatsapp.saveSettings);
+api.post("/whatsapp/bulk", whatsapp.bulk);
+api.post("/whatsapp/block", whatsapp.block);
+api.get("/whatsapp/config", whatsapp.getConfig);
+api.post("/whatsapp/config", whatsapp.saveConfig);
+api.post("/whatsapp/templates/sync", waTemplates.sync);
+api.post("/whatsapp/templates/delete", waTemplates.deleteTemplate);
+api.post("/whatsapp/broadcasts/cancel", waTemplates.cancelBroadcast);
 
 api.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

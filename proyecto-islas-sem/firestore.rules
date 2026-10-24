@@ -288,6 +288,25 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+    // Configuración de WhatsApp (embudos, equipos, respuestas rápidas, auto respuestas,
+    // chatbot, etiquetas), plantillas de Meta sincronizadas y difusiones: solo lectura;
+    // los cambios pasan por el servidor (que comprueba quién es administrador).
+    match /waConfig/{docId} {
+      allow read: if staff() && lvl('contacts', 'read') > 0;
+      allow write: if false;
+    }
+    match /waTemplates/{docId} {
+      allow read: if staff() && lvl('contacts', 'read') > 0;
+      allow write: if false;
+    }
+    match /waBroadcasts/{docId} {
+      allow read: if staff() && lvl('contacts', 'read') > 0;
+      allow write: if false;
+      match /recipients/{rid} {
+        allow read: if staff() && lvl('contacts', 'read') > 0;
+        allow write: if false;
+      }
+    }
 
     // Todo lo demás, bloqueado por defecto
     match /{document=**} {

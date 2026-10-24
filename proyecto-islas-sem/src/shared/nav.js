@@ -33,7 +33,7 @@ export const AREAS = [
     id: "whatsapp",
     label: "WhatsApp",
     icon: "whatsapp",
-    tabs: [["/dashboard/whatsapp", "Chats"], ["/dashboard/whatsapp/ajustes", "Ajustes"]],
+    tabs: [["/dashboard/whatsapp", "Chats"], ["/dashboard/whatsapp/embudos", "Embudos"], ["/dashboard/whatsapp/difusiones", "Difusiones"], ["/dashboard/whatsapp/plantillas", "Plantillas"], ["/dashboard/whatsapp/ajustes", "Ajustes"]],
   },
   {
     id: "restaurants",
