@@ -10,6 +10,31 @@ import { useResponseWatcher } from "../../crm/lib/useResponseWatcher";
 import useCrmLink from "../../lists/hooks/useCrmLink";
 import { usePerms } from "../../crm/lib/permissions";
 import { brandOf, setBrand } from "../../../shared/brand";
+import { api } from "../../../shared/api";
+
+// Avisos arriba del panel: modo soporte (administración de la plataforma dentro de una empresa)
+// y días que quedan de la prueba gratis.
+function TopNotices({ perms }) {
+  const [now] = useState(() => Date.now());
+  const a = perms.access;
+  const exit = async () => {
+    await api("platform/support/exit", {}).catch(() => {});
+    try { localStorage.removeItem("islassem:accessOk"); } catch { /* sin almacenamiento */ }
+    window.location.href = "/dashboard/plataforma";
+  };
+  const bar = (bg, children) => <div style={{ background: bg, color: "#1f2d2d", padding: "8px 16px", fontSize: 13.5, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>{children}</div>;
+  if (a?.support) {
+    return bar("#ffe08a", <>🛟 Modo soporte en <b>{a.orgName}</b> hasta las {new Date(a.supportUntil).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}. Todo lo que hagas queda a nombre de tu email.
+      <button className="crm-btn sm" onClick={exit}>Salir del modo soporte</button></>);
+  }
+  const o = perms.org || {};
+  if (o.plan === "trial" && o.trialEndsAt) {
+    const days = Math.max(0, Math.ceil((o.trialEndsAt - now) / 864e5));
+    return bar(days <= 3 ? "#ffd6d6" : "#e3f4f1", <>Prueba gratis: {days === 0 ? "termina hoy" : `quedan ${days} días`}.
+      {perms.isAdmin && <a className="crm-btn sm" href="/dashboard/admin/empresa?tab=plan">Elegir plan</a>}</>);
+  }
+  return null;
+}
 import "./DashboardLayout.styles.css";
 
 // Páginas a todo el ancho (tableros con scroll horizontal); el resto va centrado a 1240px como el prototipo
@@ -43,6 +68,7 @@ export default function DashboardLayout() {
         <Sidebar />
 
         <div className="DashboardLayout__content">
+          <TopNotices perms={perms} />
           <Header />
           <TopNav />
 

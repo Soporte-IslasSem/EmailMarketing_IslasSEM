@@ -31,6 +31,8 @@ const waTemplates = require("./lib/waTemplates");
 const waAuto = require("./lib/waAuto");
 const orgMail = require("./lib/orgMail");
 const orgs = require("./lib/orgs");
+const billing = require("./lib/billing");
+const platform = require("./lib/platform");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -47,6 +49,11 @@ api.use("/contracts", express.json({ limit: "15mb" }));
 // archivos que se envían viajan en base64 (hasta 16 MB → ~22 MB).
 api.get("/whatsapp/webhook", whatsapp.verifyWebhook);
 api.post("/whatsapp/webhook", express.raw({ type: "*/*", limit: "3mb" }), whatsapp.receiveWebhook);
+// Stripe firma el cuerpo tal cual: también sin procesar.
+api.post("/billing/webhook", express.raw({ type: "*/*", limit: "1mb" }), (req, res) => billing.webhook(req, res).catch((e) => {
+  console.error("[api] POST /billing/webhook:", e.message || e);
+  if (!res.headersSent) res.sendStatus(500);
+}));
 api.post("/whatsapp/send-media", express.json({ limit: "25mb" }), whatsapp.sendMedia);
 // Plantillas y difusiones pueden llevar un archivo de cabecera (imagen, vídeo, PDF).
 api.post("/whatsapp/send-template", express.json({ limit: "25mb" }), waTemplates.sendTemplate);
@@ -111,6 +118,17 @@ api.post("/orgs/create", safe(orgs.createOrg));
 api.get("/org/profile", safe(orgs.getProfile));
 api.post("/org/invite", safe(orgs.invite));
 api.get("/org/logo/:orgId", safe(orgs.logo));
+
+// --- Suscripción (Stripe) ---
+api.post("/billing/checkout", safe(billing.checkout));
+api.post("/billing/portal", safe(billing.portal));
+api.post("/billing/change", safe(billing.change));
+
+// --- Panel de la plataforma (PLATFORM_ADMINS) y modo soporte ---
+api.get("/platform/orgs", safe(platform.listOrgs));
+api.post("/platform/org", safe(platform.updateOrg));
+api.post("/platform/support", safe(platform.startSupport));
+api.post("/platform/support/exit", safe(platform.exitSupport));
 
 // --- Empresa: correo de salida/entrada (Ajustes › Correo) ---
 api.get("/org/mail", safe(orgMail.getMail));
@@ -232,7 +250,9 @@ async function runAll() {
   const calendar = await gcal.syncCalendar().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
   // WhatsApp: mensajes al archivar, plantillas de Meta y difusiones (programadas o en curso).
   const whatsapp = await waAuto.runCron().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
-  return { mail, replies, forms, deleted, automations, sla, flow, calendar, whatsapp };
+  // Pruebas gratis: aviso 3 días antes y suspensión al acabar sin plan.
+  const trials = await billing.runTrials().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
+  return { mail, replies, forms, deleted, automations, sla, flow, calendar, whatsapp, trials };
 }
 
 // Endpoint protegido por CRON_SECRET (para el cron de Plesk o un cron externo).

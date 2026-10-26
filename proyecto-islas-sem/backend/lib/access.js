@@ -40,9 +40,13 @@ async function checkAccess(req, res) {
     const r = await tenant.resolveUserOrg(user);
     const platformAdmin = tenant.isPlatformAdmin(user.email);
     if (r) {
+      // Soporte: está dentro solo por el acceso temporal de la plataforma.
+      const plain = { ...r.org, supportEmails: [] };
+      const support = !tenant.isMemberOf(plain, user.email) && tenant.supportActive(r.org, user.email);
       return res.json({
         allowed: tenant.isActive(r.org), orgId: r.orgId, orgName: r.org.name || "", status: r.org.status || "active",
         isAdmin: tenant.isOrgAdmin(r.org, user.email), platformAdmin, features: tenant.featuresOf(r.org),
+        ...(support ? { support: true, supportUntil: r.org.supportUntil } : {}),
       });
     }
     // Sin empresa: puede crear la suya (alta de empresa) si así lo pidió al registrarse.

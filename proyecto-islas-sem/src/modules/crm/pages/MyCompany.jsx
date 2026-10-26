@@ -25,6 +25,7 @@ export default function MyCompany() {
         {TABS.map(([k, l]) => <button key={k} className={`crm-btn ${tab === k ? "" : "ghost"} sm`} onClick={() => setParams({ tab: k }, { replace: true })}>{l}</button>)}
       </div>
       {err && <Msg m={{ err: true, text: err }} />}
+      {params.get("pago") === "ok" && <Msg m={{ text: "¡Gracias! Pago recibido: tu plan se activa en unos segundos (recarga la página si aún no lo ves)." }} />}
       {!org ? (!err && <p>Cargando…</p>)
         : tab === "perfil" ? <Profile org={org} onSaved={setOrg} />
         : tab === "correo" ? <Mail admin={org.isAdmin} />

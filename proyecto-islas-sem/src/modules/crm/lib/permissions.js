@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
 import { useOrg } from "./useOrg";
+import { useAccessInfo } from "../../../shared/access/accessStore";
 
 export const ADMIN_ROLES = ["Full access", "Administrador"];
 export const NO_ROLE = "_sinrol";
@@ -93,6 +94,7 @@ const ROUTE_ENTITY = [
 
 export function usePerms() {
   const { orgId, user } = useOrg();
+  const access = useAccessInfo();
   const [org, setOrg] = useState(null);
   useEffect(() => {
     if (!orgId) return undefined;
@@ -112,6 +114,7 @@ export function usePerms() {
     const visible = (entity, rows) => { const l = level(entity, "read"); return l === 2 ? rows : l === 1 ? rows.filter(isOwn) : []; };
     const features = featuresOf(orgId, org);
     const canSeeRoute = (path) => {
+      if (/^\/dashboard\/plataforma/.test(path)) return !!access?.platformAdmin;
       const needs = ROUTE_FEATURE.find(([re]) => re.test(path));
       if (needs && !features[needs[1]]) return false;
       if (/^\/dashboard\/admin/.test(path)) return isAdmin;
@@ -126,10 +129,10 @@ export function usePerms() {
       return !hit || level(hit[1], "read") > 0;
     };
     return {
-      ready: !!org, email, isAdmin, role, org: org || {}, orgId, features, level, isOwn, can, visible, canSeeRoute,
+      ready: !!org, email, isAdmin, role, org: org || {}, orgId, features, level, isOwn, can, visible, canSeeRoute, access,
       roles: Array.isArray(org?.roles) && org.roles.length ? org.roles : DEFAULT_ROLES,
     };
-  }, [org, user, orgId]);
+  }, [org, user, orgId, access]);
 }
 
 // Matriz completa (todos los roles, entidades y permisos con su valor) para guardarla:

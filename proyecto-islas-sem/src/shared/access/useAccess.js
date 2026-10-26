@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { auth } from "../../config/firebaseConfig";
 import { useAuth } from "../hooks/useAuth";
 import { fetchAccess } from "./checkAccess";
+import { setAccessInfo } from "./accessStore";
 
 // Último resultado "ok" por uid: al recargar la página se entra al momento y se vuelve a
 // comprobar por detrás (las reglas y el servidor siguen frenando a quien ya no tenga acceso).
@@ -35,6 +36,7 @@ export function useAccess() {
         if (alive) setResult({ uid: u.uid, state: cachedOk(u.uid) ? "ok" : "denied", info: null });
         return;
       }
+      setAccessInfo(info);
       const state = info.allowed ? "ok" : info.orgId && info.status === "suspended" ? "suspended" : info.canCreateOrg ? "noorg" : "denied";
       saveOk(u.uid, state === "ok");
       if (alive) setResult({ uid: u.uid, state, info });

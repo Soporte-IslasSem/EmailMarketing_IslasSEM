@@ -63,6 +63,12 @@ export const AREAS = [
     tabs: [["/dashboard/tasks", "Lista"], ["/dashboard/tasks/calendar", "Calendario"]],
   },
   {
+    id: "plataforma",
+    label: "Plataforma",
+    icon: "globe",
+    tabs: [["/dashboard/plataforma", "Empresas"]],
+  },
+  {
     id: "admin",
     label: "Administración",
     icon: "shield",
