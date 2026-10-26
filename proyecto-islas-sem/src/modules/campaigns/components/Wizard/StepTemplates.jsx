@@ -169,7 +169,7 @@ export default function StepTemplates() {
           Mis plantillas ({templates.length})
         </button>
         <button className={activeTab === "system" ? "active" : ""} onClick={() => setTab("system")}>
-          Plantillas de ISLAS SEM ({systemTemplates.length})
+          Plantillas prediseñadas ({systemTemplates.length})
         </button>
         {activeTab === "system" && (
           <select className="StepTemplates__filter" value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -186,7 +186,7 @@ export default function StepTemplates() {
           <p className="StepTemplates__empty">
             No tienes plantillas propias todavía.{" "}
             <button className="StepTemplates__link" onClick={() => setTab("system")}>
-              Elige una de las plantillas de ISLAS SEM
+              Elige una de las plantillas prediseñadas
             </button>
           </p>
         )}

@@ -23,7 +23,7 @@
 const { db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 const { addSubscriber } = require("./subscriptions");
-const { orgOfUser, getOrg, isActive } = require("./tenant");
+const { orgOfUser, getOrg, isActive, brandOf } = require("./tenant");
 const { getStages, flattenStages } = require("./stages");
 const { respond } = require("./stageflow");
 
@@ -87,8 +87,9 @@ async function formDefinition(req, res) {
   try {
     const f = await loadCustomForm(String(req.params.id || ""));
     if (!f || !f.active) return res.status(404).json({ ok: false, error: "Formulario no encontrado" });
-    const { orgId: _o, id: _i, listId: _l, active: _a, dealPipelineId: _d, clientType: _t, ...pub } = f;
-    res.set("Cache-Control", "no-store").json({ ok: true, form: pub });
+    const { orgId, id: _i, listId: _l, active: _a, dealPipelineId: _d, clientType: _t, ...pub } = f;
+    const b = brandOf(await getOrg(orgId));
+    res.set("Cache-Control", "no-store").json({ ok: true, form: pub, org: { id: orgId, name: b.name, legalName: b.legalName, logoUrl: b.logoUrl } });
   } catch (e) {
     console.error("[forms/def]", e);
     res.status(500).json({ ok: false, error: "Error interno" });
@@ -114,7 +115,8 @@ async function publicForms(req, res) {
       .filter((d) => !FORM_LABEL[d.id] && d.data().active !== false)
       .sort((a, b) => (a.data().createdAt?.toMillis?.() || 0) - (b.data().createdAt?.toMillis?.() || 0))
       .forEach((d) => out.push({ id: d.id, name: String(d.data().name || d.data().title || "Formulario").slice(0, 120) }));
-    res.set("Cache-Control", "no-store").json({ ok: true, forms: out, org: { name: org.brand?.name || org.name || "", logoUrl: org.brand?.logoUrl || "" } });
+    const b = brandOf(org);
+    res.set("Cache-Control", "no-store").json({ ok: true, forms: out, org: { id: orgId, name: b.name, logoUrl: b.logoUrl } });
   } catch (e) {
     console.error("[forms/public]", e);
     res.status(500).json({ ok: false, error: "Error interno" });

@@ -23,7 +23,7 @@ export default function VerifyContract() {
 
   return (
     <div className="ctr-public crm"><div className="ctr-public__box" style={{ maxWidth: 640 }}>
-      <div className="ctr-public__head">ISLAS SEM · Verificar un documento firmado</div>
+      <div className="ctr-public__head">Verificar un documento firmado</div>
       <div className="ctr-public__card">
         <form onSubmit={(e) => { e.preventDefault(); navigate(`/verificar/${code.trim().toUpperCase()}`); }} style={{ display: "flex", gap: 8 }}>
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="ID del documento (ej.: 7F3A-92C1)" style={{ flex: 1, padding: "8px 10px", border: "1px solid #dfe7e7", borderRadius: 8 }} />

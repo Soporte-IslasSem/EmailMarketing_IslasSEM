@@ -19,7 +19,7 @@ const crypto = require("crypto");
 const { admin, db, bucket } = require("./firebase");
 const { staffFromReq } = require("./access");
 const { DEFAULT_ORG_ID, norm, addActivity } = require("./link");
-const { orgPrivate, brandFor } = require("./tenant");
+const { orgPrivate, brandFor, featuresOf, getOrg } = require("./tenant");
 const { brandMailHtml } = require("./brandMail");
 const { renderPdf } = require("./pdf");
 
@@ -41,7 +41,8 @@ const uaOf = (req) => clip(req.headers["user-agent"] || "", 300);
 
 async function staff(req, res) {
   const user = await staffFromReq(req);
-  if (!user) res.status(401).json({ ok: false, error: "Sesión no válida" });
+  if (!user) { res.status(401).json({ ok: false, error: "Sesión no válida" }); return null; }
+  if (!featuresOf(user.org).contracts) { res.status(403).json({ ok: false, error: "Los contratos no están incluidos en tu plan" }); return null; }
   return user;
 }
 const fail = (res, msg, code = 400) => res.status(code).json({ ok: false, error: msg });
@@ -635,6 +636,7 @@ async function verify(req, res) {
 async function sendFromRule(deal, rule, stageName) {
   const ids = (Array.isArray(rule.templateIds) ? rule.templateIds : []).filter((x) => /^[A-Za-z0-9_-]{1,64}$/.test(x)).slice(0, 10);
   if (!ids.length) return { sent: false };
+  if (!featuresOf(await getOrg(deal.orgId || DEFAULT_ORG_ID)).contracts) return { sent: false };
   try {
     await createContract({ orgId: deal.orgId || DEFAULT_ORG_ID, contactId: deal.contactId, dealId: deal.id, title: rule.title && rule.title !== "Nueva regla" ? rule.title : "", docs: ids.map((templateId) => ({ templateId })), fromRule: rule.id || "regla" });
     return { sent: true };

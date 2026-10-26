@@ -6,23 +6,30 @@ import { BUILTIN_LIST } from "./builtinForms";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "https://email-marketing.islassem.com/api";
 
+// ?org=<id>: la página de clientela de otra empresa (sin él, la de ISLAS SEM).
+const orgParam = () => { try { return new URLSearchParams(window.location.search).get("org") || ""; } catch { return ""; } };
+
 export default function ClientArea() {
-  // Mientras carga se muestran los dos formularios fijos; luego la lista real.
-  const [forms, setForms] = useState(BUILTIN_LIST.map((b) => ({ id: b.type, name: b.name })));
+  const org = orgParam();
+  // Mientras carga se muestran los dos formularios fijos (ISLAS SEM); luego la lista real.
+  const [forms, setForms] = useState(() => (org ? [] : BUILTIN_LIST.map((b) => ({ id: b.type, name: b.name }))));
+  const [brand, setBrand] = useState(null);
   useEffect(() => {
     let alive = true;
-    fetch(`${API_BASE}/forms/public`)
+    fetch(`${API_BASE}/forms/public${org ? `?org=${encodeURIComponent(org)}` : ""}`)
       .then((r) => r.json())
-      .then((out) => { if (alive && out.ok && Array.isArray(out.forms)) setForms(out.forms); })
+      .then((out) => { if (alive && out.ok && Array.isArray(out.forms)) { setForms(out.forms); setBrand(out.org || null); } })
       .catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [org]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#f3f6f6", padding: "24px 16px", fontFamily: "'Helvetica Neue', Arial, sans-serif" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto", border: "2px solid #2a9d8f", borderRadius: 4, overflow: "hidden", background: "#fff" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 26px", borderBottom: "2px solid #2a9d8f", flexWrap: "wrap" }}>
-          <img src="/islas-sem-logo.png" alt="ISLAS SEM" style={{ height: 42 }} />
+          {!org ? <img src="/islas-sem-logo.png" alt="ISLAS SEM" style={{ height: 42 }} />
+            : brand?.logoUrl ? <img src={brand.logoUrl} alt={brand.name} style={{ height: 42 }} />
+            : <b style={{ fontSize: 20, color: "#1a7a74" }}>{brand?.name || ""}</b>}
           <div style={{ fontWeight: 800, color: "#1a9190", letterSpacing: 1, fontSize: 13, border: "2px solid #1a9190", borderRadius: 6, padding: "8px 16px" }}>ÁREA DE CLIENTELA</div>
         </div>
         {forms.map((f, i) => {

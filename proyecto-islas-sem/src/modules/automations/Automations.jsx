@@ -209,7 +209,7 @@ export default function Automations() {
               </div>
               <div className="crm-field">
                 <label>Asunto</label>
-                <input value={s.subject} onChange={(e) => setStep(i, { subject: e.target.value })} placeholder="p. ej. ¡Bienvenido a ISLAS SEM!" />
+                <input value={s.subject} onChange={(e) => setStep(i, { subject: e.target.value })} placeholder="p. ej. ¡Bienvenido!" />
               </div>
             </div>
           ))}

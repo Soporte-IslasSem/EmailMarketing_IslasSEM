@@ -111,7 +111,7 @@ export function usePipelines() {
           try {
             await addDoc(collection(db, "pipelines"), {
               orgId,
-              name: "ISLAS SEM",
+              name: orgId === "islas-sem" ? "ISLAS SEM" : "Embudo de ventas",
               order: 0,
               stages: DEFAULT_POS_STAGES,
               negStages: DEFAULT_NEG_STAGES,

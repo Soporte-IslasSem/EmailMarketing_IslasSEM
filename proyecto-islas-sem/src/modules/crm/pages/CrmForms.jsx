@@ -7,10 +7,13 @@ import FormThumb from "../components/FormThumb";
 import ShareFormModal from "../components/ShareFormModal";
 import "../crm.styles.css";
 import "./crmforms.styles.css";
+import { useOrg } from "../lib/useOrg";
 
 // Formularios del CRM (como el prototipo): plantillas para empezar, tus formularios
 // (SEPA y Datos Jurídicos incluidos, editables) y la página pública de clientela.
 export default function CrmForms() {
+  const { orgId } = useOrg();
+  const clientela = orgId && orgId !== "islas-sem" ? `/clientela?org=${encodeURIComponent(orgId)}` : "/clientela";
   const navigate = useNavigate();
   // Mismo módulo en CRM › Formularios y en Email Marketing › Formularios.
   const base = useLocation().pathname.startsWith("/dashboard/forms") ? "/dashboard/forms" : "/dashboard/crm/forms";
@@ -55,7 +58,7 @@ export default function CrmForms() {
           <p>Crea formularios editables. Cada envío entra directo en tu CRM.</p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <a className="crm-btn ghost" href="/clientela" target="_blank" rel="noreferrer">🏢 Página de clientela</a>
+          <a className="crm-btn ghost" href={clientela} target="_blank" rel="noreferrer">🏢 Página de clientela</a>
           <button className="crm-btn" onClick={() => navigate(`${base}/new`)}>+ Crear formulario</button>
         </div>
       </div>

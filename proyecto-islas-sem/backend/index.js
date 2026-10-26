@@ -30,6 +30,7 @@ const whatsapp = require("./lib/whatsapp");
 const waTemplates = require("./lib/waTemplates");
 const waAuto = require("./lib/waAuto");
 const orgMail = require("./lib/orgMail");
+const orgs = require("./lib/orgs");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -51,6 +52,10 @@ api.post("/whatsapp/send-media", express.json({ limit: "25mb" }), whatsapp.sendM
 api.post("/whatsapp/send-template", express.json({ limit: "25mb" }), waTemplates.sendTemplate);
 api.post("/whatsapp/templates/create", express.json({ limit: "25mb" }), waTemplates.createTemplate);
 api.post("/whatsapp/broadcasts/create", express.json({ limit: "25mb" }), waTemplates.createBroadcast);
+api.post("/org/profile", express.json({ limit: "2mb" }), (req, res) => orgs.saveProfile(req, res).catch((e) => {
+  console.error("[api] POST /org/profile:", e.message || e);
+  if (!res.headersSent) res.status(500).json({ ok: false, error: "Error interno" });
+}));
 api.use(express.json({ limit: "100kb" }));
 api.use(express.urlencoded({ extended: false, limit: "20kb" })); // formulario de baja y one-click de Gmail
 
@@ -100,6 +105,12 @@ api.post("/google/events", safe(gcal.pushEvent));
 
 // --- Acceso: tras registrarse/entrar, ¿este email puede usar la app (y de qué empresa es)? ---
 api.post("/access/check", safe(checkAccess));
+
+// --- Empresas: alta, perfil e imagen, logo público, invitaciones ---
+api.post("/orgs/create", safe(orgs.createOrg));
+api.get("/org/profile", safe(orgs.getProfile));
+api.post("/org/invite", safe(orgs.invite));
+api.get("/org/logo/:orgId", safe(orgs.logo));
 
 // --- Empresa: correo de salida/entrada (Ajustes › Correo) ---
 api.get("/org/mail", safe(orgMail.getMail));

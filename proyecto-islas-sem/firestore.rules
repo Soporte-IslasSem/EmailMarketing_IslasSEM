@@ -96,6 +96,9 @@ service cloud.firestore {
     }
 
     // ===== Organizaciones (multi-tenant) =====
+    function withinSeats(next, prev) {
+      return next <= prev || next <= resource.data.get('limits', {}).get('users', 100000);
+    }
     match /organizations/{orgId} {
       // Sus miembros pueden leerla aunque esté suspendida (para ver el aviso y pagar).
       allow read: if isSignedIn() && request.auth.token.email_verified == true && myOrg() == orgId && memberOf(orgData());
@@ -106,7 +109,10 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'plan', 'features', 'limits', 'billing',
           'trialEndsAt', 'supportEmails', 'supportUntil', 'flowSince', 'flowLastRun', 'createdAt', 'ownerUid', 'ownerEmail'])
         && (isOrgAdmin() || !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['accessEmails', 'adminEmails', 'memberRoles', 'memberEmails', 'rolePerms', 'roles', 'clientTypes', 'name', 'brand']));
+          .hasAny(['accessEmails', 'adminEmails', 'memberRoles', 'memberEmails', 'rolePerms', 'roles', 'clientTypes', 'name', 'brand']))
+        // Límite de usuarios del plan (limits.users): no se puede añadir a nadie por encima (quitar, sí).
+        && withinSeats(request.resource.data.get('accessEmails', []).size(), resource.data.get('accessEmails', []).size())
+        && withinSeats(request.resource.data.get('memberRoles', {}).size(), resource.data.get('memberRoles', {}).size());
     }
 
     // ===== Colecciones del CRM (aisladas por orgId) =====

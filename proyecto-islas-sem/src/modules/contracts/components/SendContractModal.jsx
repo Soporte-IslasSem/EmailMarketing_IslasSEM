@@ -130,7 +130,7 @@ export default function SendContractModal({ contactId, dealId, onClose, onSent }
 
       {step === "fill" && prepared && (
         <>
-          {!prepared.ready && <div className="cf-err" style={{ marginBottom: 10 }}>Antes de enviar, configura la firma de ISLAS SEM en <b>Ventas › Contratos › Ajustes</b> (empresa, firmante y firma dibujada).</div>}
+          {!prepared.ready && <div className="cf-err" style={{ marginBottom: 10 }}>Antes de enviar, configura la firma de tu empresa en <b>Ventas › Contratos › Ajustes</b> (empresa, firmante y firma dibujada).</div>}
           <p style={{ margin: "0 0 10px", fontSize: 13.5 }}>Se enviará a <b>{prepared.client.name || "el cliente"}</b> ({prepared.client.email || <span style={{ color: "#b0304c" }}>sin email</span>}). Revisa los datos: puedes cambiar cualquiera.</p>
           {prepared.docs.map((d, i) => (
             <div key={i} className="crm-panel" style={{ marginBottom: 10 }}>

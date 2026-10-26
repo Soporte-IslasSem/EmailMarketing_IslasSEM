@@ -13,8 +13,14 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { ensureAllowed, NO_ACCESS_MSG } from "../../../../shared/access/checkAccess";
 import "./Register.styles.css";
 
+// ?email=…: viene de una invitación (el correo «te han dado acceso»).
+const invitedEmail = () => { try { return new URLSearchParams(window.location.search).get("email") || ""; } catch { return ""; } };
+
 export default function Register() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invitedEmail);
+  // Empresa nueva: si escribe el nombre, al entrar crea el espacio de su empresa (prueba gratis).
+  const [company, setCompany] = useState("");
+  const invited = !!invitedEmail();
   const [password, setPassword] = useState("");
   const [marketing, setMarketing] = useState(false);
   const [aceptaPoliticas, setAceptaPoliticas] = useState(false);
@@ -31,7 +37,9 @@ export default function Register() {
       setError("");
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      if (!(await ensureAllowed(user))) return setError(NO_ACCESS_MSG);
+      const signup = !!company.trim();
+      if (signup) await setDoc(doc(db, "users", user.uid), { signupAt: Date.now(), signupCompany: company.trim() }, { merge: true });
+      if (!(await ensureAllowed(user, { signup }))) return setError(NO_ACCESS_MSG);
 
       const userRef = doc(db, "users", user.uid);
       const exists = await getDoc(userRef);
@@ -47,7 +55,7 @@ export default function Register() {
         }, { merge: true });
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = signup ? "/alta-empresa" : "/dashboard";
     } catch (err) {
       const code = err?.code || "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
@@ -72,7 +80,9 @@ export default function Register() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      if (!(await ensureAllowed(user))) return setError(NO_ACCESS_MSG);
+      const signup = !!company.trim();
+      if (signup) await setDoc(doc(db, "users", user.uid), { signupAt: Date.now(), signupCompany: company.trim() }, { merge: true });
+      if (!(await ensureAllowed(user, { signup }))) return setError(NO_ACCESS_MSG);
       await sendEmailVerification(user).catch(() => {}); // para entrar hay que confirmar el email
 
       await setDoc(doc(db, "users", user.uid), {
@@ -84,7 +94,7 @@ export default function Register() {
         provider: "email"
       }, { merge: true }); // merge: no tocar la empresa (orgId) que pone el servidor
 
-      window.location.href = "/dashboard";
+      window.location.href = signup ? "/alta-empresa" : "/dashboard";
     } catch (err) {
       if (err?.code === "auth/email-already-in-use") setError("Ese email ya tiene cuenta: entra desde «Iniciar sesión».");
       else if (err?.code === "auth/weak-password") setError("La contraseña es demasiado débil.");
@@ -109,8 +119,17 @@ export default function Register() {
           <img src="/islas-sem-logo.png" className="register-logo-inside" />
           <h2>Crear cuenta</h2>
           <p className="register-slogan">Influir positivamente cuidando tu negocio</p>
-          <p style={{ fontSize: 12.5, color: "#6b7d7d", margin: "8px 0 0" }}>Solo para personas dadas de alta por ISLAS SEM. Usa el email con el que te dieron acceso.</p>
+          <p style={{ fontSize: 12.5, color: "#6b7d7d", margin: "8px 0 0" }}>
+            {invited ? "Te han invitado: crea tu cuenta con este email." : "¿Te han invitado? Usa el email con el que te dieron acceso. ¿Quieres usarlo en tu empresa? Escribe su nombre y prueba gratis 14 días."}
+          </p>
         </div>
+
+        {!invited && (
+          <div className="form-inner" style={{ paddingBottom: 0 }}>
+            <label>Nombre de tu empresa <span style={{ fontWeight: 400, color: "#8a9a9a" }}>(solo si vas a crear una cuenta nueva)</span></label>
+            <input type="text" placeholder="p. ej. Talleres Pérez S.L." value={company} maxLength={80} onChange={(e) => setCompany(e.target.value)} />
+          </div>
+        )}
 
         <div className="google-btn-wrapper">
           <button className="google-btn" onClick={handleGoogleLogin}>
@@ -179,7 +198,7 @@ export default function Register() {
 
           <div className="register-btn-wrapper">
             <button className="register-btn" type="submit">
-              Crear cuenta
+              {company.trim() ? "Crear cuenta de empresa" : "Crear cuenta"}
             </button>
           </div>
 

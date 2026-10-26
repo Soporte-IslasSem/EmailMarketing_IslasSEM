@@ -37,7 +37,10 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const activeArea = areaOf(location.pathname).id;
-  const { canSeeRoute } = usePerms();
+  const { canSeeRoute, org, orgId } = usePerms();
+  // Logo de la empresa (Mi empresa); ISLAS SEM conserva el suyo.
+  const brandLogo = orgId && orgId !== "islas-sem" ? org?.brand?.logoUrl : "";
+  const brandName = orgId && orgId !== "islas-sem" ? org?.brand?.name || org?.name || "" : "";
   const areas = AREAS.map((a) => visibleArea(a, canSeeRoute)).filter(Boolean);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("islassem_sidebar_collapsed") === "1"; } catch { return false; }
@@ -64,7 +67,9 @@ export default function Sidebar() {
         </button>
 
         <div className="Sidebar__logoWrapper">
-          <img src="/islas-sem-logo-white.png" alt="Islas SEM" className="Sidebar__logo" />
+          {brandLogo ? <img src={brandLogo} alt={brandName} className="Sidebar__logo Sidebar__logo--org" />
+            : brandName ? <span className="Sidebar__orgName" title={brandName}>{brandName}</span>
+            : <img src="/islas-sem-logo-white.png" alt="Islas SEM" className="Sidebar__logo" />}
         </div>
 
         <nav className="Sidebar__nav">

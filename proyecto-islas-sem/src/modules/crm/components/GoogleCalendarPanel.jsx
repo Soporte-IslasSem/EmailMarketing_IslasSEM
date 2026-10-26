@@ -55,7 +55,7 @@ export default function GoogleCalendarPanel({ status, refresh, options, result }
             {me.connected
               ? `Tus citas llegan como tareas tuyas y las tareas que te asignen con hora aparecen en tu calendario${me.lastSyncAt ? ` · última sincronización ${hhmm(me.lastSyncAt)}` : ""}.`
               : !status.configured ? "Falta configurar el acceso a Google en el servidor."
-              : `Conecta tu cuenta (${me.email || "@islassem.com"}) para ver aquí tus citas y recibir en tu calendario las tareas que te asignen.`}
+              : `Conecta tu cuenta (${me.email || "tu email"}) para ver aquí tus citas y recibir en tu calendario las tareas que te asignen.`}
             {me.lastError && <div style={{ color: "#b0304c" }}>⚠ {me.lastError}</div>}
           </div>
         </div>
@@ -73,7 +73,7 @@ export default function GoogleCalendarPanel({ status, refresh, options, result }
             <div style={sub}>
               {status.connected
                 ? `Las citas reservadas llegan como tareas cada 2 minutos${status.lastSyncAt ? ` · última sincronización ${hhmm(status.lastSyncAt)}` : ""}.`
-                : "Conecta la cuenta grupo@islassem.com para ver aquí las citas que reserva la gente."}
+                : "Conecta la cuenta de Google de la empresa para ver aquí las citas que reserva la gente."}
               {status.lastError && <div style={{ color: "#b0304c" }}>⚠ {status.lastError}</div>}
               {(status.people || []).length > 0 && (
                 <div style={{ marginTop: 4 }}>

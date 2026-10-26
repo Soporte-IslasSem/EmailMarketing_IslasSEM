@@ -183,3 +183,8 @@
 .Sidebar__subLink:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
 .Sidebar__subLink.on { background: rgba(255, 255, 255, 0.2); color: #fff; font-weight: 600; }
 .Sidebar.collapsed .Sidebar__caret { display: none; }
+
+/* Logo o nombre de la empresa (multiempresa) */
+.Sidebar__logo--org { background: #fff; border-radius: 8px; padding: 4px 8px; max-height: 44px; object-fit: contain; }
+.Sidebar__orgName { display: block; color: #fff; font-weight: 700; font-size: 17px; line-height: 1.2; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.Sidebar.collapsed .Sidebar__orgName { display: none; }

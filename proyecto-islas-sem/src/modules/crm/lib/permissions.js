@@ -57,6 +57,20 @@ export const DEFAULT_PERMS = {
 
 const norm = (s) => String(s || "").trim().toLowerCase();
 
+// Módulos de la empresa según su plan (igual que el servidor, lib/tenant.js featuresOf).
+const FEATURE_DEFAULTS = { whatsapp: true, contracts: true, gcal: true, talentoDigital: false, restaurants: false };
+export function featuresOf(orgId, org) {
+  const own = orgId === "islas-sem" ? { talentoDigital: true, restaurants: true } : {};
+  return { ...FEATURE_DEFAULTS, ...own, ...(org?.features || {}) };
+}
+// Ruta → módulo que hace falta tener.
+const ROUTE_FEATURE = [
+  [/^\/dashboard\/whatsapp/, "whatsapp"],
+  [/^\/dashboard\/talento-digital/, "talentoDigital"],
+  [/^\/dashboard\/restaurantes/, "restaurants"],
+  [/^\/dashboard\/crm\/contracts/, "contracts"],
+];
+
 // Nivel de un rol para una entidad y permiso (con los valores por defecto).
 export function levelOf(rolePerms, role, entity, perm) {
   const v = rolePerms?.[role]?.[entity]?.[perm];
@@ -96,7 +110,10 @@ export function usePerms() {
     const can = (entity, perm, d) => { const l = level(entity, perm); return l === 2 || (l === 1 && (!d || isOwn(d))); };
     // Lista visible según "Leer" (Propios = solo los suyos).
     const visible = (entity, rows) => { const l = level(entity, "read"); return l === 2 ? rows : l === 1 ? rows.filter(isOwn) : []; };
+    const features = featuresOf(orgId, org);
     const canSeeRoute = (path) => {
+      const needs = ROUTE_FEATURE.find(([re]) => re.test(path));
+      if (needs && !features[needs[1]]) return false;
       if (/^\/dashboard\/admin/.test(path)) return isAdmin;
       if (/^\/dashboard\/campaigns\/create/.test(path)) return level("campaigns", "add") > 0;
       // Talento Digital: redactar y enviar correos, como crear campañas.
@@ -109,10 +126,10 @@ export function usePerms() {
       return !hit || level(hit[1], "read") > 0;
     };
     return {
-      ready: !!org, email, isAdmin, role, org: org || {}, level, isOwn, can, visible, canSeeRoute,
+      ready: !!org, email, isAdmin, role, org: org || {}, orgId, features, level, isOwn, can, visible, canSeeRoute,
       roles: Array.isArray(org?.roles) && org.roles.length ? org.roles : DEFAULT_ROLES,
     };
-  }, [org, user]);
+  }, [org, user, orgId]);
 }
 
 // Matriz completa (todos los roles, entidades y permisos con su valor) para guardarla:

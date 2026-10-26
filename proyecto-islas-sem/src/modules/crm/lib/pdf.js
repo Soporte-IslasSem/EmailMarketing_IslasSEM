@@ -3,6 +3,7 @@
 import pdfMake from "pdfmake/build/pdfmake";
 import pdfFonts from "pdfmake/build/vfs_fonts";
 import { money, fmtDate } from "./crm";
+import { getBrand, footerText } from "../../../shared/brand";
 
 // Resuelve el "virtual file system" de fuentes de pdfmake.
 // En 0.3.x `vfs_fonts` exporta el objeto vfs directamente (module.exports = vfs);
@@ -17,11 +18,12 @@ import { money, fmtDate } from "./crm";
   }
 })();
 
-const TEAL = "#136B68";
-const GOLD = "#E2B83C";
 
 // Construye la definición del documento a partir de un doc (quote/invoice) del CRM.
 function buildDoc(doc, { isInvoice }) {
+  // Nombre, colores y pie de la empresa (Mi empresa).
+  const brand = getBrand();
+  const TEAL = brand.color, GOLD = brand.accent;
   const items = Array.isArray(doc.items) ? doc.items : [];
   const subtotal =
     doc.subtotal != null
@@ -58,14 +60,14 @@ function buildDoc(doc, { isInvoice }) {
     header: {
       margin: [40, 24, 40, 0],
       columns: [
-        { text: "ISLAS SEM", style: "brand" },
+        { text: brand.name, style: "brand" },
         { text: isInvoice ? "FACTURA" : "PRESUPUESTO", style: "doctype", alignment: "right" },
       ],
     },
     footer: (cur, total) => ({
       margin: [40, 0, 40, 20],
       columns: [
-        { text: "ISLAS SEM SLU · Canarias · www.islassem.com", style: "foot" },
+        { text: footerText(brand), style: "foot" },
         { text: `Página ${cur} de ${total}`, style: "foot", alignment: "right" },
       ],
     }),

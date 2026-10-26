@@ -48,7 +48,7 @@ export default function SignContract() {
   if (!data) {
     return (
       <div className="ctr-public crm"><div className="ctr-public__box">
-        <div className="ctr-public__head">ISLAS SEM</div>
+        <div className="ctr-public__head">Firma de documentos</div>
         <div className="ctr-public__card">{error ? <p style={{ color: "#b0304c" }}>{error}</p> : <p>Cargando documento…</p>}</div>
       </div></div>
     );
@@ -57,7 +57,7 @@ export default function SignContract() {
   if (done || data.status === "completed") {
     return (
       <div className="ctr-public crm"><div className="ctr-public__box">
-        <div className="ctr-public__head">ISLAS SEM</div>
+        <div className="ctr-public__head">Firma de documentos</div>
         <div className="ctr-public__card ctr-ok">
           <div style={{ fontSize: 46 }}>✅</div>
           <h2>{done ? "¡Documento firmado!" : "Este documento ya está firmado"}</h2>
@@ -70,7 +70,7 @@ export default function SignContract() {
 
   return (
     <div className="ctr-public crm"><div className="ctr-public__box">
-      <div className="ctr-public__head">ISLAS SEM · Documento para firmar</div>
+      <div className="ctr-public__head">{data.provider?.company || "Documento"} · Documento para firmar</div>
       <div className="ctr-public__card">
         <h2 style={{ margin: "0 0 4px", color: "#136B68" }}>{data.title}</h2>
         <p style={{ margin: 0, fontSize: 13.5, color: "#5b6b6a" }}>

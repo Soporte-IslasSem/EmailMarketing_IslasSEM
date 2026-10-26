@@ -9,6 +9,7 @@ import ProUpgradeModal from "../../lists/components/ListDetail/modals/ProUpgrade
 import { useResponseWatcher } from "../../crm/lib/useResponseWatcher";
 import useCrmLink from "../../lists/hooks/useCrmLink";
 import { usePerms } from "../../crm/lib/permissions";
+import { brandOf, setBrand } from "../../../shared/brand";
 import "./DashboardLayout.styles.css";
 
 // Páginas a todo el ancho (tableros con scroll horizontal); el resto va centrado a 1240px como el prototipo
@@ -30,6 +31,8 @@ export default function DashboardLayout() {
   // y algunas pantallas se quedaban en "Cargando…" para siempre.
   const { user, loading } = useAuth();
   const perms = usePerms();
+  // Imagen de la empresa para los correos y PDF que se preparan en el navegador.
+  useEffect(() => { if (perms.orgId) setBrand(brandOf(perms.orgId, perms.org)); }, [perms.orgId, perms.org]);
   const allowed = !perms.ready || perms.canSeeRoute(location.pathname);
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#6b7d7d" }}>Cargando…</div>;
   if (!user) return <Navigate to="/auth/login" replace state={{ from: location.pathname }} />;

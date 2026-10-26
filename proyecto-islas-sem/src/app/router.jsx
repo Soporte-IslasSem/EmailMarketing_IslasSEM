@@ -99,6 +99,8 @@ import CrmFormBuilder from "../modules/crm/pages/CrmFormBuilder.jsx";
 import CrmSettings from "../modules/crm/pages/CrmSettings.jsx";
 import AccessGate from "../shared/access/AccessGate.jsx";
 import Access from "../modules/crm/pages/Access.jsx";
+import MyCompany, { Subscription } from "../modules/crm/pages/MyCompany.jsx";
+import Onboarding from "../modules/auth/pages/Onboarding/Onboarding.jsx";
 import RestaurantsLayout, { LegacyRestaurants } from "../modules/restaurants/layout/RestaurantsLayout.jsx";
 import RestaurantClients from "../modules/restaurants/pages/Clients.jsx";
 import RestaurantDetail from "../modules/restaurants/pages/RestaurantDetail.jsx";
@@ -170,6 +172,10 @@ const router = createBrowserRouter([
 
   // Enlaces antiguos de Restaurantes (era una pantalla aparte): llevan a la misma página dentro del panel
   { path: "/restaurantes/*", element: <LegacyRestaurants /> },
+
+  // Alta de empresa (tras registrarse para crear una) y pago de una cuenta suspendida
+  { path: "/alta-empresa", element: <AccessGate><Onboarding /></AccessGate> },
+  { path: "/suscripcion", element: <AccessGate><Subscription /></AccessGate> },
 
   // DASHBOARD
   {
@@ -257,6 +263,7 @@ const router = createBrowserRouter([
       { path: "admin/salesteams", element: <SalesTeams /> },
       { path: "admin/roles", element: <Roles /> },
       { path: "admin/accesos", element: <Access /> },
+      { path: "admin/empresa", element: <MyCompany /> },
       { path: "admin/integraciones", element: <Integrations /> },
       { path: "admin/audit", element: <Audit /> },
 

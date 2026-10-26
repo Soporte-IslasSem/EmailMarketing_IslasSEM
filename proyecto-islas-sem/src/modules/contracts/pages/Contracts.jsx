@@ -274,11 +274,11 @@ function Settings() {
     <div className="crm-panel" style={{ maxWidth: 760 }}>
       <h4>Empresa (el "Prestador" de los contratos)</h4>
       <div className="crm-two" style={{ flexWrap: "wrap" }}>
-        <div className="crm-field" style={{ flex: "1 1 45%" }}><label>Razón social</label><input value={s.company?.name || ""} onChange={set("company", "name")} placeholder="ISLAS SEM, S.L.U." /></div>
+        <div className="crm-field" style={{ flex: "1 1 45%" }}><label>Razón social</label><input value={s.company?.name || ""} onChange={set("company", "name")} placeholder="Tu empresa, S.L." /></div>
         <div className="crm-field" style={{ flex: "1 1 45%" }}><label>CIF</label><input value={s.company?.cif || ""} onChange={set("company", "cif")} /></div>
       </div>
       <div className="crm-field"><label>Domicilio</label><input value={s.company?.address || ""} onChange={set("company", "address")} /></div>
-      <h4 style={{ marginTop: 16 }}>Firmante de ISLAS SEM</h4>
+      <h4 style={{ marginTop: 16 }}>Firmante de tu empresa</h4>
       <div className="crm-two" style={{ flexWrap: "wrap" }}>
         <div className="crm-field" style={{ flex: "1 1 45%" }}><label>Nombre completo</label><input value={s.signer?.name || ""} onChange={set("signer", "name")} /></div>
         <div className="crm-field" style={{ flex: "1 1 45%" }}><label>DNI / NIF</label><input value={s.signer?.dni || ""} onChange={set("signer", "dni")} /></div>
@@ -288,7 +288,7 @@ function Settings() {
       <div className="crm-field"><label>Enviar copia de los contratos firmados a</label><input type="email" value={s.notifyEmail || ""} onChange={(e) => setS((x) => ({ ...x, notifyEmail: e.target.value }))} placeholder="Si lo dejas vacío, al firmante (o a quien envió el contrato)" /></div>
       <h4 style={{ marginTop: 16 }}>Firma</h4>
       <p style={{ fontSize: 13, color: "var(--crm-muted)", margin: "0 0 8px" }}>
-        {s.hasSignature ? "✓ Hay una firma guardada. Dibuja otra solo si quieres cambiarla." : "Dibuja la firma del firmante. Se pondrá en cada contrato que envíe ISLAS SEM, junto con la huella de quién lo envía, su IP y la fecha y hora."}
+        {s.hasSignature ? "✓ Hay una firma guardada. Dibuja otra solo si quieres cambiarla." : "Dibuja la firma del firmante. Se pondrá en cada contrato que envíe tu empresa, junto con la huella de quién lo envía, su IP y la fecha y hora."}
       </p>
       <SignaturePad onChange={setSig} />
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>

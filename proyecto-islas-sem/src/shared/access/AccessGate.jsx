@@ -28,6 +28,8 @@ export default function AccessGate({ children }) {
   if (state === "checking") return wait("Comprobando acceso…");
   if (state === "noorg" && location.pathname !== "/alta-empresa") return <Navigate to="/alta-empresa" replace />;
   if (state === "noorg") return children;
+  // Empresa suspendida: su administrador puede entrar a pagar.
+  if (state === "suspended" && info?.isAdmin && location.pathname === "/suscripcion") return children;
 
   const out = async () => { await logout(); navigate("/auth/login"); };
   const resend = async () => {

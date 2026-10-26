@@ -20,7 +20,7 @@ export function buildFormEmbed(base, formId, mode = "inline", { delaySeconds = 5
   const id = `islassem-form-${formId}-${mode}`;
   const store = `islassem-form-${formId}`;
   if (mode === "inline") {
-    return `<!-- Formulario ISLAS SEM -->
+    return `<!-- Formulario -->
 <iframe id="${id}" src="${src}" title="Formulario" loading="lazy" style="width:100%;max-width:520px;height:640px;border:0;display:block;margin:0 auto"></iframe>
 <script>
 window.addEventListener("message", function (e) {
@@ -31,7 +31,7 @@ window.addEventListener("message", function (e) {
   }
   const delay = Math.max(0, Number(delaySeconds) || 0);
   const days = Math.max(0, Number(hideDays) || 0);
-  return `<!-- Formulario ISLAS SEM (${mode === "bar" ? "barra inferior" : mode === "popup" ? "popup" : "exit intent"}): pegar antes de </body> -->
+  return `<!-- Formulario (${mode === "bar" ? "barra inferior" : mode === "popup" ? "popup" : "exit intent"}): pegar antes de </body> -->
 <script>
 (function () {
   var KEY = ${JSON.stringify(id)}, STORE = ${JSON.stringify(store)}, MODE = ${JSON.stringify(mode)};

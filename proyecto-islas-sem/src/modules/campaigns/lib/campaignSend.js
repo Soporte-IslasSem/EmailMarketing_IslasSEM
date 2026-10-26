@@ -4,6 +4,7 @@
 import { db } from "../../../config/firebaseConfig";
 import { collection, doc, writeBatch, updateDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { cleanEmailHtml } from "../../../utils/emailHtml";
+import { getBrand } from "../../../shared/brand";
 
 // Base pública del backend (para links de baja y pixel de tracking). Se configura por entorno.
 const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || "https://email-marketing.islassem.com/api";
@@ -63,8 +64,9 @@ function personalize(html, { campaignId, sub }) {
     .replace(/{{\s*email\s*}}/gi, sub.email || "");
   out = trackLinks(out, campaignId, sub.id);
   const pixel = `<img src="${API_BASE}/o/${campaignId}/${sub.id}.png" width="1" height="1" alt="" style="display:none" />`;
+  const who = String(getBrand().legalName || getBrand().name || "").replace(/[<>&"]/g, "");
   const unsub = `<div style="text-align:center;font-size:11px;color:#9aa8a8;margin-top:24px">
-    ISLAS SEM SLU · Si no deseas recibir más correos, <a href="${API_BASE}/u/${sub.id}" style="color:#9aa8a8">date de baja aquí</a>.
+    ${who} · Si no deseas recibir más correos, <a href="${API_BASE}/u/${sub.id}" style="color:#9aa8a8">date de baja aquí</a>.
   </div>`;
   return out + unsub + pixel;
 }

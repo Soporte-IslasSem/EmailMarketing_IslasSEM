@@ -152,8 +152,8 @@ export const SOURCE_LABELS = [
   ["contact.address", "Cliente · dirección"], ["contact.city", "Cliente · ciudad"], ["contact.province", "Cliente · provincia"],
   ["company.name", "Empresa del cliente · nombre"], ["company.cif", "Empresa del cliente · CIF"], ["company.address", "Empresa del cliente · dirección"],
   ["deal.amount", "Negociación · importe"], ["deal.title", "Negociación · título"],
-  ["org.name", "ISLAS SEM · razón social"], ["org.cif", "ISLAS SEM · CIF"], ["org.address", "ISLAS SEM · domicilio"],
-  ["org.signerName", "ISLAS SEM · firmante"], ["org.signerDni", "ISLAS SEM · DNI del firmante"], ["org.signerRole", "ISLAS SEM · cargo del firmante"],
+  ["org.name", "Tu empresa · razón social"], ["org.cif", "Tu empresa · CIF"], ["org.address", "Tu empresa · domicilio"],
+  ["org.signerName", "Tu empresa · firmante"], ["org.signerDni", "Tu empresa · DNI del firmante"], ["org.signerRole", "Tu empresa · cargo del firmante"],
   ["date.today", "Fecha de hoy"], ["form", "Campo de un formulario…"], ["fixed", "Valor fijo…"], ["ask", "Preguntar al enviar"],
 ];
 export function guessSource(hole) {

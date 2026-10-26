@@ -91,7 +91,7 @@ export default function PublicForm() {
     let alive = true;
     fetch(`${API_BASE}/forms/def/${encodeURIComponent(formType || "")}`)
       .then((r) => r.json())
-      .then((out) => alive && setRemote({ type: formType, status: out.ok ? "ok" : "missing", def: out.ok ? out.form : null }))
+      .then((out) => alive && setRemote({ type: formType, status: out.ok ? "ok" : "missing", def: out.ok ? out.form : null, org: out.org || null }))
       .catch(() => alive && setRemote({ type: formType, status: "missing", def: null }));
     return () => { alive = false; };
   }, [formType]);
@@ -196,7 +196,7 @@ export default function PublicForm() {
         {error && <div style={{ background: "#fdeef1", color: "#b0304c", padding: "9px 12px", borderRadius: 8, fontSize: 13, margin: "14px 0" }}>{error}</div>}
         <button type="submit" disabled={sending} style={{ ...btn, background: cfg.color, marginTop: 16 }}>{sending ? "Enviando…" : cfg.btn}</button>
         <p style={{ fontSize: 11, color: "#9aa8a8", marginTop: 16, textAlign: "center" }}>
-          Tus datos se tratan conforme al RGPD para la gestión de tu relación con ISLAS SEM SLU.
+          Tus datos se tratan conforme al RGPD para la gestión de tu relación con {(remote.type === formType && remote.org?.legalName) || "ISLAS SEM SLU"}.
           {RECAPTCHA_KEY && (
             <>
               <br />Protegido por reCAPTCHA de Google: se aplican su{" "}

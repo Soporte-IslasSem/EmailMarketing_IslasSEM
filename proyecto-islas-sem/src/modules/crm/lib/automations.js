@@ -3,6 +3,7 @@
 import { crmCreate, crmUpdate, logActivity } from "./crm";
 import { getStages, findStage } from "./pipelines";
 import { queueEmail, basicEmail } from "./outbox";
+import { getBrand } from "../../../shared/brand";
 
 export const WHEN_OPTS = [
   ["immediately", "inmediatamente", 0],
@@ -238,7 +239,7 @@ export async function runStageAutomations(pipeline, deal, stageId, orgId) {
         await queueEmail(orgId, {
           to: deal.contactEmail || "",
           toName: deal.contact || "",
-          subject: `${r.title || "Documento"} · ISLAS SEM`,
+          subject: `${r.title || "Documento"} · ${getBrand().name}`,
           kind: mkind,
           dealId: deal.id,
           contactId: deal.contactId || "",
