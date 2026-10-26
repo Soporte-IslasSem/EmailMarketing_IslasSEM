@@ -14,6 +14,7 @@ export default function PlatformAdmin() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [nw, setNw] = useState({ name: "", adminEmail: "", plan: "trial" });
   const load = () => api("platform/orgs").then(setData).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
   const rows = useMemo(() => (data?.orgs || []).filter((o) => !q || `${o.name} ${o.id} ${o.ownerEmail}`.toLowerCase().includes(q.toLowerCase())), [data, q]);
@@ -27,6 +28,16 @@ export default function PlatformAdmin() {
     try { await api("platform/org", { orgId: o.id, ...body }); setMsg(`✓ ${o.name}: ${label}`); await load(); } catch (e) { setMsg("No se pudo: " + e.message); }
     setBusy("");
   };
+  const create = async () => {
+    setBusy("create"); setMsg("");
+    try {
+      const r = await api("platform/create", nw);
+      setMsg(`✓ Empresa creada (${r.orgId}). ${nw.adminEmail} ya puede entrar con Google o registrándose con ese email.`);
+      setNw({ name: "", adminEmail: "", plan: "trial" });
+      await load();
+    } catch (e) { setMsg("No se pudo: " + e.message); }
+    setBusy("");
+  };
   const support = async (o) => {
     if (!window.confirm(`Entrar como soporte en «${o.name}» durante 60 minutos? Quedará registrado.`)) return;
     try { await api("platform/support", { orgId: o.id, minutes: 60 }); try { localStorage.removeItem("islassem:accessOk"); } catch { /* sin almacenamiento */ } window.location.href = "/dashboard"; }
@@ -38,6 +49,13 @@ export default function PlatformAdmin() {
     <div className="crm">
       <div className="crm__top">
         <div><h1>Plataforma</h1><p>{totals.all} empresas · {totals.active} activas · {totals.paying} pagando · {totals.trial} en prueba</p></div>
+      </div>
+      <div style={{ background: "#fff", border: "1px solid var(--crm-line)", borderRadius: 12, padding: 14, marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <b style={{ fontSize: 14 }}>Nueva empresa</b>
+        <input className="crm-search" style={{ margin: 0, maxWidth: 220 }} placeholder="Nombre de la empresa" value={nw.name} onChange={(e) => setNw({ ...nw, name: e.target.value })} />
+        <input className="crm-search" style={{ margin: 0, maxWidth: 240 }} type="email" placeholder="Email del administrador" value={nw.adminEmail} onChange={(e) => setNw({ ...nw, adminEmail: e.target.value })} />
+        <select value={nw.plan} onChange={(e) => setNw({ ...nw, plan: e.target.value })}>{(data?.plans || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+        <button className="crm-btn sm" onClick={create} disabled={busy === "create" || !nw.name || !nw.adminEmail}>{busy === "create" ? "Creando…" : "Dar de alta"}</button>
       </div>
       <input className="crm-search" placeholder="Buscar empresa, id o email…" value={q} onChange={(e) => setQ(e.target.value)} />
       {msg && <p style={{ fontSize: 13, color: /^No/.test(msg) ? "#b0304c" : "var(--crm-teal-dark)" }}>{msg}</p>}

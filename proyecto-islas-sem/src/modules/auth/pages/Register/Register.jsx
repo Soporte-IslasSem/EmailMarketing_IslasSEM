@@ -21,6 +21,7 @@ export default function Register() {
   // Empresa nueva: si escribe el nombre, al entrar crea el espacio de su empresa (prueba gratis).
   const [company, setCompany] = useState("");
   const invited = !!invitedEmail();
+  const signupOpen = import.meta.env.VITE_ORG_SIGNUP === "open";
   const [password, setPassword] = useState("");
   const [marketing, setMarketing] = useState(false);
   const [aceptaPoliticas, setAceptaPoliticas] = useState(false);
@@ -120,11 +121,13 @@ export default function Register() {
           <h2>Crear cuenta</h2>
           <p className="register-slogan">Influir positivamente cuidando tu negocio</p>
           <p style={{ fontSize: 12.5, color: "#6b7d7d", margin: "8px 0 0" }}>
-            {invited ? "Te han invitado: crea tu cuenta con este email." : "¿Te han invitado? Usa el email con el que te dieron acceso. ¿Quieres usarlo en tu empresa? Escribe su nombre y prueba gratis 14 días."}
+            {invited ? "Te han invitado: crea tu cuenta con este email."
+              : signupOpen ? "¿Te han invitado? Usa el email con el que te dieron acceso. ¿Quieres usarlo en tu empresa? Escribe su nombre y prueba gratis 14 días."
+              : "Solo para personas dadas de alta. Usa el email con el que te dieron acceso."}
           </p>
         </div>
 
-        {!invited && (
+        {!invited && signupOpen && (
           <div className="form-inner" style={{ paddingBottom: 0 }}>
             <label>Nombre de tu empresa <span style={{ fontWeight: 400, color: "#8a9a9a" }}>(solo si vas a crear una cuenta nueva)</span></label>
             <input type="text" placeholder="p. ej. Talleres Pérez S.L." value={company} maxLength={80} onChange={(e) => setCompany(e.target.value)} />

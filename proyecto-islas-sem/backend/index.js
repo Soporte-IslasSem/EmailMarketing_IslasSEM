@@ -127,6 +127,7 @@ api.post("/billing/change", safe(billing.change));
 // --- Panel de la plataforma (PLATFORM_ADMINS) y modo soporte ---
 api.get("/platform/orgs", safe(platform.listOrgs));
 api.post("/platform/org", safe(platform.updateOrg));
+api.post("/platform/create", safe(platform.createOrg));
 api.post("/platform/support", safe(platform.startSupport));
 api.post("/platform/support/exit", safe(platform.exitSupport));
 

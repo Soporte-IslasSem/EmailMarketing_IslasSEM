@@ -68,6 +68,22 @@ async function updateOrg(req, res) {
   res.json({ ok: true });
 }
 
+// POST /api/platform/create { name, adminEmail, plan? } — da de alta una empresa a mano (cuando el
+// alta pública está cerrada). Su administrador entra con ese email (Google o registrándose).
+async function createOrg(req, res) {
+  const user = await platformAdmin(req, res);
+  if (!user) return;
+  const name = String(req.body?.name || "").trim().slice(0, 80);
+  const adminEmail = tenant.norm(req.body?.adminEmail);
+  const plan = PLANS[req.body?.plan] ? req.body.plan : "trial";
+  if (name.length < 2) return fail(res, "Escribe el nombre de la empresa");
+  if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(adminEmail)) return fail(res, "Email del administrador no válido");
+  if ((await tenant.findOrgsForEmail(adminEmail)).length) return fail(res, "Ese email ya tiene acceso a una empresa", 409);
+  const orgId = await require("./orgs").newOrg({ name, ownerEmail: adminEmail, via: `platform:${user.email}`, plan });
+  await audit(user.email, "create", orgId, { adminEmail, plan });
+  res.json({ ok: true, orgId });
+}
+
 // POST /api/platform/support { orgId, minutes } — entra en la empresa como administrador de
 // soporte durante un tiempo (máx. 4 h). Su perfil apunta a esa empresa hasta que salga.
 async function startSupport(req, res) {
@@ -103,4 +119,4 @@ async function exitSupport(req, res) {
   res.json({ ok: true });
 }
 
-module.exports = { listOrgs, updateOrg, startSupport, exitSupport };
+module.exports = { listOrgs, updateOrg, createOrg, startSupport, exitSupport };

@@ -51,7 +51,9 @@ async function checkAccess(req, res) {
     }
     // Sin empresa: puede crear la suya (alta de empresa) si así lo pidió al registrarse.
     const prof = (await db.collection("users").doc(user.uid).get()).data() || {};
-    if (req.body?.signup === true || prof.signupAt || platformAdmin) return res.json({ allowed: false, canCreateOrg: true, platformAdmin });
+    // Alta pública de empresas solo con ORG_SIGNUP=open (si no, las crea la plataforma a mano).
+    const open = process.env.ORG_SIGNUP === "open";
+    if ((open && (req.body?.signup === true || prof.signupAt)) || platformAdmin) return res.json({ allowed: false, canCreateOrg: true, platformAdmin });
     let removed = false;
     const rec = await admin.auth().getUser(user.uid);
     const ageMs = Date.now() - new Date(rec.metadata.creationTime).getTime();

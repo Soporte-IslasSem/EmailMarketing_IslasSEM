@@ -27,24 +27,29 @@ async function createOrg(req, res) {
   if (!user?.email) return fail(res, "Sesión no válida", 401);
   if (user.email_verified !== true) return fail(res, "Verifica tu email antes de crear la empresa", 403);
   const email = tenant.norm(user.email);
+  if (process.env.ORG_SIGNUP !== "open" && !tenant.isPlatformAdmin(email)) return fail(res, "El alta de empresas aún no está abierta. Escríbenos y te damos de alta.", 403);
   if (await tenant.resolveUserOrg(user)) return fail(res, "Tu cuenta ya pertenece a una empresa", 409);
   const name = clip(req.body?.name, 80);
   if (name.length < 2) return fail(res, "Escribe el nombre de tu empresa");
   const pref = db.collection("users").doc(user.uid);
   const prof = (await pref.get()).data() || {};
   if (prof.createdOrgAt && Date.now() - prof.createdOrgAt < 3600e3) return fail(res, "Ya creaste una empresa hace poco", 429);
-  const orgId = `${slug(name)}-${crypto.randomBytes(3).toString("hex")}`;
-  const now = Date.now();
-  const p = planFields("trial");
-  await tenant.orgRef(orgId).create({
-    name, status: "active", ...p, trialEndsAt: now + TRIAL_DAYS * 864e5,
-    accessEmails: [email], adminEmails: [email], memberRoles: {}, memberEmails: [],
-    ownerUid: user.uid, ownerEmail: email, brand: { name }, createdAt: new Date(), createdVia: "signup",
-  });
-  await pref.set({ orgId, email, role: "owner", createdOrgAt: now }, { merge: true });
-  tenant.forgetOrg(orgId);
+  const orgId = await newOrg({ name, ownerEmail: email, ownerUid: user.uid, via: "signup" });
+  await pref.set({ orgId, email, role: "owner", createdOrgAt: Date.now() }, { merge: true });
   console.log(`[orgs] alta de empresa ${orgId} por ${email}`);
   res.json({ ok: true, orgId });
+}
+
+// Crea la ficha de una empresa nueva (prueba gratis, su administrador con acceso).
+async function newOrg({ name, ownerEmail, ownerUid = "", via, plan = "trial" }) {
+  const orgId = `${slug(name)}-${crypto.randomBytes(3).toString("hex")}`;
+  await tenant.orgRef(orgId).create({
+    name, status: "active", ...planFields(plan), ...(plan === "trial" ? { trialEndsAt: Date.now() + TRIAL_DAYS * 864e5 } : {}),
+    accessEmails: [ownerEmail], adminEmails: [ownerEmail], memberRoles: {}, memberEmails: [],
+    ownerUid, ownerEmail, brand: { name }, createdAt: new Date(), createdVia: via,
+  });
+  tenant.forgetOrg(orgId);
+  return orgId;
 }
 
 /* ------------------------------------------------------------------ perfil */
@@ -151,4 +156,4 @@ async function invite(req, res) {
   res.json({ ok: true, already: !!out.already, otherOrg: others.length > 0 });
 }
 
-module.exports = { createOrg, getProfile, saveProfile, logo, invite, seats };
+module.exports = { createOrg, newOrg, getProfile, saveProfile, logo, invite, seats };
