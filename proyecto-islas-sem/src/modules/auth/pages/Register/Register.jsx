@@ -44,7 +44,7 @@ export default function Register() {
           fechaAceptacion: null,
           versionPolitica: "v1.0",
           provider: "google"
-        });
+        }, { merge: true });
       }
 
       window.location.href = "/dashboard";
@@ -82,7 +82,7 @@ export default function Register() {
         fechaAceptacion: new Date().toISOString(),
         versionPolitica: "v1.0",
         provider: "email"
-      });
+      }, { merge: true }); // merge: no tocar la empresa (orgId) que pone el servidor
 
       window.location.href = "/dashboard";
     } catch (err) {

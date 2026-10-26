@@ -1,17 +1,25 @@
 // WhatsApp (sección WhatsApp de la app) con la API oficial de Meta (WhatsApp Cloud API), sin
-// intermediarios.
+// intermediarios. Multiempresa: cada empresa conecta SU número y su cuenta de WhatsApp Business.
 //
-// - Ajustes (system/whatsappSettings): identificador del número, de la cuenta (WABA), token de
-//   acceso, clave secreta de la app y token de verificación del webhook. El token y la clave
-//   secreta NUNCA salen del servidor: la app solo sabe si están puestos.
-// - Webhook (/api/whatsapp/webhook): Meta avisa de cada mensaje que entra, de cada cambio de
-//   estado (enviado, entregado, leído, fallido) y de las revisiones de plantillas. Se
-//   comprueba la firma (X-Hub-Signature-256) con la clave secreta; sin firma válida, nada.
-// - Chats (waChats/<wa_id>): uno por número. Se liga al contacto del CRM con el mismo teléfono
-//   (o a mano desde la app). Mensajes en waChats/<wa_id>/messages/<id>. Cada chat está en una
-//   columna de un embudo (funnelId/stageId), con equipo, agente, etiquetas y notas.
-// - La app LEE chats y mensajes en tiempo real (reglas: solo empleados que pueden ver
-//   contactos) pero no escribe: enviar, asignar, mover, archivar o ligar pasa por aquí.
+// - Ajustes (organizations/{org}/private/whatsappSettings): identificador del número, de la
+//   cuenta (WABA), token de acceso, clave secreta de la app y token de verificación del webhook.
+//   El token y la clave secreta NUNCA salen del servidor: la app solo sabe si están puestos.
+//   Dos formas de conectar:
+//   · Con un botón (Embedded Signup de Meta, app de la plataforma: META_APP_ID/META_APP_SECRET/
+//     META_CONFIG_ID): la empresa entra con su Facebook, elige o registra su número y listo.
+//   · A mano (su propia app de Meta): pega los identificadores, el token y la clave secreta.
+// - Índice (waIndex): número (phone_<id>), cuenta (waba_<id>) y token de verificación
+//   (verify_<token>) → empresa. Un número solo puede estar en una empresa.
+// - Webhook (/api/whatsapp/webhook, uno para todas): Meta avisa de cada mensaje que entra, de
+//   cada cambio de estado (enviado, entregado, leído, fallido) y de las revisiones de
+//   plantillas. Cada aviso va a la empresa de su número/cuenta, y solo si la firma
+//   (X-Hub-Signature-256) es válida con la clave de la plataforma o con la de esa empresa.
+// - Chats (organizations/{org}/waChats/<wa_id>): uno por número de cliente. Se liga al contacto
+//   del CRM con el mismo teléfono (o a mano). Mensajes en …/waChats/<wa_id>/messages/<id>.
+//   Cada chat está en una columna de un embudo (funnelId/stageId), con equipo, agente,
+//   etiquetas y notas.
+// - La app LEE chats y mensajes en tiempo real (reglas: solo los de su empresa y quien puede
+//   ver contactos) pero no escribe: enviar, asignar, mover, archivar o ligar pasa por aquí.
 // - Regla de WhatsApp: solo se puede escribir texto libre si el cliente escribió en las
 //   últimas 24 h. Fuera de esa ventana hacen falta plantillas aprobadas (waTemplates.js).
 // - Lo automático (embudo de entrada, asignación, bienvenida, fuera de horario, chatbot,
@@ -19,14 +27,18 @@
 const crypto = require("crypto");
 const { admin, db, bucket } = require("./firebase");
 const { staffFromReq } = require("./access");
-const { DEFAULT_ORG_ID, norm } = require("./link");
+const { norm } = require("./link");
+const { orgRef, orgPrivate, privateRef, featuresOf } = require("./tenant");
 const cfgLib = require("./waConfig");
 
 const GRAPH = (process.env.WA_GRAPH_BASE || "https://graph.facebook.com").replace(/\/$/, "");
 const VERSION = process.env.WA_GRAPH_VERSION || "v23.0";
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
-const SETTINGS = () => db.collection("system").doc("whatsappSettings");
-const CHATS = () => db.collection("waChats");
+// App de Meta de la plataforma (conexión con un botón).
+const META = () => ({ appId: process.env.META_APP_ID || "", appSecret: process.env.META_APP_SECRET || "", configId: process.env.META_CONFIG_ID || "", verifyToken: process.env.META_VERIFY_TOKEN || "" });
+const SETTINGS = (orgId) => privateRef(orgId, "whatsappSettings");
+const CHATS = (orgId) => orgRef(orgId).collection("waChats");
+const INDEX = () => db.collection("waIndex");
 const WINDOW_MS = 24 * 3600e3;
 const MAX_MEDIA = 16 * 1024 * 1024; // lo que se descarga/guarda de cada archivo
 const clip = (s, n = 200) => String(s ?? "").trim().slice(0, n);
@@ -38,23 +50,37 @@ const msgDocId = (wamid) => crypto.createHash("sha1").update(String(wamid)).dige
 const RANK = { pending: 0, sent: 1, delivered: 2, read: 3, failed: 4 };
 const auto = () => require("./waAuto"); // (perezoso: waAuto usa este módulo)
 
-let cache = null; // ajustes en memoria 30 s (el webhook llega muy seguido)
-async function settings(fresh = false) {
-  if (!fresh && cache && Date.now() - cache.at < 30e3) return cache.s;
-  const s = (await SETTINGS().get()).data() || {};
-  cache = { at: Date.now(), s };
+// Ajustes de cada empresa en memoria 30 s (el webhook llega muy seguido).
+const cache = new Map();
+async function settings(orgId, fresh = false) {
+  if (!orgId) throw httpError("Falta la empresa", 500);
+  const hit = cache.get(orgId);
+  if (!fresh && hit && Date.now() - hit.at < 30e3) return hit.s;
+  const s = (await (await orgPrivate(orgId, "whatsappSettings")).get()).data() || {};
+  cache.set(orgId, { at: Date.now(), s });
   return s;
+}
+const resetSettingsCache = (orgId) => (orgId ? cache.delete(orgId) : cache.clear());
+
+// Índice número/cuenta/token → empresa (60 s en memoria).
+const idxCache = new Map();
+const idxKey = (kind, id) => `${kind}_${String(id || "").replace(/[^A-Za-z0-9_-]/g, "")}`;
+async function indexOrg(kind, id) {
+  const key = idxKey(kind, id);
+  if (!id || key.length < kind.length + 2) return null;
+  const hit = idxCache.get(key);
+  if (hit && Date.now() - hit.at < 60e3) return hit.orgId;
+  const orgId = (await INDEX().doc(key).get()).data()?.orgId || null;
+  idxCache.set(key, { at: Date.now(), orgId });
+  if (idxCache.size > 5000) idxCache.clear();
+  return orgId;
 }
 
 async function staff(req, res) {
   const user = await staffFromReq(req);
-  if (!user) res.status(401).json({ ok: false, error: "Sesión no válida" });
+  if (!user) { res.status(401).json({ ok: false, error: "Sesión no válida" }); return null; }
+  if (!featuresOf(user.org).whatsapp) { res.status(403).json({ ok: false, error: "WhatsApp no está incluido en tu plan" }); return null; }
   return user;
-}
-async function isAdmin(email) {
-  const org = (await db.collection("organizations").doc(DEFAULT_ORG_ID).get()).data() || {};
-  const admins = (org.adminEmails || []).map(norm);
-  return !admins.length || admins.includes(norm(email));
 }
 
 // Número en formato de WhatsApp (solo dígitos, con prefijo de país). Los de 9 cifras sin
@@ -69,10 +95,9 @@ function toWaId(phone, cc = "34") {
 
 /* ------------------------------------------------------------------ Graph API */
 
-async function graph(path, { method = "GET", body, form, token } = {}) {
-  const s = await settings();
-  const tk = token || s.token;
-  if (!tk) throw httpError("WhatsApp no está configurado (falta el token en Ajustes)", 409);
+async function graph(orgId, path, { method = "GET", body, form, token } = {}) {
+  const tk = token || (await settings(orgId)).token;
+  if (!tk) throw httpError("WhatsApp no está configurado (falta conectar el número en Ajustes)", 409);
   const r = await fetch(`${GRAPH}/${VERSION}/${path}`, {
     method,
     headers: { Authorization: `Bearer ${tk}`, ...(body ? { "Content-Type": "application/json" } : {}) },
@@ -92,7 +117,7 @@ async function graph(path, { method = "GET", body, form, token } = {}) {
 function explain(e) {
   const code = Number(e.code);
   if (code === 131047 || code === 470) return "Han pasado más de 24 h desde el último mensaje del cliente: hace falta una plantilla aprobada por Meta.";
-  if (code === 190) return "El token de acceso de Meta no es válido o ha caducado. Cámbialo en WhatsApp › Ajustes.";
+  if (code === 190) return "El token de acceso de Meta no es válido o ha caducado. Vuelve a conectar WhatsApp en Ajustes.";
   if (code === 131026) return "Ese número no puede recibir el mensaje (no tiene WhatsApp o no acepta mensajes de empresas).";
   if (code === 131056) return "Demasiados mensajes seguidos a este número. Espera un poco.";
   if (code === 131051) return "Tipo de mensaje no admitido por WhatsApp.";
@@ -103,6 +128,8 @@ function explain(e) {
   if (code === 132001) return "Esa plantilla no existe en ese idioma o aún no está aprobada.";
   if (code === 132015 || code === 132016) return "Esa plantilla está pausada o desactivada por Meta por su baja calidad.";
   if (code === 131031) return "La cuenta de WhatsApp Business está bloqueada o restringida por Meta.";
+  if (code === 133005) return "El PIN de verificación en dos pasos no coincide. Quítalo o cámbialo en WhatsApp Manager y vuelve a intentarlo.";
+  if (code === 133010) return "El número aún no está registrado en la API de WhatsApp.";
   if (code === 368) return "Meta ha restringido temporalmente esta cuenta por incumplir sus políticas.";
   if (code === 100) return `Petición rechazada por Meta: ${e.error_data?.details || e.error_user_msg || e.message || "parámetro no válido"}`;
   return e.error_user_msg || e.error_data?.details || e.message || "";
@@ -110,11 +137,11 @@ function explain(e) {
 
 /* ------------------------------------------------------------------ contactos */
 
-// Contacto del CRM con ese número (compara los últimos 9 dígitos de teléfono y WhatsApp).
-async function findContact(waId) {
+// Contacto del CRM de la empresa con ese número (compara los últimos 9 dígitos de teléfono y WhatsApp).
+async function findContact(orgId, waId) {
   const key = digits(waId).slice(-9);
   if (key.length < 9) return null;
-  const snap = await db.collection("contacts").where("orgId", "==", DEFAULT_ORG_ID).select("phone", "whatsapp", "firstName", "lastName", "deleted").get();
+  const snap = await db.collection("contacts").where("orgId", "==", orgId).select("phone", "whatsapp", "firstName", "lastName", "deleted").get();
   const hit = snap.docs.find((d) => {
     const c = d.data();
     return !c.deleted && [c.phone, c.whatsapp].some((p) => digits(p).length >= 9 && digits(p).slice(-9) === key);
@@ -126,47 +153,67 @@ async function findContact(waId) {
 
 /* ------------------------------------------------------------------ webhook */
 
+// Meta comprueba el webhook con el token de verificación: el de la app de la plataforma o el
+// de una empresa que conectó su propia app.
 function verifyWebhook(req, res) {
-  settings(true).then((s) => {
-    const ok = req.query["hub.mode"] === "subscribe" && s.verifyToken && req.query["hub.verify_token"] === s.verifyToken;
-    if (!ok) return res.sendStatus(403);
+  (async () => {
+    const token = String(req.query["hub.verify_token"] || "");
+    if (req.query["hub.mode"] !== "subscribe" || !token) return res.sendStatus(403);
+    const platform = !!META().verifyToken && token === META().verifyToken;
+    const own = !platform && /^[A-Za-z0-9_-]{8,100}$/.test(token) && (await indexOrg("verify", token));
+    if (!platform && !own) return res.sendStatus(403);
     res.type("text/plain").send(String(req.query["hub.challenge"] || ""));
-  }).catch(() => res.sendStatus(500));
+  })().catch(() => res.sendStatus(500));
+}
+
+function signatureOk(raw, sig, secret) {
+  if (!secret || !sig) return false;
+  const expected = "sha256=" + crypto.createHmac("sha256", secret).update(raw).digest("hex");
+  return sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
 
 async function receiveWebhook(req, res) {
   const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
-  const s = await settings();
-  const sig = String(req.headers["x-hub-signature-256"] || "");
-  const expected = s.appSecret ? "sha256=" + crypto.createHmac("sha256", s.appSecret).update(raw).digest("hex") : "";
-  const valid = expected && sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
-  if (!valid) return res.sendStatus(401);
   let payload;
   try { payload = JSON.parse(raw.toString("utf8")); } catch { return res.sendStatus(400); }
-  // Meta reintenta si no respondemos rápido: se contesta ya y se procesa después.
-  res.sendStatus(200);
-  try {
-    await processPayload(payload, s);
-  } catch (e) {
-    console.error("[whatsapp] webhook:", e.message || e);
-  }
-}
-
-async function processPayload(payload, s) {
+  const sig = String(req.headers["x-hub-signature-256"] || "");
+  const platformOk = signatureOk(raw, sig, META().appSecret);
+  // Cada cambio va a la empresa de su número (mensajes) o de su cuenta (plantillas).
+  const jobs = [];
   for (const entry of payload?.entry || []) {
     for (const change of entry.changes || []) {
       const v = change.value || {};
-      if (change.field === "message_template_status_update" || change.field === "message_template_quality_update") {
-        await require("./waTemplates").templateEvent(change.field, v).catch((e) => console.error("[whatsapp] plantilla:", e.message || e));
-        continue;
-      }
-      if (change.field !== "messages" || !v.metadata) continue;
-      if (s.phoneNumberId && String(v.metadata.phone_number_id) !== String(s.phoneNumberId)) continue;
-      const names = Object.fromEntries((v.contacts || []).map((c) => [c.wa_id, c.profile?.name || ""]));
-      for (const m of v.messages || []) await inbound(m, names[m.from] || "").catch((e) => console.error("[whatsapp] mensaje:", e.message || e));
-      for (const st of v.statuses || []) await statusUpdate(st).catch((e) => console.error("[whatsapp] estado:", e.message || e));
+      const orgId = change.field === "messages"
+        ? await indexOrg("phone", v.metadata?.phone_number_id)
+        : await indexOrg("waba", entry.id);
+      if (orgId) jobs.push({ orgId, change });
     }
   }
+  // Firma: la de la plataforma vale para todas; si no, la de la app propia de esa empresa.
+  const allowed = new Map();
+  for (const orgId of new Set(jobs.map((j) => j.orgId))) {
+    allowed.set(orgId, platformOk || signatureOk(raw, sig, (await settings(orgId)).appSecret));
+  }
+  const ok = jobs.filter((j) => allowed.get(j.orgId));
+  if (jobs.length && !ok.length) return res.sendStatus(401);
+  // Meta reintenta si no respondemos rápido: se contesta ya y se procesa después.
+  res.sendStatus(200);
+  for (const j of ok) {
+    try { await processChange(j.orgId, j.change); } catch (e) { console.error("[whatsapp] webhook:", j.orgId, e.message || e); }
+  }
+}
+
+async function processChange(orgId, change) {
+  const v = change.value || {};
+  if (change.field === "message_template_status_update" || change.field === "message_template_quality_update") {
+    return require("./waTemplates").templateEvent(orgId, change.field, v).catch((e) => console.error("[whatsapp] plantilla:", e.message || e));
+  }
+  if (change.field !== "messages" || !v.metadata) return;
+  const s = await settings(orgId);
+  if (s.phoneNumberId && String(v.metadata.phone_number_id) !== String(s.phoneNumberId)) return;
+  const names = Object.fromEntries((v.contacts || []).map((c) => [c.wa_id, c.profile?.name || ""]));
+  for (const m of v.messages || []) await inbound(orgId, m, names[m.from] || "").catch((e) => console.error("[whatsapp] mensaje:", e.message || e));
+  for (const st of v.statuses || []) await statusUpdate(orgId, st).catch((e) => console.error("[whatsapp] estado:", e.message || e));
 }
 
 // Texto de un mensaje entrante y su archivo (si lo trae).
@@ -192,27 +239,27 @@ const PREVIEW = { image: "📷 Foto", document: "📄 Documento", audio: "🎤 A
 const preview = (type, text, filename) => clip(text || (type === "document" && filename ? `📄 ${filename}` : PREVIEW[type]) || "", 120);
 
 // Una reacción no es un mensaje nuevo: se pega al mensaje al que reacciona.
-async function reaction(m) {
+async function reaction(orgId, m) {
   const waId = digits(m.from);
   const target = m.reaction?.message_id;
   if (!waId || !target) return;
-  const ref = CHATS().doc(waId).collection("messages").doc(msgDocId(target));
+  const ref = CHATS(orgId).doc(waId).collection("messages").doc(msgDocId(target));
   await ref.update({ reaction: clip(m.reaction?.emoji, 8) }).catch(() => {});
 }
 
-async function inbound(m, profileName) {
-  if (m.type === "reaction") return reaction(m);
+async function inbound(orgId, m, profileName) {
+  if (m.type === "reaction") return reaction(orgId, m);
   const waId = digits(m.from);
   if (!waId) return;
   const id = msgDocId(m.id);
-  const chatRef = CHATS().doc(waId);
+  const chatRef = CHATS(orgId).doc(waId);
   const msgRef = chatRef.collection("messages").doc(id);
   const p = parseInbound(m);
   const at = Number(m.timestamp) * 1000 || Date.now();
   // create() falla si ya existe: Meta puede repetir el aviso y así no se duplica.
   try {
     await msgRef.create({
-      orgId: DEFAULT_ORG_ID, chatId: waId, wamid: m.id, dir: "in", type: p.type, text: p.text,
+      orgId, chatId: waId, wamid: m.id, dir: "in", type: p.type, text: p.text,
       media: p.media ? { ...p.media, path: "", pending: true } : null,
       replyTo: m.context?.id ? msgDocId(m.context.id) : "", at, createdAt: Date.now(),
       ...(m.interactive?.list_reply?.id || m.interactive?.button_reply?.id ? { replyId: clip(m.interactive.list_reply?.id || m.interactive.button_reply?.id, 100) } : {}),
@@ -221,9 +268,9 @@ async function inbound(m, profileName) {
     if (e.code === 6 || /already exists/i.test(e.message)) return;
     throw e;
   }
-  const cfg = await cfgLib.getConfig();
+  const cfg = await cfgLib.getConfig(orgId);
   const pre = await chatRef.get();
-  const contact = pre.exists ? null : await findContact(waId);
+  const contact = pre.exists ? null : await findContact(orgId, waId);
   // En una transacción: dos mensajes que llegan a la vez cuentan los dos y solo uno de ellos
   // "abre" la conversación (bienvenida, asignación…).
   const r = await db.runTransaction(async (tx) => {
@@ -232,7 +279,7 @@ async function inbound(m, profileName) {
     const reentry = !isNew && cfg.entry.reentryDays > 0 && chat.lastInboundAt && at - chat.lastInboundAt > cfg.entry.reentryDays * 864e5;
     const reopened = !isNew && !!chat.archived;
     const patch = {
-      orgId: DEFAULT_ORG_ID, waId, phone: `+${waId}`, profileName: clip(profileName, 120) || chat?.profileName || "",
+      orgId, waId, phone: `+${waId}`, profileName: clip(profileName, 120) || chat?.profileName || "",
       lastText: preview(p.type, p.text, p.media?.filename), lastDir: "in", lastAt: at, lastInboundAt: at,
       unread: (chat?.unread || 0) + 1, archived: false, closingDueAt: 0, updatedAt: Date.now(),
     };
@@ -255,37 +302,37 @@ async function inbound(m, profileName) {
     tx.set(chatRef, patch, { merge: true });
     return { chat: { ...(chat || {}), ...patch, id: waId }, isNew, newConversation: isNew || reentry || reopened };
   });
-  if (p.media) await saveInboundMedia(msgRef, waId, id, p.media).catch(async (e) => {
+  if (p.media) await saveInboundMedia(orgId, msgRef, waId, id, p.media).catch(async (e) => {
     console.error("[whatsapp] archivo:", e.message || e);
     await msgRef.update({ "media.pending": false, "media.error": clip(e.message, 200) }).catch(() => {});
   });
-  await auto().afterInbound({ ...r, msg: m, p, cfg }).catch((e) => console.error("[whatsapp] automático:", e.message || e));
+  await auto().afterInbound({ orgId, ...r, msg: m, p, cfg }).catch((e) => console.error("[whatsapp] automático:", e.message || e));
 }
 
 const EXT = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac", "video/mp4": "mp4", "video/3gpp": "3gp", "application/pdf": "pdf" };
 const extOf = (mime, filename) => (/\.([A-Za-z0-9]{1,6})$/.exec(filename || "")?.[1] || EXT[String(mime).split(";")[0]] || "bin").toLowerCase();
 
 // Meta guarda los archivos poco tiempo: se descargan enseguida a nuestro Storage.
-async function saveInboundMedia(msgRef, waId, id, media) {
-  const info = await graph(media.id);
+async function saveInboundMedia(orgId, msgRef, waId, id, media) {
+  const info = await graph(orgId, media.id);
   if (Number(info.file_size) > MAX_MEDIA) {
     await msgRef.update({ "media.pending": false, "media.error": "Archivo demasiado grande para guardarlo (más de 16 MB)", "media.size": Number(info.file_size) });
     return;
   }
-  const s = await settings();
+  const s = await settings(orgId);
   const r = await fetch(info.url, { headers: { Authorization: `Bearer ${s.token}` } });
   if (!r.ok) throw new Error(`Descarga del archivo: ${r.status}`);
   const buf = Buffer.from(await r.arrayBuffer());
   const mime = info.mime_type || media.mime || "application/octet-stream";
-  const path = `whatsapp/${DEFAULT_ORG_ID}/${waId}/${id}.${extOf(mime, media.filename)}`;
+  const path = `whatsapp/${orgId}/${waId}/${id}.${extOf(mime, media.filename)}`;
   await bucket().file(path).save(buf, { contentType: mime, resumable: false });
   await msgRef.update({ "media.path": path, "media.pending": false, "media.size": buf.length, "media.mime": mime });
 }
 
-async function statusUpdate(st) {
+async function statusUpdate(orgId, st) {
   const waId = digits(st.recipient_id);
   if (!waId || !st.id) return;
-  const ref = CHATS().doc(waId).collection("messages").doc(msgDocId(st.id));
+  const ref = CHATS(orgId).doc(waId).collection("messages").doc(msgDocId(st.id));
   await db.runTransaction(async (tx) => {
     const cur = (await tx.get(ref)).data();
     if (!cur) return; // mensaje enviado desde otro sitio (p. ej. el móvil): no lo tenemos
@@ -303,7 +350,7 @@ async function statusUpdate(st) {
         if (was < 2 && RANK[st.status] >= 2) b.delivered = inc(1);
         if (st.status === "read") b.read = inc(1);
       }
-      if (Object.keys(b).length) tx.set(db.collection("waBroadcasts").doc(cur.broadcastId), b, { merge: true });
+      if (Object.keys(b).length) tx.set(orgRef(orgId).collection("waBroadcasts").doc(cur.broadcastId), b, { merge: true });
     }
     tx.update(ref, patch);
   });
@@ -312,10 +359,10 @@ async function statusUpdate(st) {
 /* ------------------------------------------------------------------ enviar */
 
 // Envía a Meta. Devuelve el wamid y el wa_id que Meta reconoce (puede cambiar un dígito).
-async function deliver(waId, msgBody) {
-  const s = await settings();
-  if (!s.phoneNumberId) throw httpError("WhatsApp no está configurado (falta el número en Ajustes)", 409);
-  const out = await graph(`${s.phoneNumberId}/messages`, {
+async function deliver(orgId, waId, msgBody) {
+  const s = await settings(orgId);
+  if (!s.phoneNumberId) throw httpError("WhatsApp no está configurado (falta conectar el número en Ajustes)", 409);
+  const out = await graph(orgId, `${s.phoneNumberId}/messages`, {
     method: "POST", body: { messaging_product: "whatsapp", recipient_type: "individual", to: waId, ...msgBody },
   });
   return { wamid: out.messages?.[0]?.id || `local-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`, waId: digits(out.contacts?.[0]?.wa_id) || waId };
@@ -323,12 +370,12 @@ async function deliver(waId, msgBody) {
 
 // Guarda el mensaje saliente y actualiza el chat. `by`: { email, name } de quien lo envía
 // o { auto: true, name } si lo manda el sistema (entonces no se marca el chat como leído).
-async function storeOutbound(waId, wamid, data, by = {}, chatPatch = {}) {
-  const ref = CHATS().doc(waId);
+async function storeOutbound(orgId, waId, wamid, data, by = {}, chatPatch = {}) {
+  const ref = CHATS(orgId).doc(waId);
   const id = msgDocId(wamid);
   const at = Date.now();
   await ref.collection("messages").doc(id).set({
-    orgId: DEFAULT_ORG_ID, chatId: waId, wamid, dir: "out", status: "pending", at, createdAt: at,
+    orgId, chatId: waId, wamid, dir: "out", status: "pending", at, createdAt: at,
     byEmail: by.email ? norm(by.email) : "", byName: clip(by.name || by.email || "Automático", 120), auto: !!by.auto, ...data,
   });
   await ref.set({
@@ -339,15 +386,15 @@ async function storeOutbound(waId, wamid, data, by = {}, chatPatch = {}) {
 }
 
 // Envío automático (bienvenida, chatbot…): dentro de la ventana de 24 h, sin usuario.
-async function sendAuto(waId, msgBody, data, name = "Respuesta automática") {
-  const d = await deliver(waId, msgBody);
-  return storeOutbound(waId, d.wamid, data, { auto: true, name });
+async function sendAuto(orgId, waId, msgBody, data, name = "Respuesta automática") {
+  const d = await deliver(orgId, waId, msgBody);
+  return storeOutbound(orgId, waId, d.wamid, data, { auto: true, name });
 }
-const sendAutoText = (waId, text, name) => sendAuto(waId, { type: "text", text: { body: text, preview_url: /https?:\/\//.test(text) } }, { type: "text", text }, name);
+const sendAutoText = (orgId, waId, text, name) => sendAuto(orgId, waId, { type: "text", text: { body: text, preview_url: /https?:\/\//.test(text) } }, { type: "text", text }, name);
 
-async function openChat(chatId, { needWindow = true } = {}) {
+async function openChat(orgId, chatId, { needWindow = true } = {}) {
   const waId = digits(chatId);
-  const ref = CHATS().doc(waId || "x");
+  const ref = CHATS(orgId).doc(waId || "x");
   const chat = (await ref.get()).data();
   if (!chat) throw httpError("Ese chat no existe", 404);
   if (chat.blocked) throw httpError("Este número está bloqueado. Desbloquéalo para escribirle.", 409);
@@ -362,10 +409,10 @@ async function send(req, res) {
   if (!user) return;
   const text = String(req.body?.text || "").trim().slice(0, 4096);
   if (!text) return fail(res, "Escribe un mensaje");
-  const c = await openChat(req.body?.chatId);
+  const c = await openChat(user.orgId, req.body?.chatId);
   const replyTo = clip(req.body?.replyToWamid, 300);
-  const d = await deliver(c.waId, { type: "text", text: { body: text, preview_url: /https?:\/\//.test(text) }, ...(replyTo ? { context: { message_id: replyTo } } : {}) });
-  const id = await storeOutbound(c.waId, d.wamid, { type: "text", text, replyTo: replyTo ? msgDocId(replyTo) : "" }, user);
+  const d = await deliver(user.orgId, c.waId, { type: "text", text: { body: text, preview_url: /https?:\/\//.test(text) }, ...(replyTo ? { context: { message_id: replyTo } } : {}) });
+  const id = await storeOutbound(user.orgId, c.waId, d.wamid, { type: "text", text, replyTo: replyTo ? msgDocId(replyTo) : "" }, user);
   res.json({ ok: true, id });
 }
 
@@ -373,13 +420,13 @@ const KIND_OF = (mime) => (/^image\/(jpeg|png)$/.test(mime) ? "image" : /^video\
 const safeName = (s) => clip(s, 200).replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").trim() || "archivo";
 
 // Sube un archivo a Meta (para enviarlo) y devuelve su id.
-async function uploadMedia(buf, mime, filename) {
-  const s = await settings();
+async function uploadMedia(orgId, buf, mime, filename) {
+  const s = await settings(orgId);
   const form = new FormData();
   form.append("messaging_product", "whatsapp");
   form.append("type", mime);
   form.append("file", new Blob([buf], { type: mime }), filename);
-  return (await graph(`${s.phoneNumberId}/media`, { method: "POST", form })).id;
+  return (await graph(orgId, `${s.phoneNumberId}/media`, { method: "POST", form })).id;
 }
 // Archivo que llega en base64 desde la app.
 function fileFromBody(f) {
@@ -388,8 +435,8 @@ function fileFromBody(f) {
   if (buf.length > MAX_MEDIA) throw httpError("El archivo pasa de 16 MB", 413);
   return { buf, mime: clip(f.mime, 100) || "application/octet-stream", filename: safeName(f.name) };
 }
-async function saveCopy(waId, wamid, f) {
-  const path = `whatsapp/${DEFAULT_ORG_ID}/${waId}/${msgDocId(wamid)}.${extOf(f.mime, f.filename)}`;
+async function saveCopy(orgId, waId, wamid, f) {
+  const path = `whatsapp/${orgId}/${waId}/${msgDocId(wamid)}.${extOf(f.mime, f.filename)}`;
   await bucket().file(path).save(f.buf, { contentType: f.mime, resumable: false });
   return path;
 }
@@ -400,23 +447,24 @@ async function sendMedia(req, res) {
   const b = req.body || {};
   const f = fileFromBody(b);
   const caption = String(b.caption || "").trim().slice(0, 1024);
-  const c = await openChat(b.chatId);
-  const mediaId = await uploadMedia(f.buf, f.mime, f.filename);
+  const c = await openChat(user.orgId, b.chatId);
+  const mediaId = await uploadMedia(user.orgId, f.buf, f.mime, f.filename);
   const type = KIND_OF(f.mime);
   const payload = { id: mediaId, ...(type !== "audio" && caption ? { caption } : {}), ...(type === "document" ? { filename: f.filename } : {}) };
-  const d = await deliver(c.waId, { type, [type]: payload });
-  const path = await saveCopy(c.waId, d.wamid, f);
-  const id = await storeOutbound(c.waId, d.wamid, { type, text: type !== "audio" ? caption : "", media: { mime: f.mime, filename: f.filename, path, size: f.buf.length } }, user);
+  const d = await deliver(user.orgId, c.waId, { type, [type]: payload });
+  const path = await saveCopy(user.orgId, c.waId, d.wamid, f);
+  const id = await storeOutbound(user.orgId, c.waId, d.wamid, { type, text: type !== "audio" ? caption : "", media: { mime: f.mime, filename: f.filename, path, size: f.buf.length } }, user);
   res.json({ ok: true, id });
 }
 
 /* ------------------------------------------------------------------ gestión de chats */
 
 async function fileUrl(req, res) {
-  if (!(await staff(req, res))) return;
-  const ref = CHATS().doc(digits(req.body?.chatId) || "x").collection("messages").doc(clip(req.body?.id, 80) || "x");
+  const user = await staff(req, res);
+  if (!user) return;
+  const ref = CHATS(user.orgId).doc(digits(req.body?.chatId) || "x").collection("messages").doc(clip(req.body?.id, 80) || "x");
   const m = (await ref.get()).data();
-  if (!m?.media?.path) return fail(res, "Ese archivo no está disponible", 404);
+  if (!m?.media?.path || !m.media.path.startsWith(`whatsapp/${user.orgId}/`)) return fail(res, "Ese archivo no está disponible", 404);
   const [url] = await bucket().file(m.media.path).getSignedUrl({ action: "read", expires: Date.now() + 60 * 60e3 });
   res.json({ ok: true, url });
 }
@@ -434,10 +482,10 @@ async function updateChat(req, res) {
   const user = await staff(req, res);
   if (!user) return;
   const b = req.body || {};
-  const ref = CHATS().doc(digits(b.chatId) || "x");
+  const ref = CHATS(user.orgId).doc(digits(b.chatId) || "x");
   const chat = (await ref.get()).data();
   if (!chat) return fail(res, "Ese chat no existe", 404);
-  const cfg = await cfgLib.getConfig();
+  const cfg = await cfgLib.getConfig(user.orgId);
   const patch = {};
   if (b.read) patch.unread = 0;
   if (b.unread) patch.unread = Math.max(1, chat.unread || 0);
@@ -466,7 +514,7 @@ async function updateChat(req, res) {
     const cid = clip(b.contactId, 80);
     if (cid) {
       const c = (await db.collection("contacts").doc(cid).get()).data();
-      if (!c || c.orgId !== DEFAULT_ORG_ID) return fail(res, "Ese contacto no existe", 404);
+      if (!c || c.orgId !== user.orgId) return fail(res, "Ese contacto no existe", 404);
       Object.assign(patch, { contactId: cid, contactName: `${c.firstName || ""} ${c.lastName || ""}`.trim() });
     } else Object.assign(patch, { contactId: "", contactName: "" });
   }
@@ -481,16 +529,16 @@ async function bulk(req, res) {
   const user = await staff(req, res);
   if (!user) return;
   const b = req.body || {};
-  const cfg = await cfgLib.getConfig();
+  const cfg = await cfgLib.getConfig(user.orgId);
   const from = cfgLib.parseStage(cfg, b.from);
   if (!from) return fail(res, "Esa columna no existe", 404);
   const action = ["move", "archive", "clear"].includes(b.action) ? b.action : "";
   if (!action) return fail(res, "Acción no válida");
   const to = action === "move" ? cfgLib.parseStage(cfg, b.to) : null;
   if (action === "move" && !to) return fail(res, "Elige la columna de destino");
-  if (action === "clear" && !(await isAdmin(user.email))) return fail(res, "Solo un administrador puede vaciar una columna", 403);
+  if (action === "clear" && !user.isAdmin) return fail(res, "Solo un administrador puede vaciar una columna", 403);
   const me = norm(user.email);
-  const snap = await CHATS().where("funnelId", "==", from.funnelId).get();
+  const snap = await CHATS(user.orgId).where("funnelId", "==", from.funnelId).get();
   const docs = snap.docs.filter((d) => {
     const c = d.data();
     return c.stageId === from.stageId && !c.archived && (b.scope !== "mine" || c.assigneeEmail === me);
@@ -514,11 +562,11 @@ async function block(req, res) {
   const user = await staff(req, res);
   if (!user) return;
   const waId = digits(req.body?.chatId);
-  const ref = CHATS().doc(waId || "x");
+  const ref = CHATS(user.orgId).doc(waId || "x");
   if (!(await ref.get()).exists) return fail(res, "Ese chat no existe", 404);
   const blocked = req.body?.blocked === true;
-  const s = await settings();
-  await graph(`${s.phoneNumberId}/block_users`, { method: blocked ? "POST" : "DELETE", body: { messaging_product: "whatsapp", block_users: [{ user: waId }] } });
+  const s = await settings(user.orgId);
+  await graph(user.orgId, `${s.phoneNumberId}/block_users`, { method: blocked ? "POST" : "DELETE", body: { messaging_product: "whatsapp", block_users: [{ user: waId }] } });
   await ref.update({ blocked, updatedAt: Date.now(), ...(blocked ? { archived: true } : {}) });
   res.json({ ok: true });
 }
@@ -528,67 +576,175 @@ async function block(req, res) {
 async function getConfig(req, res) {
   const user = await staff(req, res);
   if (!user) return;
-  res.json({ ok: true, admin: await isAdmin(user.email), config: await cfgLib.getConfig(true) });
+  res.json({ ok: true, admin: user.isAdmin, config: await cfgLib.getConfig(user.orgId, true) });
 }
 async function saveConfig(req, res) {
   const user = await staff(req, res);
   if (!user) return;
-  const patch = await cfgLib.saveConfig(user, await isAdmin(user.email), clip(req.body?.section, 30), req.body?.value);
+  const patch = await cfgLib.saveConfig(user, user.isAdmin, clip(req.body?.section, 30), req.body?.value);
   res.json({ ok: true, patch });
 }
 
-/* ------------------------------------------------------------------ ajustes */
+/* ------------------------------------------------------------------ conexión (ajustes) */
 
 async function getSettings(req, res) {
   const user = await staff(req, res);
   if (!user) return;
-  const s = await settings(true);
+  const s = await settings(user.orgId, true);
+  const m = META();
   res.json({
-    ok: true, admin: await isAdmin(user.email),
+    ok: true, admin: user.isAdmin,
     settings: {
-      phoneNumberId: s.phoneNumberId || "", wabaId: s.wabaId || "", appId: s.appId || "", verifyToken: s.verifyToken || "",
+      phoneNumberId: s.phoneNumberId || "", wabaId: s.wabaId || "", appId: s.platformApp ? "" : s.appId || "", verifyToken: s.platformApp ? "" : s.verifyToken || "",
       displayPhone: s.displayPhone || "", verifiedName: s.verifiedName || "", quality: s.quality || "",
       messagingLimit: s.messagingLimit || "", hasToken: !!s.token, hasAppSecret: !!s.appSecret, checkedAt: s.checkedAt || 0,
       templatesSyncedAt: s.templatesSyncedAt || 0, webhookUrl: `${PUBLIC_URL}/api/whatsapp/webhook`,
+      platformApp: !!s.platformApp, connectedVia: s.token ? s.connectedVia || "manual" : "",
     },
+    // Conexión con un botón (si la plataforma tiene su app de Meta configurada).
+    embedded: m.appId && m.configId && m.appSecret ? { appId: m.appId, configId: m.configId, version: VERSION } : null,
   });
 }
 
+// Guarda la conexión de una empresa y su índice (número/cuenta/token → empresa). Un número o
+// una cuenta que ya usa otra empresa no se puede conectar.
+async function assertFree(orgId, ids) {
+  for (const [kind, id] of ids) {
+    if (!id) continue;
+    const other = (await INDEX().doc(idxKey(kind, id)).get()).data()?.orgId;
+    if (other && other !== orgId) {
+      throw httpError(kind === "phone" ? "Ese número de WhatsApp ya está conectado en otra empresa de la plataforma." : "Esa cuenta de WhatsApp Business ya está conectada en otra empresa de la plataforma.", 409);
+    }
+  }
+}
+async function storeConnection(user, next, info) {
+  const orgId = user.orgId;
+  await assertFree(orgId, [["phone", next.phoneNumberId], ["waba", next.wabaId]]);
+  const cur = await settings(orgId, true);
+  const batch = db.batch();
+  // Quita del índice lo que esta empresa tenía antes y ya no usa.
+  for (const [kind, oldId, newId] of [["phone", cur.phoneNumberId, next.phoneNumberId], ["waba", cur.wabaId, next.wabaId], ["verify", cur.verifyToken, next.verifyToken]]) {
+    if (oldId && oldId !== newId) batch.delete(INDEX().doc(idxKey(kind, oldId)));
+    if (newId) batch.set(INDEX().doc(idxKey(kind, newId)), { orgId, kind, at: Date.now() });
+  }
+  batch.set(SETTINGS(orgId), {
+    ...next, displayPhone: clip(info.display_phone_number, 40), verifiedName: clip(info.verified_name, 120),
+    quality: clip(info.quality_rating, 20), messagingLimit: clip(info.messaging_limit_tier, 30),
+    checkedAt: Date.now(), updatedAt: Date.now(), updatedBy: norm(user.email), disconnectedAt: admin.firestore.FieldValue.delete(),
+  }, { merge: true });
+  await batch.commit();
+  resetSettingsCache(orgId);
+  idxCache.clear();
+}
+
+const PHONE_FIELDS = "display_phone_number,verified_name,quality_rating,messaging_limit_tier";
+
+// Conexión a mano (app de Meta propia de la empresa).
 async function saveSettings(req, res) {
   const user = await staff(req, res);
   if (!user) return;
-  if (!(await isAdmin(user.email))) return fail(res, "Solo un administrador puede cambiar la conexión de WhatsApp", 403);
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede cambiar la conexión de WhatsApp", 403);
   const b = req.body || {};
-  const cur = await settings(true);
+  const cur = await settings(user.orgId, true);
+  const own = !cur.platformApp; // si venía del botón, al guardar a mano pasa a app propia
   const next = {
     phoneNumberId: digits(b.phoneNumberId).slice(0, 30), wabaId: digits(b.wabaId).slice(0, 30),
-    appId: digits(b.appId).slice(0, 30) || cur.appId || "",
-    verifyToken: clip(b.verifyToken, 100) || cur.verifyToken || crypto.randomBytes(16).toString("hex"),
-    token: String(b.token || "").trim() || cur.token || "", appSecret: String(b.appSecret || "").trim() || cur.appSecret || "",
+    appId: digits(b.appId).slice(0, 30) || (own ? cur.appId : "") || "",
+    verifyToken: clip(b.verifyToken, 100).replace(/[^A-Za-z0-9_-]/g, "") || (own ? cur.verifyToken : "") || crypto.randomBytes(16).toString("hex"),
+    token: String(b.token || "").trim() || (own ? cur.token : "") || "", appSecret: String(b.appSecret || "").trim() || (own ? cur.appSecret : "") || "",
+    platformApp: false, connectedVia: "manual",
   };
   if (!next.phoneNumberId) return fail(res, "Falta el identificador del número de teléfono");
   if (!next.token) return fail(res, "Falta el token de acceso");
+  if (next.verifyToken.length < 8) return fail(res, "El token de verificación tiene que tener al menos 8 caracteres");
   // Se comprueba con Meta antes de guardar: así no se queda guardado algo que no funciona.
   let info;
   try {
-    info = await graph(`${next.phoneNumberId}?fields=display_phone_number,verified_name,quality_rating,messaging_limit_tier`, { token: next.token });
+    info = await graph(user.orgId, `${next.phoneNumberId}?fields=${PHONE_FIELDS}`, { token: next.token });
   } catch (e) {
     return fail(res, `Meta no acepta estos datos: ${e.message}`, 400);
   }
   // La cuenta (WABA) tiene que suscribir esta app para que lleguen los mensajes al webhook.
   let subscribed = false;
   if (next.wabaId) {
-    subscribed = await graph(`${next.wabaId}/subscribed_apps`, { method: "POST", token: next.token }).then(() => true).catch(() => false);
+    subscribed = await graph(user.orgId, `${next.wabaId}/subscribed_apps`, { method: "POST", token: next.token }).then(() => true).catch(() => false);
   }
-  await SETTINGS().set({
-    ...next, displayPhone: clip(info.display_phone_number, 40), verifiedName: clip(info.verified_name, 120),
-    quality: clip(info.quality_rating, 20), messagingLimit: clip(info.messaging_limit_tier, 30),
-    checkedAt: Date.now(), updatedAt: Date.now(), updatedBy: norm(user.email),
-  }, { merge: true });
-  cache = null;
+  await storeConnection(user, next, info);
   // Primera sincronización de plantillas (si falla no impide guardar).
-  if (next.wabaId) await require("./waTemplates").syncTemplates().catch(() => {});
+  if (next.wabaId) await require("./waTemplates").syncTemplates(user.orgId).catch(() => {});
   res.json({ ok: true, subscribed });
+}
+
+// Conexión con un botón (Embedded Signup): la app manda el código de Facebook y los
+// identificadores que Meta le pasó al terminar (número y cuenta). El servidor cambia el código
+// por un token de la empresa, registra el número en la API, suscribe la app a su cuenta y lo
+// guarda. coexistence: el número sigue también en la app WhatsApp Business del móvil.
+async function embeddedSignup(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede conectar WhatsApp", 403);
+  const m = META();
+  if (!m.appId || !m.appSecret || !m.configId) return fail(res, "La conexión con un botón no está disponible: configura la app de Meta de la plataforma.", 409);
+  const b = req.body || {};
+  const code = clip(b.code, 1000);
+  const wabaId = digits(b.wabaId).slice(0, 30);
+  if (!code || !wabaId) return fail(res, "Faltan datos de Meta. Vuelve a pulsar «Conectar con Facebook».");
+  // 1) Código → token de la empresa (de larga duración).
+  const tr = await fetch(`${GRAPH}/${VERSION}/oauth/access_token?${new URLSearchParams({ client_id: m.appId, client_secret: m.appSecret, code })}`);
+  const tk = await tr.json().catch(() => ({}));
+  if (!tr.ok || !tk.access_token) return fail(res, `Meta no aceptó la conexión: ${explain(tk.error || {}) || tr.status}`, 400);
+  const token = tk.access_token;
+  // 2) Si Meta no nos dijo el número (cuenta sin número todavía), el primero de la cuenta.
+  let phone = digits(b.phoneNumberId).slice(0, 30);
+  if (!phone) {
+    const list = await graph(user.orgId, `${wabaId}/phone_numbers?fields=id`, { token }).catch(() => ({}));
+    phone = digits(list.data?.[0]?.id);
+    if (!phone) return fail(res, "Tu cuenta de WhatsApp Business aún no tiene ningún número. Termina de añadirlo en Meta y vuelve a conectar.", 409);
+  }
+  // Antes de tocar nada en Meta: que el número no sea ya de otra empresa de la plataforma.
+  await assertFree(user.orgId, [["phone", phone], ["waba", wabaId]]);
+  // 3) Registrar el número en la API (no hace falta en coexistencia con la app del móvil).
+  const pin = String(crypto.randomInt(100000, 1000000));
+  if (!b.coexistence) {
+    await graph(user.orgId, `${phone}/register`, { method: "POST", token, body: { messaging_product: "whatsapp", pin } }).catch((e) => {
+      // Ya registrado (p. ej. reconexión): seguimos; otro error se avisa.
+      if (!/already|registrad/i.test(`${e.meta?.message || ""} ${e.message}`)) throw httpError(`No se pudo registrar el número en WhatsApp: ${e.message}`, 400);
+    });
+  }
+  // 4) Suscribir la app de la plataforma a su cuenta (para recibir sus mensajes).
+  await graph(user.orgId, `${wabaId}/subscribed_apps`, { method: "POST", token }).catch((e) => { throw httpError(`No se pudo activar la recepción de mensajes: ${e.message}`, 400); });
+  const info = await graph(user.orgId, `${phone}?fields=${PHONE_FIELDS}`, { token });
+  await storeConnection(user, {
+    phoneNumberId: phone, wabaId, appId: m.appId, token, appSecret: "", verifyToken: "", platformApp: true,
+    connectedVia: b.coexistence ? "embedded-coexistence" : "embedded", pin: b.coexistence ? "" : pin,
+  }, info);
+  await require("./waTemplates").syncTemplates(user.orgId).catch(() => {});
+  res.json({ ok: true, displayPhone: info.display_phone_number || "", verifiedName: info.verified_name || "" });
+}
+
+// Desconectar WhatsApp de la empresa (deja de recibir y enviar; los chats se quedan).
+async function disconnect(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede desconectar WhatsApp", 403);
+  const cur = await settings(user.orgId, true);
+  if (cur.platformApp && cur.wabaId && cur.token) {
+    await graph(user.orgId, `${cur.wabaId}/subscribed_apps`, { method: "DELETE", token: cur.token }).catch(() => {});
+  }
+  const batch = db.batch();
+  for (const [kind, id] of [["phone", cur.phoneNumberId], ["waba", cur.wabaId], ["verify", cur.verifyToken]]) if (id) batch.delete(INDEX().doc(idxKey(kind, id)));
+  const FV = admin.firestore.FieldValue;
+  batch.set(SETTINGS(user.orgId), { token: FV.delete(), appSecret: FV.delete(), pin: FV.delete(), disconnectedAt: Date.now(), updatedBy: norm(user.email) }, { merge: true });
+  await batch.commit();
+  resetSettingsCache(user.orgId);
+  idxCache.clear();
+  res.json({ ok: true });
+}
+
+// Empresas con WhatsApp conectado (para el cron).
+async function connectedOrgs() {
+  const snap = await INDEX().where("kind", "==", "phone").get();
+  return [...new Set(snap.docs.map((d) => d.data().orgId).filter(Boolean))];
 }
 
 // Envuelve cada ruta: los errores con status (409, 502…) llegan a la app con su mensaje.
@@ -602,11 +758,11 @@ module.exports = {
   verifyWebhook, receiveWebhook: route(receiveWebhook), send: route(send), sendMedia: route(sendMedia),
   fileUrl: route(fileUrl), updateChat: route(updateChat), bulk: route(bulk), block: route(block),
   getConfig: route(getConfig), saveConfig: route(saveConfig),
-  getSettings: route(getSettings), saveSettings: route(saveSettings),
+  getSettings: route(getSettings), saveSettings: route(saveSettings), embeddedSignup: route(embeddedSignup), disconnect: route(disconnect),
   // para waAuto / waTemplates
-  route, staff, isAdmin, settings, graph, deliver, storeOutbound, sendAuto, sendAutoText, openChat, findContact,
-  uploadMedia, fileFromBody, saveCopy, toWaId, clip, digits, fail, httpError, msgDocId, CHATS, SETTINGS, WINDOW_MS, KIND_OF, GRAPH, VERSION,
-  resetSettingsCache: () => { cache = null; },
+  route, staff, settings, graph, deliver, storeOutbound, sendAuto, sendAutoText, openChat, findContact,
+  uploadMedia, fileFromBody, saveCopy, toWaId, clip, digits, fail, httpError, msgDocId, CHATS, SETTINGS, INDEX, WINDOW_MS, KIND_OF, GRAPH, VERSION,
+  resetSettingsCache, indexOrg, connectedOrgs,
   // para las pruebas
-  processPayload, parseInbound,
+  processChange, parseInbound,
 };

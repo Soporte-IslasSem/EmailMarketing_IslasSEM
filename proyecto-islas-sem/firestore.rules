@@ -11,16 +11,20 @@ service cloud.firestore {
     function myOrg() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.orgId;
     }
-    // ===== Acceso a la app =====
-    // Solo entra quien es empleado (Administración › Empleados, memberRoles) o está en la
-    // lista de acceso (organizations/islas-sem.accessEmails, Administración › Sistema ›
-    // Accesos) y tiene el email verificado (Google lo verifica; con contraseña, el enlace
-    // que llega por email). Así nadie puede usar un email que no es suyo.
-    function staff() {
-      let org = get(/databases/$(database)/documents/organizations/islas-sem).data;
+    // ===== Acceso a la app (multiempresa) =====
+    // Cada usuario es de una empresa (users/{uid}.orgId, que solo cambia el servidor). Entra
+    // quien figura en ella: empleado (Administración › Empleados, memberRoles), lista de acceso
+    // (accessEmails, Administración › Sistema › Accesos) o soporte de la plataforma mientras
+    // dure (supportEmails hasta supportUntil); con el email verificado (Google lo verifica; con
+    // contraseña, el enlace que llega por email) y con la empresa sin suspender.
+    function memberOf(org) {
       let email = request.auth.token.email.lower();
+      return email in org.get('accessEmails', []) || email in org.get('memberRoles', {})
+        || (email in org.get('supportEmails', []) && request.time.toMillis() < org.get('supportUntil', 0));
+    }
+    function staff() {
       return isSignedIn() && request.auth.token.email_verified == true
-        && (email in org.get('accessEmails', []) || email in org.get('memberRoles', {}));
+        && memberOf(orgData()) && !(orgData().get('status', 'active') in ['suspended', 'deleted']);
     }
     function isMember(orgId) {
       return isSignedIn() && myOrg() == orgId && staff();
@@ -45,7 +49,8 @@ service cloud.firestore {
     }
     function isOrgAdmin() {
       let admins = orgData().get('adminEmails', []);
-      return isSignedIn() && (admins.size() == 0 || myEmail() in admins);
+      return isSignedIn() && (admins.size() == 0 || myEmail() in admins
+        || (myEmail() in orgData().get('supportEmails', []) && request.time.toMillis() < orgData().get('supportUntil', 0)));
     }
     function myRole() {
       return orgData().get('memberRoles', {}).get(myEmail(), '_sinrol');
@@ -81,20 +86,27 @@ service cloud.firestore {
         .hasAny(['clientType', 'clientTypes', 'ownerType', 'ownerId', 'ownerName', 'ownerEmail']);
     }
 
-    // Cada usuario solo puede leer/escribir su propio perfil
+    // Cada usuario solo puede leer/escribir su propio perfil; la empresa (orgId) la pone el servidor.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId && !('orgId' in request.resource.data);
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.get('orgId', null) == resource.data.get('orgId', null);
+      allow delete: if false;
     }
 
     // ===== Organizaciones (multi-tenant) =====
     match /organizations/{orgId} {
-      // Quien tiene acceso puede leerla aunque aún no tenga perfil (primer inicio de sesión).
-      allow read: if isMember(orgId) || (orgId == 'islas-sem' && staff());
-      allow create: if false; // la organización ya existe; nadie crea otras desde la app
-      // Accesos, roles, administradores y tipos de cliente: solo administradores.
-      allow update: if isMember(orgId) && (isOrgAdmin() || !request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['accessEmails', 'adminEmails', 'memberRoles', 'rolePerms', 'roles', 'clientTypes']));
-      allow delete: if isMember(orgId) && isOrgAdmin();
+      // Sus miembros pueden leerla aunque esté suspendida (para ver el aviso y pagar).
+      allow read: if isSignedIn() && request.auth.token.email_verified == true && myOrg() == orgId && memberOf(orgData());
+      allow create, delete: if false; // las altas y bajas de empresas las hace el servidor
+      // Accesos, roles, administradores, tipos de cliente e imagen: solo administradores.
+      // Plan, estado, módulos, límites, soporte y cobros: solo el servidor.
+      allow update: if isMember(orgId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'plan', 'features', 'limits', 'billing',
+          'trialEndsAt', 'supportEmails', 'supportUntil', 'flowSince', 'flowLastRun', 'createdAt', 'ownerUid', 'ownerEmail'])
+        && (isOrgAdmin() || !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['accessEmails', 'adminEmails', 'memberRoles', 'memberEmails', 'rolePerms', 'roles', 'clientTypes', 'name', 'brand']));
     }
 
     // ===== Colecciones del CRM (aisladas por orgId) =====
@@ -154,12 +166,10 @@ service cloud.firestore {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();
     }
-    // Envíos de formularios PÚBLICOS (SEPA / Datos Jurídicos): cualquiera puede CREAR
-    // (sin login), pero solo los miembros de la org pueden leer/gestionar. Sin lectura pública.
+    // Envíos de formularios PÚBLICOS: los guarda el servidor (/api/forms/submit, con reCAPTCHA y
+    // la empresa del formulario); solo los miembros de esa empresa pueden leerlos/gestionarlos.
     match /formSubmissions/{docId} {
-      allow create: if request.resource.data.orgId is string
-                    && request.resource.data.formType is string
-                    && request.resource.data.status == "recibido";
+      allow create: if false;
       allow read, update, delete: if ownDocOrg();
     }
     // Formularios creados en CRM › Formularios. La página pública los lee a través del
@@ -277,33 +287,37 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
-    // ===== WhatsApp =====
-    // La app solo LEE (en tiempo real) los chats y sus mensajes, quien puede ver contactos.
-    // Escribir (enviar, asignar, archivar, ligar al contacto) lo hace el servidor.
-    match /waChats/{chatId} {
-      allow read: if staff() && lvl('contacts', 'read') > 0;
+    // ===== WhatsApp (cada empresa en su carpeta: organizations/{orgId}/…) =====
+    // La app solo LEE (en tiempo real) los chats y sus mensajes de SU empresa, quien puede ver
+    // contactos. Escribir (enviar, asignar, archivar, ligar al contacto) lo hace el servidor.
+    // Configuración (embudos, equipos, respuestas rápidas, auto respuestas, chatbot, etiquetas),
+    // plantillas de Meta sincronizadas y difusiones: solo lectura; los cambios pasan por el
+    // servidor (que comprueba quién es administrador). Los ajustes con el token de Meta están en
+    // organizations/{orgId}/private, que nadie lee desde la app.
+    function waReader(orgId) {
+      return isMember(orgId) && lvl('contacts', 'read') > 0;
+    }
+    match /organizations/{orgId}/waChats/{chatId} {
+      allow read: if waReader(orgId);
       allow write: if false;
       match /messages/{msgId} {
-        allow read: if staff() && lvl('contacts', 'read') > 0;
+        allow read: if waReader(orgId);
         allow write: if false;
       }
     }
-    // Configuración de WhatsApp (embudos, equipos, respuestas rápidas, auto respuestas,
-    // chatbot, etiquetas), plantillas de Meta sincronizadas y difusiones: solo lectura;
-    // los cambios pasan por el servidor (que comprueba quién es administrador).
-    match /waConfig/{docId} {
-      allow read: if staff() && lvl('contacts', 'read') > 0;
+    match /organizations/{orgId}/waConfig/{docId} {
+      allow read: if waReader(orgId);
       allow write: if false;
     }
-    match /waTemplates/{docId} {
-      allow read: if staff() && lvl('contacts', 'read') > 0;
+    match /organizations/{orgId}/waTemplates/{docId} {
+      allow read: if waReader(orgId);
       allow write: if false;
     }
-    match /waBroadcasts/{docId} {
-      allow read: if staff() && lvl('contacts', 'read') > 0;
+    match /organizations/{orgId}/waBroadcasts/{docId} {
+      allow read: if waReader(orgId);
       allow write: if false;
       match /recipients/{rid} {
-        allow read: if staff() && lvl('contacts', 'read') > 0;
+        allow read: if waReader(orgId);
         allow write: if false;
       }
     }

@@ -19,9 +19,10 @@ let printer;
 const getPrinter = () => (printer = printer || new PdfPrinter(fonts));
 
 const money = (n) => "€" + Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const TEAL = "#136B68", GOLD = "#E2B83C";
+const TEAL_DEFAULT = "#136B68", GOLD_DEFAULT = "#E2B83C";
 
-function buildDoc(doc, isInvoice) {
+function buildDoc(doc, isInvoice, brand = {}) {
+  const TEAL = brand.color || TEAL_DEFAULT, GOLD = brand.accent || GOLD_DEFAULT;
   const items = Array.isArray(doc.items) ? doc.items : [];
   const subtotal = doc.subtotal != null ? Number(doc.subtotal) : items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.qty) || 0), 0);
   const total = doc.amount != null ? Number(doc.amount) : subtotal * 1.21;
@@ -44,7 +45,7 @@ function buildDoc(doc, isInvoice) {
     pageSize: "A4",
     pageMargins: [40, 60, 40, 50],
     content: [
-      { columns: [{ text: "ISLAS SEM", style: "brand" }, { text: isInvoice ? "FACTURA" : "PRESUPUESTO", style: "doctype", alignment: "right" }] },
+      { columns: [{ text: brand.name || "ISLAS SEM", style: "brand" }, { text: isInvoice ? "FACTURA" : "PRESUPUESTO", style: "doctype", alignment: "right" }] },
       { columns: [
         [{ text: `Nº ${doc.number || "—"}`, style: "docnum" }, { text: `Estado: ${doc.status || "—"}`, style: "muted" }],
         [{ text: "Cliente", style: "label", alignment: "right" }, { text: doc.client || "—", style: "client", alignment: "right" }, { text: doc.concept || "", style: "muted", alignment: "right" }],
@@ -74,11 +75,12 @@ function buildDoc(doc, isInvoice) {
   };
 }
 
-// Devuelve el PDF como Buffer.
-function renderDocPDF(doc, { isInvoice = false } = {}) {
+// Devuelve el PDF como Buffer, con el nombre y los colores de la empresa del documento.
+async function renderDocPDF(doc, { isInvoice = false } = {}) {
+  const brand = await require("./tenant").brandFor(doc.orgId);
   return new Promise((resolve, reject) => {
     try {
-      const pdfDoc = getPrinter().createPdfKitDocument(buildDoc(doc, isInvoice));
+      const pdfDoc = getPrinter().createPdfKitDocument(buildDoc(doc, isInvoice, brand));
       const chunks = [];
       pdfDoc.on("data", (c) => chunks.push(c));
       pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));

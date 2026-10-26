@@ -17,7 +17,7 @@ async function runSLA() {
     if (!o || o.state !== "enviada" || !o.dueAt || now < o.dueAt || o.escalatedAt) continue;
     if ((d.board || "pos") === "neg") continue;
     if (d.status === "ganado" || d.status === "perdido") continue;
-    const pipeline = pipelines.find((p) => p.id === d.pipelineId) || pipelines[0];
+    const pipeline = pipelines.find((p) => p.id === d.pipelineId) || pipelines.find((p) => p.orgId === d.orgId);
     if (!pipeline) continue;
     const target = pickNegTarget(pipeline, d);
     try {

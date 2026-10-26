@@ -1,4 +1,5 @@
-// Configuración de la sección WhatsApp (waConfig/main), la que ve y usa todo el equipo:
+// Configuración de la sección WhatsApp de cada empresa (organizations/{org}/waConfig/main), la que
+// ve y usa todo su equipo:
 // embudos y sus columnas, reglas de entrada, equipos, asignación automática, ausencias,
 // etiquetas, respuestas rápidas, auto respuestas (bienvenida, cierre, fuera de horario) y
 // chatbot. La app la lee en tiempo real; los cambios entran por aquí (POST /whatsapp/config)
@@ -6,9 +7,10 @@
 // respuestas rápidas y su estado (disponible / ausente).
 const crypto = require("crypto");
 const { db } = require("./firebase");
-const { DEFAULT_ORG_ID, norm } = require("./link");
+const { norm } = require("./link");
+const { orgRef, getOrg } = require("./tenant");
 
-const REF = () => db.collection("waConfig").doc("main");
+const REF = (orgId) => orgRef(orgId).collection("waConfig").doc("main");
 const clip = (s, n = 200) => String(s ?? "").trim().slice(0, n);
 const newId = () => crypto.randomBytes(5).toString("hex");
 const cleanId = (s) => String(s || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
@@ -37,13 +39,15 @@ const DEFAULTS = {
   defaultCountry: "34",
 };
 
-let cache = null;
-async function getConfig(fresh = false) {
-  if (!fresh && cache && Date.now() - cache.at < 15e3) return cache.c;
-  const d = (await REF().get()).data() || {};
+const cache = new Map(); // orgId -> { at, c }
+async function getConfig(orgId, fresh = false) {
+  if (!orgId) throw new Error("getConfig: falta la empresa");
+  const hit = cache.get(orgId);
+  if (!fresh && hit && Date.now() - hit.at < 15e3) return hit.c;
+  const d = (await REF(orgId).get()).data() || {};
   const c = { ...DEFAULTS, ...d, autoReply: { ...DEFAULTS.autoReply, ...(d.autoReply || {}) }, chatbot: { ...DEFAULTS.chatbot, ...(d.chatbot || {}) } };
   if (!Array.isArray(c.funnels) || !c.funnels.length) c.funnels = DEFAULTS.funnels;
-  cache = { at: Date.now(), c };
+  cache.set(orgId, { at: Date.now(), c });
   return c;
 }
 
@@ -70,27 +74,28 @@ function inHours(h, now = new Date()) {
   return hm >= d.from && hm < d.to;
 }
 
-// Personas a las que se puede asignar un chat: los empleados con email más quien tiene
-// acceso a la app (Accesos / roles), 60 s en memoria.
-let peopleCache = null;
-async function people() {
-  if (peopleCache && Date.now() - peopleCache.at < 60e3) return peopleCache.list;
-  const snap = await db.collection("employees").where("orgId", "==", DEFAULT_ORG_ID).get();
+// Personas de la empresa a las que se puede asignar un chat: los empleados con email más quien
+// tiene acceso a la app (Accesos / roles), 60 s en memoria.
+const peopleCache = new Map();
+async function people(orgId) {
+  const hit = peopleCache.get(orgId);
+  if (hit && Date.now() - hit.at < 60e3) return hit.list;
+  const snap = await db.collection("employees").where("orgId", "==", orgId).get();
   const list = snap.docs.map((d) => d.data()).filter((e) => e.email && !e.deleted && e.active !== false)
     .map((e) => ({ email: norm(e.email), name: `${e.firstName || ""} ${e.lastName || ""}`.trim() || e.email }));
-  const org = (await db.collection("organizations").doc(DEFAULT_ORG_ID).get()).data() || {};
+  const org = (await getOrg(orgId)) || {};
   for (const email of [...(org.accessEmails || []), ...Object.keys(org.memberRoles || {})].map(norm)) {
     if (email && !list.some((p) => p.email === email)) list.push({ email, name: email.split("@")[0] });
   }
-  peopleCache = { at: Date.now(), list };
+  peopleCache.set(orgId, { at: Date.now(), list });
   return list;
 }
 
 // Asignación automática aleatoria: entre los miembros del equipo indicado (o de los equipos
 // de la asignación automática, o de todo el personal si no hay equipos). Los ausentes solo
 // entran si así se ha configurado.
-async function pickAssignee(c, teamId) {
-  const all = await people();
+async function pickAssignee(orgId, c, teamId) {
+  const all = await people(orgId);
   const teams = teamId ? c.teams.filter((t) => t.id === teamId) : c.routing.teamIds?.length ? c.teams.filter((t) => c.routing.teamIds.includes(t.id)) : [];
   const members = teams.length ? new Set(teams.flatMap((t) => t.members || [])) : null;
   const team = all.filter((p) => !members || members.has(p.email));
@@ -184,7 +189,8 @@ const SECTIONS = {
 // POST /whatsapp/config { section, value } (las rutas comprueban la sesión antes)
 async function saveConfig(user, admin, section, value) {
   const email = norm(user.email);
-  const c = await getConfig(true);
+  const orgId = user.orgId;
+  const c = await getConfig(orgId, true);
   let patch;
   if (section === "presence") {
     const away = { ...(c.away || {}) };
@@ -213,9 +219,9 @@ async function saveConfig(user, admin, section, value) {
     patch = fn(value || {}, c);
   }
   // mergeFields: cada campo se sustituye entero (merge mezclaría mapas y no borraría claves).
-  const data = { ...patch, orgId: DEFAULT_ORG_ID, updatedAt: Date.now(), updatedBy: email };
-  await REF().set(data, { mergeFields: Object.keys(data) });
-  cache = null;
+  const data = { ...patch, orgId, updatedAt: Date.now(), updatedBy: email };
+  await REF(orgId).set(data, { mergeFields: Object.keys(data) });
+  cache.delete(orgId);
   return patch;
 }
 

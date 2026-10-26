@@ -2,8 +2,7 @@
 // Busca el contacto por email; si no existe, lo encuentra como prospecto;
 // si tampoco, crea un prospecto nuevo. Así nada entrante queda huérfano.
 const { db } = require("./firebase");
-
-const DEFAULT_ORG_ID = "islas-sem";
+const { DEFAULT_ORG_ID } = require("./tenant");
 const norm = (e) => String(e || "").trim().toLowerCase();
 
 async function findByEmail(collection, orgId, email) {

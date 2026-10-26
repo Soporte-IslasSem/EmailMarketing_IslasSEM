@@ -1,13 +1,14 @@
 // Google Calendar ⇄ Tareas del CRM.
 //
 // Hay dos clases de calendario conectado:
-// - El de la empresa (grupo@/marketing@): lo conecta un administrador. Estado en
-//   system/googleCalendar. Las citas que llegan se asignan a quien elija el administrador.
-// - El de cada trabajador (su cuenta @islassem.com): lo conecta cada uno desde Tareas.
-//   Estado en system/gcal_user_<uid>. Sus citas llegan como tareas asignadas a él, y las
-//   tareas que se le asignan con hora se publican en su calendario.
-// Los refresh tokens están en la colección system, que las reglas de Firestore no dejan
-// leer desde la app: solo el servidor los usa.
+// - El de la empresa (en ISLAS SEM, grupo@/marketing@): lo conecta un administrador. Estado en
+//   organizations/{org}/private/googleCalendar (cada empresa el suyo). Las citas que llegan se
+//   asignan a quien elija el administrador.
+// - El de cada trabajador: lo conecta cada uno desde Tareas. Estado en system/gcal_user_<uid>
+//   (con el orgId de su empresa). Sus citas llegan como tareas asignadas a él, y las tareas que
+//   se le asignan con hora se publican en su calendario.
+// Los refresh tokens están donde las reglas de Firestore no dejan leer desde la app: solo el
+// servidor los usa.
 //
 // - Google → app (cron, cada ~2 min por calendario): las citas se convierten en tareas
 //   (activities) con fecha, hora, invitados y Meet. Si cambian o se cancelan en Google,
@@ -21,21 +22,24 @@ const crypto = require("crypto");
 const { admin, db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson } = require("./link");
 const { staffFromReq } = require("./access");
+const { privateRef, orgPrivate, activeOrgs, featuresOf, brandFor, isOrgAdmin, getOrg } = require("./tenant");
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
 const REDIRECT_URI = `${PUBLIC_URL}/api/google/callback`;
 const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events"];
 const DEFAULT_TZ = "Atlantic/Canary";
-const OWN_DOMAIN = "islassem.com";
 const SYNC_EVERY_MS = 110e3;
 const FV = admin.firestore.FieldValue;
 const COMPANY = "company";
-const stateRef = () => db.collection("system").doc("googleCalendar");
+const stateRef = (orgId) => privateRef(orgId, "googleCalendar");
 const userRef = (uid) => db.collection("system").doc(`gcal_user_${uid}`);
-// Calendario = { key, ref }. key "company" o "u_<uid>" (se guarda en la tarea como googleCal).
-const companyCal = () => ({ key: COMPANY, ref: stateRef() });
-const userCal = (uid) => ({ key: `u_${uid}`, ref: userRef(uid) });
-const calOf = (key) => (!key || key === COMPANY ? companyCal() : userCal(String(key).slice(2)));
+// Calendario = { key, ref, orgId }. key "company" o "u_<uid>" (se guarda en la tarea como googleCal).
+const companyCal = (orgId) => ({ key: COMPANY, ref: stateRef(orgId), orgId });
+const userCal = (uid, orgId) => ({ key: `u_${uid}`, ref: userRef(uid), orgId });
+const calOf = (key, orgId) => (!key || key === COMPANY ? companyCal(orgId) : userCal(String(key).slice(2), orgId));
+// Las tareas de ISLAS SEM ya tenían id gcal_<evento>; el resto de empresas, con su id delante
+// (la misma cita puede estar en el calendario de dos empresas).
+const eventDocId = (orgId, calKey, evId) => (orgId === DEFAULT_ORG_ID ? "" : `${orgId}_`) + (calKey === COMPANY ? `gcal_${evId}` : `gcal_${calKey}_${evId}`);
 
 const configured = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
@@ -45,18 +49,15 @@ const configured = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_C
 async function authUser(req) {
   const user = await staffFromReq(req); // con acceso a la app (lista de acceso + email verificado)
   if (!user) return null;
-  const prof = await db.collection("users").doc(user.uid).get().catch(() => null);
-  const orgId = prof?.exists ? prof.data().orgId : null;
-  if (orgId !== DEFAULT_ORG_ID) return null;
-  return { uid: user.uid, email: norm(user.email), orgId };
+  if (!featuresOf(user.org).gcal) return null;
+  await orgPrivate(user.orgId, "googleCalendar"); // ISLAS SEM: trae el estado antiguo de system/
+  return { uid: user.uid, email: norm(user.email), orgId: user.orgId };
 }
 
 // Igual que en la app y en las reglas de Firestore: organizations/{orgId}.adminEmails
 // (empleados con rol "Full access"/"Administrador"). Si está vacío, todos lo son.
 async function isAdmin(u) {
-  const org = (await db.collection("organizations").doc(u.orgId).get()).data() || {};
-  const admins = (org.adminEmails || []).map(norm);
-  return !admins.length || admins.includes(u.email);
+  return isOrgAdmin((await getOrg(u.orgId)) || {}, u.email);
 }
 
 async function guard(req, res, { adminOnly = false } = {}) {
@@ -79,15 +80,16 @@ async function tokenRequest(params) {
   return data;
 }
 
-const cachedAccess = new Map(); // key -> { token, exp }
+const cachedAccess = new Map(); // orgId:key -> { token, exp }
+const cacheKey = (cal) => `${cal.orgId}:${cal.key}`;
 async function accessToken(cal) {
-  const c = cachedAccess.get(cal.key);
+  const c = cachedAccess.get(cacheKey(cal));
   if (c && c.exp > Date.now() + 60e3) return c.token;
   const st = (await cal.ref.get()).data();
   if (!st?.refreshToken) throw new Error("Google Calendar no está conectado");
   try {
     const t = await tokenRequest({ grant_type: "refresh_token", refresh_token: st.refreshToken });
-    cachedAccess.set(cal.key, { token: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000 });
+    cachedAccess.set(cacheKey(cal), { token: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000 });
     return t.access_token;
   } catch (e) {
     // Permiso revocado en Google: se marca para que la app pida reconectar.
@@ -119,12 +121,12 @@ async function connect(req, res) {
     const u = await guard(req, res, { adminOnly: scope === COMPANY });
     if (!u) return;
     const state = crypto.randomBytes(24).toString("hex");
-    await db.collection("system").doc(`googleOAuthState_${state}`).set({ state, scope, uid: u.uid, email: u.email, exp: Date.now() + 10 * 60e3 });
+    await db.collection("system").doc(`googleOAuthState_${state}`).set({ state, scope, uid: u.uid, email: u.email, orgId: u.orgId, exp: Date.now() + 10 * 60e3 });
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     url.search = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: "code",
       scope: SCOPES.join(" "), access_type: "offline", prompt: "consent", include_granted_scopes: "true",
-      login_hint: scope === "me" ? u.email : process.env.GOOGLE_CALENDAR_ACCOUNT || "grupo@islassem.com", state,
+      login_hint: scope === "me" || u.orgId !== DEFAULT_ORG_ID ? u.email : process.env.GOOGLE_CALENDAR_ACCOUNT || "grupo@islassem.com", state,
     }).toString();
     res.json({ ok: true, url: url.toString() });
   } catch (e) {
@@ -147,12 +149,13 @@ async function callback(req, res) {
     const t = await tokenRequest({ grant_type: "authorization_code", code: String(req.query.code || ""), redirect_uri: REDIRECT_URI });
     if (!t.refresh_token) return back("sin-permiso");
     const info = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${t.access_token}` } }).then((r) => r.json()).catch(() => ({}));
-    const cal = s.scope === "me" ? userCal(s.uid) : companyCal();
-    cachedAccess.set(cal.key, { token: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000 });
+    const orgId = s.orgId || DEFAULT_ORG_ID;
+    const cal = s.scope === "me" ? userCal(s.uid, orgId) : companyCal(orgId);
+    cachedAccess.set(cacheKey(cal), { token: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000 });
     await cal.ref.set({
       refreshToken: t.refresh_token, account: norm(info.email), calendarId: "primary",
       connectedAt: Date.now(), connectedBy: s.email, syncToken: FV.delete(), needsReconnect: false, lastError: FV.delete(),
-      ...(s.scope === "me" ? { kind: "gcalUser", uid: s.uid, email: s.email, orgId: DEFAULT_ORG_ID } : {}),
+      ...(s.scope === "me" ? { kind: "gcalUser", uid: s.uid, email: s.email, orgId } : {}),
     }, { merge: true });
     syncOne(cal, { force: true }).catch((e) => console.warn("[gcal] primera sync:", e.message));
     back("ok");
@@ -166,14 +169,14 @@ async function callback(req, res) {
 async function status(req, res) {
   const u = await guard(req, res);
   if (!u) return;
-  const st = (await stateRef().get()).data() || {};
+  const st = (await stateRef(u.orgId).get()).data() || {};
   const mine = (await userRef(u.uid).get()).data() || {};
   const admin = await isAdmin(u);
   const brief = (x) => ({ connected: !!x.refreshToken && !x.needsReconnect, account: x.account || "", lastSyncAt: x.lastSyncAt || null, lastError: x.lastError || "" });
   // El administrador ve qué trabajadores tienen su calendario conectado.
   const people = admin
     ? (await db.collection("system").where("kind", "==", "gcalUser").get()).docs
-      .map((d) => d.data()).filter((x) => x.refreshToken).map((x) => ({ email: x.email || "", ...brief(x) }))
+      .map((d) => d.data()).filter((x) => x.refreshToken && (x.orgId || DEFAULT_ORG_ID) === u.orgId).map((x) => ({ email: x.email || "", ...brief(x) }))
     : [];
   res.json({
     ok: true, configured: configured(), connected: !!st.refreshToken && !st.needsReconnect,
@@ -191,7 +194,7 @@ async function settings(req, res) {
   const clean = a && ["person", "team"].includes(a.type) && a.id
     ? { type: a.type, id: String(a.id).slice(0, 64), name: String(a.name || "").slice(0, 120), email: norm(a.email).slice(0, 200) }
     : null;
-  await stateRef().set({ defaultAssignee: clean }, { merge: true });
+  await stateRef(u.orgId).set({ defaultAssignee: clean }, { merge: true });
   res.json({ ok: true });
 }
 
@@ -200,12 +203,12 @@ async function disconnect(req, res) {
   const scope = req.body?.scope === "me" ? "me" : COMPANY;
   const u = await guard(req, res, { adminOnly: scope === COMPANY });
   if (!u) return;
-  const cal = scope === "me" ? userCal(u.uid) : companyCal();
+  const cal = scope === "me" ? userCal(u.uid, u.orgId) : companyCal(u.orgId);
   const st = (await cal.ref.get()).data();
   if (st?.refreshToken) {
     await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(st.refreshToken)}`, { method: "POST" }).catch(() => {});
   }
-  cachedAccess.delete(cal.key);
+  cachedAccess.delete(cacheKey(cal));
   await cal.ref.set({ refreshToken: FV.delete(), syncToken: FV.delete(), account: "", needsReconnect: false, lastError: FV.delete() }, { merge: true });
   res.json({ ok: true });
 }
@@ -232,13 +235,15 @@ function addMinutes(date, time, mins) {
 
 const stripHtml = (s) => String(s || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
 
-async function upsertEvent(ev, tz, defaultAssignee, calKey = COMPANY) {
+async function upsertEvent(ev, tz, defaultAssignee, calKey = COMPANY, orgId = DEFAULT_ORG_ID, ownDomain = "") {
   // La misma cita puede estar en varios calendarios (empresa y trabajadores invitados):
   // cada calendario solo toca su tarea, y no se crea una segunda si ya existe en otro.
-  const found = (await db.collection("activities").where("googleEventId", "==", ev.id).get()).docs;
+  // Solo cuentan las tareas de la misma empresa.
+  const found = (await db.collection("activities").where("googleEventId", "==", ev.id).get()).docs
+    .filter((d) => (d.data().orgId || DEFAULT_ORG_ID) === orgId);
   const own = found.find((d) => (d.data().googleCal || COMPANY) === calKey);
   if (!own && found.length) return "skip";
-  const ref = own ? own.ref : db.collection("activities").doc(calKey === COMPANY ? `gcal_${ev.id}` : `gcal_${calKey}_${ev.id}`);
+  const ref = own ? own.ref : db.collection("activities").doc(eventDocId(orgId, calKey, ev.id));
   const prev = own ? own.data() : null;
   const fromApp = prev && prev.source !== "google";
 
@@ -267,10 +272,10 @@ async function upsertEvent(ev, tz, defaultAssignee, calKey = COMPANY) {
 
   // Quien reserva (invitado externo) se vincula a su ficha o entra como prospecto.
   let person = { contactId: prev?.contactId || "", leadId: prev?.leadId || "" };
-  const booker = guests.find((g) => g.email && !g.email.endsWith(`@${OWN_DOMAIN}`));
+  const booker = guests.find((g) => g.email && !(ownDomain && g.email.endsWith(`@${ownDomain}`)));
   if (!prev && booker) {
     const [firstName, ...rest] = (booker.name || "").split(" ");
-    const r = await resolvePerson(DEFAULT_ORG_ID, {
+    const r = await resolvePerson(orgId, {
       email: booker.email, firstName, lastName: rest.join(" "), source: "Google Calendar",
       notes: `Reservó una cita: "${(ev.summary || "").slice(0, 120)}"`,
     }).catch(() => null);
@@ -278,7 +283,7 @@ async function upsertEvent(ev, tz, defaultAssignee, calKey = COMPANY) {
   }
 
   await ref.set({
-    orgId: DEFAULT_ORG_ID, type: "Reunión", source: "google", body: stripHtml(ev.description).slice(0, 4000),
+    orgId, type: "Reunión", source: "google", body: stripHtml(ev.description).slice(0, 4000),
     ...common,
     contactId: person.contactId || "", leadId: person.leadId || "",
     entity: person.leadId ? "lead" : person.contactId ? "contact" : null, entityId: person.leadId || person.contactId || null,
@@ -293,7 +298,7 @@ async function upsertEvent(ev, tz, defaultAssignee, calKey = COMPANY) {
 // Trabajador dueño de un calendario personal → asignación de sus citas.
 async function ownerAssignee(st) {
   const email = norm(st.email);
-  const emp = (await db.collection("employees").where("orgId", "==", DEFAULT_ORG_ID).get()).docs
+  const emp = (await db.collection("employees").where("orgId", "==", st.orgId || DEFAULT_ORG_ID).get()).docs
     .find((d) => norm(d.data().email) === email);
   const name = emp ? `${emp.data().firstName || ""} ${emp.data().lastName || ""}`.trim() : "";
   return { type: "person", id: emp?.id || "", name: name || email, email };
@@ -302,10 +307,19 @@ async function ownerAssignee(st) {
 // Sincroniza todos los calendarios conectados (empresa + trabajadores).
 async function syncCalendar({ force = false } = {}) {
   if (!configured()) return { skipped: "sin configurar" };
-  const out = { company: await syncOne(companyCal(), { force }).catch((e) => ({ error: String(e.message || e).slice(0, 200) })) };
+  const out = {};
+  const orgs = (await activeOrgs()).filter((o) => featuresOf(o).gcal);
+  for (const o of orgs) {
+    await orgPrivate(o.id, "googleCalendar");
+    const r = await syncOne(companyCal(o.id), { force }).catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
+    if (!r.skipped) out[o.id] = r;
+  }
+  const active = new Set(orgs.map((o) => o.id));
   const users = (await db.collection("system").where("kind", "==", "gcalUser").get()).docs;
   for (const d of users) {
-    const r = await syncOne(userCal(d.data().uid), { force }).catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
+    const orgId = d.data().orgId || DEFAULT_ORG_ID;
+    if (!active.has(orgId)) continue;
+    const r = await syncOne(userCal(d.data().uid, orgId), { force }).catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
     if (!r.skipped) out[d.data().email || d.id] = r;
   }
   return out;
@@ -329,7 +343,8 @@ async function syncOne(cal, { force = false } = {}) {
     const base = syncToken
       ? { syncToken }
       : { timeMin: new Date(Date.now() - 7 * 864e5).toISOString(), singleEvents: "true" };
-    const assignee = cal.key === COMPANY ? st.defaultAssignee || null : await ownerAssignee(st);
+    const assignee = cal.key === COMPANY ? st.defaultAssignee || null : await ownerAssignee({ ...st, orgId: cal.orgId });
+    const ownDomain = (await brandFor(cal.orgId)).domain;
     for (let page = 0; page < 20; page++) {
       let data;
       try {
@@ -346,7 +361,7 @@ async function syncOne(cal, { force = false } = {}) {
       tz = data.timeZone || tz;
       for (const ev of data.items || []) {
         if (!ev.start && ev.status !== "cancelled") continue;
-        const r = await upsertEvent(ev, tz, assignee, cal.key);
+        const r = await upsertEvent(ev, tz, assignee, cal.key, cal.orgId, ownDomain);
         if (counts[r] !== undefined) counts[r]++;
       }
       if (data.nextPageToken) { pageToken = data.nextPageToken; continue; }
@@ -368,13 +383,14 @@ const connected = async (cal) => { const st = (await cal.ref.get()).data(); retu
 // Calendario donde va la cita: el que ya tenga; si no, el de la persona asignada; si no,
 // el de la empresa; y como último recurso el de quien la publica.
 async function pickCalendar(a, u) {
-  if (a.googleEventId) return connected(calOf(a.googleCal));
+  if (a.googleEventId) return connected(calOf(a.googleCal, u.orgId));
   if (a.assigneeType === "person" && a.assigneeEmail) {
-    const d = (await db.collection("system").where("kind", "==", "gcalUser").where("email", "==", norm(a.assigneeEmail)).limit(1).get()).docs[0];
-    const c = d && (await connected(userCal(d.data().uid)));
+    const d = (await db.collection("system").where("kind", "==", "gcalUser").where("email", "==", norm(a.assigneeEmail)).get()).docs
+      .find((x) => (x.data().orgId || DEFAULT_ORG_ID) === u.orgId);
+    const c = d && (await connected(userCal(d.data().uid, u.orgId)));
     if (c) return c;
   }
-  return (await connected(companyCal())) || connected(userCal(u.uid));
+  return (await connected(companyCal(u.orgId))) || connected(userCal(u.uid, u.orgId));
 }
 
 // POST /api/google/events { activityId } — crea o actualiza la cita de una tarea con hora.
@@ -393,9 +409,10 @@ async function pushEvent(req, res) {
     const st = (await cal.ref.get()).data() || {};
     const tz = st.timeZone || DEFAULT_TZ;
     const endTime = HHMM.test(a.endTime || "") && a.endTime > a.dueTime ? { date: a.dueDate, time: a.endTime } : addMinutes(a.dueDate, a.dueTime, 60);
+    const brand = await brandFor(u.orgId);
     const body = {
       summary: a.title || "Tarea",
-      description: `${a.body ? `${a.body}\n\n` : ""}Creada desde ISLAS SEM${a.assigneeName ? ` · Asignada a ${a.assigneeName}` : ""}`,
+      description: `${a.body ? `${a.body}\n\n` : ""}Creada desde ${brand.name || "el CRM"}${a.assigneeName ? ` · Asignada a ${a.assigneeName}` : ""}`,
       start: { dateTime: `${a.dueDate}T${a.dueTime}:00`, timeZone: tz },
       end: { dateTime: `${endTime.date}T${endTime.time}:00`, timeZone: tz },
       ...(a.location ? { location: a.location } : {}),

@@ -26,7 +26,9 @@
 // - Solo se leen las negociaciones que cambiaron desde la última vuelta (updatedAt) y las
 //   que esperan respuesta: el coste no crece con el tamaño del CRM.
 const { db } = require("./firebase");
-const { DEFAULT_ORG_ID, addActivity } = require("./link");
+const { addActivity } = require("./link");
+const { activeOrgs, orgRef, brandFor } = require("./tenant");
+const { brandMailHtml } = require("./brandMail");
 const { getStages, flattenStages, findStage, nextPosStage, pickNegTarget, plazoTxt } = require("./stages");
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
@@ -71,17 +73,6 @@ async function sourceFormOf(d) {
   return s?.exists ? String(s.data().formType || "") : "";
 }
 
-function emailHtml({ title, body, cta, ctaUrl }) {
-  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#2a3a3a;max-width:560px;margin:auto">
-    <div style="background:#136B68;color:#fff;padding:16px 20px;font-size:18px;font-weight:bold">ISLAS SEM</div>
-    <div style="padding:20px;border:1px solid #e3eaea;border-top:none">
-      <h2 style="color:#136B68;margin:0 0 12px">${esc(title)}</h2>
-      <div style="font-size:14px;line-height:1.6">${body}</div>
-      ${cta && ctaUrl ? `<p style="margin-top:20px"><a href="${ctaUrl}" style="background:#E2B83C;color:#1f2d2d;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:bold">${esc(cta)}</a></p>` : ""}
-    </div>
-    <div style="padding:12px 20px;font-size:11px;color:#9aa8a8">ISLAS SEM SLU · Canarias · www.islassem.com</div>
-  </div>`;
-}
 
 async function contactEmailOf(d) {
   if (d.contactEmail) return d.contactEmail;
@@ -111,6 +102,7 @@ async function runRules(pipeline, deal) {
   const rules = stageRules.filter((r) => matchesInterest(r, text) && matchesClient(r, clientTypes, relation) && matchesSource(r, sourceForm));
   if (!rules.length) return { ran: 0, waitH: 0 };
   const email = await contactEmailOf(deal);
+  const brand = await brandFor(deal.orgId);
   let waitH = 0;
   for (const r of rules) {
     const days = WHEN_DAYS[r.when] ?? 0;
@@ -148,8 +140,8 @@ async function runRules(pipeline, deal) {
       + (files.length ? `<p style="margin-top:14px">Te adjuntamos: ${files.map((a) => esc(a.name)).join(", ")}.</p><!--ADJUNTOS-->` : "");
     await db.collection("outbox").add({
       orgId: deal.orgId, to: email, toName: deal.contact || "",
-      subject: r.subject || `${r.title || "Documento"} · ISLAS SEM`,
-      html: emailHtml({ title: r.title || "ISLAS SEM", body, cta: ctaUrl ? "Rellenar formulario" : "", ctaUrl }),
+      subject: r.subject || `${r.title || "Documento"} · ${brand.name}`,
+      html: brandMailHtml(brand, { title: r.title || brand.name, body, cta: ctaUrl ? "Rellenar formulario" : "", ctaUrl }),
       text: "", kind: formId === "sepa" ? "sepa" : formId === "juridicos" ? "juridicos" : r.action === "form" ? "form" : "email",
       status: !email ? "skipped" : days ? "scheduled" : "pending", ...(days ? { sendAfter: due.getTime() } : {}),
       dealId: deal.id, contactId: deal.contactId || "", attachment: null, attachments: files, attempts: 0,
@@ -228,27 +220,42 @@ async function respond(dealId, via) {
   return true;
 }
 
+// Recorre todas las empresas activas. Las negociaciones que cambiaron (y las que esperan respuesta)
+// se leen una sola vez para todas y se reparten por empresa.
 async function runStageFlow() {
-  const orgRef = db.collection("organizations").doc(DEFAULT_ORG_ID);
-  const org = (await orgRef.get()).data() || {};
-  let since = org.flowSince?.toMillis?.() || 0;
-  if (!since) { since = Date.now(); await orgRef.set({ flowSince: new Date(since) }, { merge: true }); }
-
-  const pipelines = Object.fromEntries((await db.collection("pipelines").where("orgId", "==", DEFAULT_ORG_ID).get()).docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+  const orgs = await activeOrgs();
+  const out = { entered: 0, rules: 0, toNegative: 0 };
+  if (!orgs.length) return out;
   const now = Date.now();
-  // Solo lo que cambió desde la última vuelta (con 3 min de margen) y lo que espera
-  // respuesta. La primera vez, todo (para marcar las negociaciones existentes).
-  const last = org.flowLastRun || 0;
-  const byId = new Map();
-  const add = (snap) => snap.docs.forEach((d) => d.data().orgId === DEFAULT_ORG_ID && byId.set(d.id, d));
-  if (!last) add(await db.collection("deals").where("orgId", "==", DEFAULT_ORG_ID).get());
-  else {
-    add(await db.collection("deals").where("updatedAt", ">=", new Date(last - 180e3)).get());
+  const byOrg = new Map(orgs.map((o) => [o.id, new Map()]));
+  const add = (snap) => snap.docs.forEach((d) => byOrg.get(d.data().orgId)?.set(d.id, d));
+  // La primera vez de cada empresa, todas sus negociaciones (para marcar las existentes).
+  const fresh = orgs.filter((o) => !o.flowLastRun);
+  for (const o of fresh) add(await db.collection("deals").where("orgId", "==", o.id).get());
+  const running = orgs.filter((o) => o.flowLastRun);
+  if (running.length) {
+    // Solo lo que cambió desde la última vuelta (con 3 min de margen) y lo que espera respuesta.
+    const since = Math.min(...running.map((o) => o.flowLastRun));
+    add(await db.collection("deals").where("updatedAt", ">=", new Date(since - 180e3)).get());
     add(await db.collection("deals").where("flow.waiting", "==", true).get());
   }
-  const deals = [...byId.values()];
-  const out = { entered: 0, rules: 0, toNegative: 0 };
+  for (const o of orgs) {
+    try {
+      const r = await runOrgFlow(o.id, [...byOrg.get(o.id).values()], now);
+      out.entered += r.entered; out.rules += r.rules; out.toNegative += r.toNegative;
+    } catch (e) { console.error("[stageflow]", o.id, e.message); }
+  }
+  return out;
+}
 
+async function runOrgFlow(orgId, deals, now) {
+  const oRef = orgRef(orgId);
+  const org = (await oRef.get()).data() || {};
+  let since = org.flowSince?.toMillis?.() || 0;
+  if (!since) { since = Date.now(); await oRef.set({ flowSince: new Date(since) }, { merge: true }); }
+
+  const pipelines = Object.fromEntries((await db.collection("pipelines").where("orgId", "==", orgId).get()).docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+  const out = { entered: 0, rules: 0, toNegative: 0 };
   for (const doc of deals) {
     const d = { id: doc.id, ...doc.data() };
     const pipeline = pipelines[d.pipelineId];
@@ -301,7 +308,7 @@ async function runStageFlow() {
       out.toNegative++;
     }
   }
-  await orgRef.set({ flowLastRun: now }, { merge: true });
+  await oRef.set({ flowLastRun: now }, { merge: true });
   return out;
 }
 

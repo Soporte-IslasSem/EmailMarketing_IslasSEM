@@ -1,48 +1,30 @@
-// Multi-tenant foundation (oculto para el cliente por ahora).
-// Cada usuario pertenece a una organización (orgId). Todos los datos del CRM
-// se guardan con ese orgId, de modo que la plataforma queda preparada para
-// ser multi-empresa (SaaS) más adelante sin reescribir nada.
-//
-// Mientras el cliente hace pruebas, todos los usuarios caen en la misma
-// organización (DEFAULT_ORG_ID = "islas-sem"). Cuando se abra el SaaS, bastará
-// con crear organizaciones distintas y asignar orgId por invitación.
+// Empresa (organización) del usuario. Cada usuario pertenece a una (users/{uid}.orgId) y todos
+// los datos del CRM se guardan con ese orgId; las reglas de Firestore no dejan ver los de otra.
+// El orgId lo pone el servidor al comprobar el acceso (/api/access/check): la app nunca lo elige.
 import { useEffect, useState } from "react";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
 import { useAuth } from "../../../shared/hooks/useAuth";
+import { fetchAccess } from "../../../shared/access/checkAccess";
 
+// La primera empresa (formularios fijos, Talento Digital…).
 export const DEFAULT_ORG_ID = "islas-sem";
-export const DEFAULT_ORG_NAME = "ISLAS SEM";
 
-// Cache por sesión para no re-crear el perfil en cada componente.
+// Cache por sesión para no leer el perfil en cada componente.
 let _profileCache = null;
 
 async function ensureProfile(user) {
   if (_profileCache && _profileCache.uid === user.uid) return _profileCache;
-
   const uref = doc(db, "users", user.uid);
-  const snap = await getDoc(uref);
-
-  if (snap.exists() && snap.data().orgId) {
-    _profileCache = { uid: user.uid, orgId: snap.data().orgId, role: snap.data().role || "member" };
-    return _profileCache;
+  let snap = await getDoc(uref).catch(() => null);
+  if (!snap?.exists() || !snap.data().orgId) {
+    // Sin empresa en el perfil: el servidor la busca por su email y la guarda.
+    await fetchAccess(user);
+    snap = await getDoc(uref).catch(() => null);
   }
-
-  // Primer acceso: asignar a la organización por defecto y crearla si falta.
-  const orgId = DEFAULT_ORG_ID;
-  await setDoc(
-    uref,
-    { email: user.email, orgId, role: "owner", createdAt: serverTimestamp() },
-    { merge: true }
-  );
-  await setDoc(
-    doc(db, "organizations", orgId),
-    { name: DEFAULT_ORG_NAME, createdAt: serverTimestamp() },
-    { merge: true }
-  );
-
-  _profileCache = { uid: user.uid, orgId, role: "owner" };
-  return _profileCache;
+  const orgId = snap?.exists() ? snap.data().orgId || null : null;
+  _profileCache = orgId ? { uid: user.uid, orgId, role: snap.data().role || "member" } : null;
+  return { uid: user.uid, orgId, role: snap?.data()?.role || "member" };
 }
 
 export function useOrg() {

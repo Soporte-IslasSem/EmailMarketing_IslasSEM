@@ -23,6 +23,7 @@
 const { db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
 const { addSubscriber } = require("./subscriptions");
+const { orgOfUser, getOrg, isActive } = require("./tenant");
 const { getStages, flattenStages } = require("./stages");
 const { respond } = require("./stageflow");
 
@@ -95,12 +96,17 @@ async function formDefinition(req, res) {
 }
 
 // GET /api/forms/public — formularios publicados para la página de clientela.
-async function publicForms(_req, res) {
+async function publicForms(req, res) {
   try {
-    const snap = await db.collection("crmForms").where("orgId", "==", DEFAULT_ORG_ID).get();
+    // ?org=<id>: página de clientela de otra empresa; sin él, la de ISLAS SEM.
+    const orgId = /^[A-Za-z0-9_-]{1,64}$/.test(String(req.query?.org || "")) ? String(req.query.org) : DEFAULT_ORG_ID;
+    const org = await getOrg(orgId);
+    if (!org || !isActive(org)) return res.status(404).json({ ok: false, error: "No encontrado" });
+    const snap = await db.collection("crmForms").where("orgId", "==", orgId).get();
     const saved = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
     const out = [];
-    for (const [id, label] of [["juridicos", "Solicitud Datos Jurídicos – Representante Legal"], ["sepa", "Orden de Domiciliación SEPA"]]) {
+    const fixed = orgId === DEFAULT_ORG_ID ? [["juridicos", "Solicitud Datos Jurídicos – Representante Legal"], ["sepa", "Orden de Domiciliación SEPA"]] : [];
+    for (const [id, label] of fixed) {
       const o = saved[id];
       if (!o || o.active !== false) out.push({ id, name: o?.name || label });
     }
@@ -108,7 +114,7 @@ async function publicForms(_req, res) {
       .filter((d) => !FORM_LABEL[d.id] && d.data().active !== false)
       .sort((a, b) => (a.data().createdAt?.toMillis?.() || 0) - (b.data().createdAt?.toMillis?.() || 0))
       .forEach((d) => out.push({ id: d.id, name: String(d.data().name || d.data().title || "Formulario").slice(0, 120) }));
-    res.set("Cache-Control", "no-store").json({ ok: true, forms: out });
+    res.set("Cache-Control", "no-store").json({ ok: true, forms: out, org: { name: org.brand?.name || org.name || "", logoUrl: org.brand?.logoUrl || "" } });
   } catch (e) {
     console.error("[forms/public]", e);
     res.status(500).json({ ok: false, error: "Error interno" });
@@ -170,8 +176,11 @@ async function submitForm(req, res) {
 
 // "Lista destino": suscribe el email del formulario a esa lista de Email Marketing, con la
 // misma lógica que el resto de altas (doble confirmación de la lista, aviso y webhook).
-async function subscribeToList(listId, email, name, formId) {
+async function subscribeToList(listId, email, name, formId, orgId) {
   if (!listId || !EMAIL_RE.test(email || "")) return false;
+  // La lista tiene que ser de la misma empresa que el formulario.
+  const list = (await db.collection("lists").doc(String(listId)).get().catch(() => null))?.data();
+  if (!list || (await orgOfUser(list.userId)) !== orgId) return false;
   const r = await addSubscriber({ listId, email, name, source: "crm-form", formId });
   return r.status === "subscribed" || r.status === "pending" ? r.status : false;
 }
@@ -409,7 +418,7 @@ async function processFormSubmissions() {
     if (s.formType === "juridicos") {
       await markRgpdSigned(orgId, s.data, contactId, doc.id).catch((e) => console.warn("[forms] rgpd:", e.message));
     }
-    const subscribed = s.listId ? await subscribeToList(s.listId, person.email, [person.firstName, person.lastName].filter(Boolean).join(" "), s.formType).catch((e) => { console.warn("[forms] lista:", e.message); return false; }) : false;
+    const subscribed = s.listId ? await subscribeToList(s.listId, person.email, [person.firstName, person.lastName].filter(Boolean).join(" "), s.formType, orgId).catch((e) => { console.warn("[forms] lista:", e.message); return false; }) : false;
     await doc.ref.update({ contactId, leadId, dealId, status: "vinculado", linkedAt: new Date(), ...(subscribed ? { subscribedToList: subscribed } : {}) });
     linked++;
   }

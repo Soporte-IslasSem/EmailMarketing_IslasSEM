@@ -42,7 +42,7 @@ export default function Login() {
           fechaAceptacion: null,
           versionPolitica: "v1.0",
           provider: "google"
-        });
+        }, { merge: true });
       }
 
       window.location.href = "/dashboard";

@@ -9,6 +9,7 @@
 // Solo se inscriben suscriptores que entran en la lista DESPUÉS de activar la automatización
 // (no se dispara contra toda la lista existente). Los correos van a la misma cola (outbox).
 const { admin, db } = require("./firebase");
+const { orgOfUser, brandFor, footerText } = require("./tenant");
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
 const API = `${PUBLIC_URL}/api`;
@@ -19,19 +20,24 @@ const toMs = (ts) => (ts?.toMillis ? ts.toMillis() : typeof ts === "number" ? ts
 
 const absolutize = (html) => String(html || "").replace(/\b(src|href)=(["'])\/(?!\/)/gi, `$1=$2${PUBLIC_URL}/`);
 
-function personalize(html, sub) {
+const escHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// Pie con el nombre legal de la empresa que envía (brand) y el enlace de baja.
+function personalize(html, sub, brand = {}) {
   const out = absolutize(html)
     .replace(/{{\s*(nombre|name)\s*}}/gi, sub.name || sub.firstName || "")
     .replace(/{{\s*email\s*}}/gi, sub.email || "");
+  const who = brand.legalName || brand.name || "ISLAS SEM SLU";
   return out + `<div style="text-align:center;font-size:11px;color:#9aa8a8;margin-top:24px">
-    ISLAS SEM SLU · Si no deseas recibir más correos, <a href="${API}/u/${sub.id}" style="color:#9aa8a8">date de baja aquí</a>.
+    ${escHtml(who)} · Si no deseas recibir más correos, <a href="${API}/u/${sub.id}" style="color:#9aa8a8">date de baja aquí</a>.
   </div>`;
 }
 
-async function stepHtml(step) {
+async function stepHtml(step, userId) {
   if (step.templateId) {
     const t = await db.collection("templates").doc(step.templateId).get().catch(() => null);
-    if (t && t.exists && t.data().html) return t.data().html;
+    // Solo plantillas del dueño de la automatización.
+    if (t && t.exists && t.data().html && (!userId || t.data().userId === userId)) return t.data().html;
   }
   return step.html || "";
 }
@@ -86,10 +92,11 @@ async function sendDue(autosById) {
     const subSnap = await db.collection("subscribers").doc(e.subscriberId).get();
     const sub = subSnap.exists ? { id: subSnap.id, ...subSnap.data() } : null;
     if (!sub || !emailable(sub)) { await d.ref.update({ done: true, stoppedReason: "baja/rebote" }); continue; }
-    const html = await stepHtml(step);
+    const html = await stepHtml(step, auto.userId);
+    const orgId = await orgOfUser(auto.userId);
     await db.collection("outbox").add({
-      orgId: "islas-sem", to: sub.email, toName: sub.name || "", subject: step.subject || "(sin asunto)",
-      html: personalize(html, sub), kind: "automation", automationId: auto.id, step: e.step,
+      orgId, to: sub.email, toName: sub.name || "", subject: step.subject || "(sin asunto)",
+      html: personalize(html, sub, await brandFor(orgId)), kind: "automation", automationId: auto.id, step: e.step,
       subscriberId: sub.id, unsubscribeUrl: `${API}/u/${sub.id}`,
       status: "pending", attempts: 0, error: "", sentAt: null, createdAt: new Date(),
     });

@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const { admin, db } = require("./firebase");
 const { confirmEmailHtml, confirmPageHtml, unsubscribePageHtml, page, esc } = require("./notificationHtml");
 const { fireWebhook } = require("./webhooks");
+const { orgOfUser } = require("./tenant");
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
 const API = `${PUBLIC_URL}/api`;
@@ -48,7 +49,7 @@ async function notifyOwner(list, subject, text) {
   const to = u?.exists ? u.data().email : "";
   if (!to) return;
   await db.collection("outbox").add({
-    orgId: "islas-sem", to, subject, html: `<p style="font-family:Arial">${esc(text)}</p>`,
+    orgId: await orgOfUser(list.userId), to, subject, html: `<p style="font-family:Arial">${esc(text)}</p>`,
     kind: "notification", status: "pending", attempts: 0, error: "", sentAt: null, createdAt: new Date(),
   });
 }
@@ -69,7 +70,7 @@ function rateLimited(ip) {
 async function tagContactFromList(list, email, name) {
   if (!list?.crm || !String(list.crmKey || "").startsWith("type:")) return;
   const typeId = String(list.crmKey).slice(5);
-  const orgId = "islas-sem";
+  const orgId = await orgOfUser(list.userId); // la empresa del dueño de la lista
   const snap = await db.collection("contacts").where("orgId", "==", orgId).select("email", "clientType", "clientTypes", "clientId").get();
   const norm = (e) => String(e || "").trim().toLowerCase();
   const typesOf = (d) => (Array.isArray(d.clientTypes) ? d.clientTypes.filter(Boolean) : d.clientType ? [d.clientType] : []);
@@ -130,7 +131,7 @@ async function addSubscriber({ listId, email, name = "", userId, source = "form"
   if (doubleOptIn) {
     const url = `${API}/forms/confirm/${subRef.id}?t=${token}`;
     await db.collection("outbox").add({
-      orgId: "islas-sem", to: email, subject: s.confirmEmail.subject || "Confirma tu suscripción",
+      orgId: await orgOfUser(list.userId), to: email, subject: s.confirmEmail.subject || "Confirma tu suscripción",
       html: confirmEmailHtml(s.general, s.confirmEmail, url), kind: "confirm", subscriberId: subRef.id,
       status: "pending", attempts: 0, error: "", sentAt: null, createdAt: new Date(),
     });

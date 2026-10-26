@@ -280,3 +280,8 @@
   .wa-drawer { width: 100vw; }
   .wa-pop--emoji { width: auto; right: 12px; }
 }
+
+/* Conexión con un botón (Facebook) */
+.wa-fb { background: #1877f2 !important; border-color: #1877f2 !important; color: #fff !important; }
+.wa-fb:hover { filter: brightness(1.08); }
+.wa-link { border: none; background: none; color: var(--crm-primary, #0e7c7b); cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline; }

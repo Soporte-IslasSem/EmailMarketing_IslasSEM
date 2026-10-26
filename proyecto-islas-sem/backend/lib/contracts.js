@@ -3,7 +3,7 @@
 // - Plantillas (contractTemplates): un .DOCX convertido a bloques de texto (lo hace la app al
 //   subirlo) con sus huecos [..] y de dónde sale cada uno; o un PDF que se firma tal cual.
 // - Contrato (contracts): uno o varios documentos para un cliente (un "sobre"). Al enviarlo,
-//   ISLAS SEM ya firma (firma guardada en Ajustes + huella de quien envía) y el cliente recibe
+//   la empresa ya firma (firma guardada en Ajustes + huella de quien envía) y el cliente recibe
 //   un enlace personal /firmar/<token>. Allí revisa, confirma sus datos, dibuja su firma y firma.
 // - Al firmar: el servidor anota la huella (nombre, DNI/NIF, sociedad y CIF si es empresa, IP,
 //   navegador, fecha y hora DEL SERVIDOR), genera los PDF firmados con el certificado, calcula
@@ -13,15 +13,20 @@
 // Todo pasa por aquí (Admin SDK): la app no lee ni escribe estas colecciones directamente, así
 // que no hace falta tocar las reglas de la base de datos. Quien llama tiene que tener acceso
 // a la app (staffFromReq), salvo las rutas públicas del enlace de firma.
+// Cada empresa tiene sus ajustes (organizations/{org}/private/contractSettings), sus plantillas y
+// sus contratos (orgId) y sus archivos en contracts/<org>/…: nadie toca los de otra.
 const crypto = require("crypto");
 const { admin, db, bucket } = require("./firebase");
 const { staffFromReq } = require("./access");
 const { DEFAULT_ORG_ID, norm, addActivity } = require("./link");
+const { orgPrivate, brandFor } = require("./tenant");
+const { brandMailHtml } = require("./brandMail");
 const { renderPdf } = require("./pdf");
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://email-marketing.islassem.com").replace(/\/$/, "");
 const TZ = "Atlantic/Canary";
-const SETTINGS = () => db.collection("system").doc("contractSettings");
+const SETTINGS = (orgId) => orgPrivate(orgId || DEFAULT_ORG_ID, "contractSettings");
+const orgOf = (c) => c?.orgId || DEFAULT_ORG_ID;
 const HOLE = /\[([^\[\]]{1,120})\]/g;
 const TEAL = "#136B68";
 const sha256 = (buf) => crypto.createHash("sha256").update(buf).digest("hex");
@@ -85,12 +90,16 @@ function cleanFields(fields, holes) {
 }
 
 // Datos del cliente para rellenar (contacto, su empresa, la negociación y el último formulario).
-async function contextFor({ contactId, dealId }) {
-  const get = async (col, id) => (id ? (await db.collection(col).doc(id).get().catch(() => null))?.data() || null : null);
+async function contextFor({ contactId, dealId, orgId }) {
+  // Solo documentos de la misma empresa.
+  const get = async (col, id) => {
+    const d = id ? (await db.collection(col).doc(String(id)).get().catch(() => null))?.data() || null : null;
+    return d && orgOf(d) === orgId ? d : null;
+  };
   const deal = await get("deals", dealId);
   const contact = await get("contacts", contactId || deal?.contactId || "");
   const company = await get("companies", contact?.companyId || deal?.companyId || "");
-  const settings = (await SETTINGS().get()).data() || {};
+  const settings = (await (await SETTINGS(orgId)).get()).data() || {};
   // Último formulario rellenado por esta persona / negociación (para los huecos "form").
   let formData = {};
   const subs = [];
@@ -98,8 +107,8 @@ async function contextFor({ contactId, dealId }) {
   const cid = contactId || deal?.contactId;
   if (cid) subs.push(...(await db.collection("formSubmissions").where("contactId", "==", cid).get()).docs);
   subs.sort((a, b) => (a.data().createdAt?.toMillis?.() || 0) - (b.data().createdAt?.toMillis?.() || 0));
-  subs.forEach((s) => { formData = { ...formData, ...(s.data().data || {}) }; });
-  return { deal, contact, company, settings, formData, contactId: cid || "", dealId: dealId || "" };
+  subs.filter((x) => orgOf(x.data()) === orgId).forEach((s) => { formData = { ...formData, ...(s.data().data || {}) }; });
+  return { deal, contact, company, settings, formData, contactId: contact || deal ? cid || "" : "", dealId: deal ? dealId : "", orgId };
 }
 
 function valueFor(field, ctx) {
@@ -210,7 +219,7 @@ function certificate(c, docInfo) {
       table: {
         widths: [130, "*"], body: [
           row("Documento", docInfo.name), row("ID del contrato", c.code), row("Huella del contenido (SHA-256)", docInfo.contentHash),
-          ...signerRows("Firma de ISLAS SEM (prestador)", c.provider || {}), ...signerRows("Firma del cliente", c.client || {}),
+          ...signerRows(`Firma de ${c.provider?.company || "ISLAS SEM"} (prestador)`, c.provider || {}), ...signerRows("Firma del cliente", c.client || {}),
         ],
       },
       layout: "lightHorizontalLines",
@@ -218,7 +227,7 @@ function certificate(c, docInfo) {
     { text: "Historial", bold: true, color: TEAL, margin: [0, 12, 0, 4] },
     ...(c.events || []).map((e) => ({ text: `${when(e.at)} · ${e.label}${e.ip ? ` · IP ${e.ip}` : ""}`, fontSize: 8.5 })),
     { text: `Comprobar la autenticidad: ${PUBLIC_URL}/verificar/${c.code}`, fontSize: 8.5, margin: [0, 12, 0, 0], color: TEAL },
-    { text: "Firma electrónica simple con evidencias conforme al Reglamento (UE) 910/2014 (eIDAS). La fecha y la hora las registra el servidor de ISLAS SEM, no el dispositivo del firmante.", fontSize: 7.5, color: "#777", margin: [0, 8, 0, 0] },
+    { text: "Firma electrónica simple con evidencias conforme al Reglamento (UE) 910/2014 (eIDAS). La fecha y la hora las registra el servidor de la plataforma de firma, no el dispositivo del firmante.", fontSize: 7.5, color: "#777", margin: [0, 8, 0, 0] },
   ];
 }
 async function buildSignedPdf(c, d) {
@@ -247,29 +256,21 @@ async function buildSignedPdf(c, d) {
 
 /* ------------------------------------------------------------------ correo */
 
-function mailHtml(title, body, cta, url) {
-  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#2a3a3a;max-width:560px;margin:auto">
-    <div style="background:${TEAL};color:#fff;padding:16px 20px;font-size:18px;font-weight:bold">ISLAS SEM</div>
-    <div style="padding:20px;border:1px solid #e3eaea;border-top:none">
-      <h2 style="color:${TEAL};margin:0 0 12px">${esc(title)}</h2>
-      <div style="font-size:14px;line-height:1.6">${body}</div>
-      ${cta ? `<p style="margin-top:20px"><a href="${url}" style="background:#E2B83C;color:#1f2d2d;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:bold">${esc(cta)}</a></p>` : ""}
-    </div>
-    <div style="padding:12px 20px;font-size:11px;color:#9aa8a8">ISLAS SEM · Canarias · www.islassem.com</div>
-  </div>`;
-}
-const queue = (item) => db.collection("outbox").add({
-  orgId: DEFAULT_ORG_ID, text: "", status: item.to ? "pending" : "skipped", attempts: 0, error: item.to ? "" : "Sin email del destinatario",
+const mailHtml = (brand, title, body, cta, url) => brandMailHtml(brand, { title, body, cta, ctaUrl: url });
+const queue = (orgId, item) => db.collection("outbox").add({
+  orgId, text: "", status: item.to ? "pending" : "skipped", attempts: 0, error: item.to ? "" : "Sin email del destinatario",
   sentAt: null, attachment: null, source: "contracts", createdAt: new Date(), updatedAt: new Date(), ...item,
 });
 
 /* ------------------------------------------------------------------ crear y enviar */
 
 // docs de entrada: [{ templateId, values? } | { upload: { name, kind, blocks?, data? (pdf base64) }, values? }]
-async function createContract({ contactId, dealId, title, docs, manual = {}, by, ip, ua, fromRule = "" }) {
-  const ctx = await contextFor({ contactId, dealId });
+async function createContract({ orgId, contactId, dealId, title, docs, manual = {}, by, ip, ua, fromRule = "" }) {
+  const ctx = await contextFor({ contactId, dealId, orgId });
   const s = ctx.settings;
-  if (!s.signer?.name || !s.company?.name || !s.signaturePath) throw new Error("Configura antes la firma de ISLAS SEM en Contratos › Ajustes (empresa, firmante y firma).");
+  const brand = await brandFor(orgId);
+  if (!s.signer?.name || !s.company?.name || !s.signaturePath) throw new Error("Configura antes la firma de tu empresa en Contratos › Ajustes (empresa, firmante y firma).");
+  if (!ctx.contactId && !ctx.dealId) throw new Error("No se encontró el cliente");
   const email = norm(ctx.contact?.email || ctx.deal?.contactEmail);
   if (!email) throw new Error("El cliente no tiene email: añádelo en su ficha para poder enviarle el contrato.");
   const out = [];
@@ -277,7 +278,7 @@ async function createContract({ contactId, dealId, title, docs, manual = {}, by,
   for (const [i, d] of (docs || []).slice(0, 10).entries()) {
     if (d.templateId) {
       const t = (await db.collection("contractTemplates").doc(String(d.templateId)).get()).data();
-      if (!t || t.archived) throw new Error("Una de las plantillas ya no existe");
+      if (!t || t.archived || orgOf(t) !== orgId) throw new Error("Una de las plantillas ya no existe");
       if (t.kind === "pdf") { out.push({ name: t.name, kind: "pdf", sourcePath: t.sourcePath, sourceHash: t.sourceHash, templateId: d.templateId }); continue; }
       const r = resolveValues(t.fields, ctx, { ...manual, ...(d.values || {}) });
       r.missing.forEach((k) => missing.push(`${t.name}: ${k}`));
@@ -287,7 +288,7 @@ async function createContract({ contactId, dealId, title, docs, manual = {}, by,
       if (d.upload.kind === "pdf") {
         const buf = Buffer.from(String(d.upload.data || ""), "base64");
         if (!buf.length || buf.length > 10 * 1024 * 1024 || buf.subarray(0, 4).toString() !== "%PDF") throw new Error(`"${name}" no es un PDF válido (máx. 10 MB)`);
-        const path = `contracts/${DEFAULT_ORG_ID}/originals/${Date.now()}-${crypto.randomBytes(4).toString("hex")}.pdf`;
+        const path = `contracts/${orgId}/originals/${Date.now()}-${crypto.randomBytes(4).toString("hex")}.pdf`;
         await bucket().file(path).save(buf, { contentType: "application/pdf", resumable: false });
         out.push({ name, kind: "pdf", sourcePath: path, sourceHash: sha256(buf) });
       } else {
@@ -304,7 +305,7 @@ async function createContract({ contactId, dealId, title, docs, manual = {}, by,
   const c = ctx.contact || {};
   const now = Date.now();
   const contract = {
-    orgId: DEFAULT_ORG_ID, code: newCode(), token: crypto.randomBytes(24).toString("hex"),
+    orgId, code: newCode(), token: crypto.randomBytes(24).toString("hex"),
     title: clip(title || out.map((d) => d.name).join(" + "), 200), status: "sent",
     contactId: ctx.contactId, dealId: ctx.dealId, companyId: c.companyId || "",
     clientName: [c.firstName, c.lastName].filter(Boolean).join(" ") || ctx.deal?.contact || "", clientEmail: email,
@@ -323,11 +324,11 @@ async function createContract({ contactId, dealId, title, docs, manual = {}, by,
   };
   const ref = await db.collection("contracts").add(contract);
   const url = `${PUBLIC_URL}/firmar/${contract.token}`;
-  await queue({
-    to: email, toName: contract.clientName, subject: `${contract.title} · para firmar · ISLAS SEM`, kind: "contract", dealId: ctx.dealId, contactId: ctx.contactId,
-    html: mailHtml("Documento para firmar", `Hola ${esc(contract.clientName)},<br><br>${esc(s.company.name)} te ha enviado <b>${esc(contract.title)}</b> para que lo revises y lo firmes electrónicamente.<br><br>Solo tienes que abrir el enlace, revisar el documento, confirmar tus datos y firmar con el ratón o con el dedo.`, "Revisar y firmar", url),
+  await queue(orgId, {
+    to: email, toName: contract.clientName, subject: `${contract.title} · para firmar · ${brand.name}`, kind: "contract", dealId: ctx.dealId, contactId: ctx.contactId,
+    html: mailHtml(brand, "Documento para firmar", `Hola ${esc(contract.clientName)},<br><br>${esc(s.company.name)} te ha enviado <b>${esc(contract.title)}</b> para que lo revises y lo firmes electrónicamente.<br><br>Solo tienes que abrir el enlace, revisar el documento, confirmar tus datos y firmar con el ratón o con el dedo.`, "Revisar y firmar", url),
   });
-  await addActivity(DEFAULT_ORG_ID, {
+  await addActivity(orgId, {
     type: "Documento", title: `✍️ Contrato enviado a firmar: ${contract.title} → ${email}`, done: true,
     entity: ctx.dealId ? "deal" : "contact", entityId: ctx.dealId || ctx.contactId, contactId: ctx.contactId,
   });
@@ -337,13 +338,16 @@ async function createContract({ contactId, dealId, title, docs, manual = {}, by,
 /* ------------------------------------------------------------------ rutas de la app (con acceso) */
 
 async function getSettings(req, res) {
-  if (!(await staff(req, res))) return;
-  const s = (await SETTINGS().get()).data() || {};
+  const user = await staff(req, res);
+  if (!user) return;
+  const s = (await (await SETTINGS(user.orgId)).get()).data() || {};
   res.json({ ok: true, settings: { company: s.company || {}, signer: s.signer || {}, hasSignature: !!s.signaturePath, notifyEmail: s.notifyEmail || "" } });
 }
 async function saveSettings(req, res) {
   const user = await staff(req, res);
   if (!user) return;
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede cambiar los ajustes de contratos", 403);
+  const orgId = user.orgId;
   const b = req.body || {};
   const patch = {
     company: { name: clip(b.company?.name, 150), cif: clip(b.company?.cif, 30), address: clip(b.company?.address, 250) },
@@ -353,17 +357,18 @@ async function saveSettings(req, res) {
   if (b.signature) {
     const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.signature));
     if (!m) return fail(res, "Firma no válida");
-    const path = `contracts/${DEFAULT_ORG_ID}/provider-signature-${Date.now()}.png`;
+    const path = `contracts/${orgId}/provider-signature-${Date.now()}.png`;
     await bucket().file(path).save(Buffer.from(m[1], "base64"), { contentType: "image/png", resumable: false });
     patch.signaturePath = path;
   }
-  await SETTINGS().set(patch, { merge: true });
+  await (await SETTINGS(orgId)).set(patch, { merge: true });
   res.json({ ok: true });
 }
 
 async function listTemplates(req, res) {
-  if (!(await staff(req, res))) return;
-  const snap = await db.collection("contractTemplates").where("orgId", "==", DEFAULT_ORG_ID).get();
+  const user = await staff(req, res);
+  if (!user) return;
+  const snap = await db.collection("contractTemplates").where("orgId", "==", user.orgId).get();
   const templates = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.archived)
     .map(({ blocks, ...t }) => ({ ...t, preview: (blocks || []).slice(0, 400) }))
     .sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -373,14 +378,15 @@ async function listTemplates(req, res) {
 async function saveTemplate(req, res) {
   const user = await staff(req, res);
   if (!user) return;
+  const orgId = user.orgId;
   const b = req.body || {};
   const name = clip(b.name, 120);
   if (!name) return fail(res, "Ponle un nombre a la plantilla");
   const ref = b.id ? db.collection("contractTemplates").doc(String(b.id)) : db.collection("contractTemplates").doc();
   const cur = b.id ? (await ref.get()).data() : null;
-  if (b.id && !cur) return fail(res, "La plantilla no existe", 404);
+  if (b.id && (!cur || orgOf(cur) !== orgId)) return fail(res, "La plantilla no existe", 404);
   const kind = cur?.kind || (b.kind === "pdf" ? "pdf" : "docx");
-  const data = { orgId: DEFAULT_ORG_ID, name, kind, updatedAt: Date.now(), updatedBy: user.email };
+  const data = { orgId, name, kind, updatedAt: Date.now(), updatedBy: user.email };
   if (kind === "docx") {
     const blocks = b.blocks ? cleanBlocks(b.blocks) : cur?.blocks || [];
     if (!blocks.length) return fail(res, "El documento está vacío");
@@ -388,7 +394,7 @@ async function saveTemplate(req, res) {
   } else if (!cur) {
     const buf = Buffer.from(String(b.data || ""), "base64");
     if (!buf.length || buf.length > 10 * 1024 * 1024 || buf.subarray(0, 4).toString() !== "%PDF") return fail(res, "No es un PDF válido (máx. 10 MB)");
-    const path = `contracts/${DEFAULT_ORG_ID}/templates/${ref.id}.pdf`;
+    const path = `contracts/${orgId}/templates/${ref.id}.pdf`;
     await bucket().file(path).save(buf, { contentType: "application/pdf", resumable: false });
     Object.assign(data, { sourcePath: path, sourceHash: sha256(buf), fields: [] });
   }
@@ -397,21 +403,26 @@ async function saveTemplate(req, res) {
   res.json({ ok: true, id: ref.id });
 }
 async function archiveTemplate(req, res) {
-  if (!(await staff(req, res))) return;
-  await db.collection("contractTemplates").doc(String(req.body?.id || "x")).set({ archived: true, updatedAt: Date.now() }, { merge: true });
+  const user = await staff(req, res);
+  if (!user) return;
+  const ref = db.collection("contractTemplates").doc(String(req.body?.id || "x"));
+  const cur = (await ref.get()).data();
+  if (!cur || orgOf(cur) !== user.orgId) return fail(res, "La plantilla no existe", 404);
+  await ref.set({ archived: true, updatedAt: Date.now() }, { merge: true });
   res.json({ ok: true });
 }
 
 // Rellena los huecos con los datos del cliente sin enviar nada (para la ventana de envío).
 async function prepare(req, res) {
-  if (!(await staff(req, res))) return;
+  const user = await staff(req, res);
+  if (!user) return;
   const { contactId, dealId, docs } = req.body || {};
-  const ctx = await contextFor({ contactId, dealId });
+  const ctx = await contextFor({ contactId, dealId, orgId: user.orgId });
   const out = [];
   for (const d of (Array.isArray(docs) ? docs : []).slice(0, 10)) {
     if (d.templateId) {
       const t = (await db.collection("contractTemplates").doc(String(d.templateId)).get()).data();
-      if (!t) continue;
+      if (!t || orgOf(t) !== user.orgId) continue;
       out.push(t.kind === "pdf" ? { name: t.name, kind: "pdf", fields: [] } : { name: t.name, kind: "docx", fields: t.fields, ...resolveValues(t.fields, ctx) });
     } else if (d.upload && d.upload.kind !== "pdf") {
       const blocks = cleanBlocks(d.upload.blocks);
@@ -428,18 +439,19 @@ async function send(req, res) {
   if (!user) return;
   const b = req.body || {};
   try {
-    const r = await createContract({ contactId: b.contactId, dealId: b.dealId, title: b.title, docs: b.docs, manual: b.values || {}, by: user.email, ip: ipOf(req), ua: uaOf(req) });
+    const orgId = user.orgId;
+    const r = await createContract({ orgId, contactId: b.contactId, dealId: b.dealId, title: b.title, docs: b.docs, manual: b.values || {}, by: user.email, ip: ipOf(req), ua: uaOf(req) });
     // "Guardar también como plantilla" (documentos subidos)
     for (const d of (b.docs || []).filter((x) => x.upload && x.saveAsTemplate)) {
       const ref = db.collection("contractTemplates").doc();
       if (d.upload.kind === "pdf") {
         const buf = Buffer.from(String(d.upload.data || ""), "base64");
-        const path = `contracts/${DEFAULT_ORG_ID}/templates/${ref.id}.pdf`;
+        const path = `contracts/${orgId}/templates/${ref.id}.pdf`;
         await bucket().file(path).save(buf, { contentType: "application/pdf", resumable: false });
-        await ref.set({ orgId: DEFAULT_ORG_ID, name: clip(d.upload.name, 120), kind: "pdf", sourcePath: path, sourceHash: sha256(buf), fields: [], createdAt: Date.now(), createdBy: user.email });
+        await ref.set({ orgId, name: clip(d.upload.name, 120), kind: "pdf", sourcePath: path, sourceHash: sha256(buf), fields: [], createdAt: Date.now(), createdBy: user.email });
       } else {
         const blocks = cleanBlocks(d.upload.blocks);
-        await ref.set({ orgId: DEFAULT_ORG_ID, name: clip(d.upload.name, 120), kind: "docx", blocks, fields: cleanFields(d.upload.fields, holesOf(blocks)), createdAt: Date.now(), createdBy: user.email });
+        await ref.set({ orgId, name: clip(d.upload.name, 120), kind: "docx", blocks, fields: cleanFields(d.upload.fields, holesOf(blocks)), createdAt: Date.now(), createdBy: user.email });
       }
     }
     res.json({ ok: true, ...r });
@@ -450,9 +462,10 @@ async function send(req, res) {
 
 const STATUS_LABEL = { sent: "Enviado", viewed: "Visto por el cliente", completed: "Firmado", cancelled: "Anulado" };
 async function list(req, res) {
-  if (!(await staff(req, res))) return;
+  const user = await staff(req, res);
+  if (!user) return;
   const { contactId, dealId } = req.query || {};
-  let q = db.collection("contracts").where("orgId", "==", DEFAULT_ORG_ID);
+  let q = db.collection("contracts").where("orgId", "==", user.orgId);
   if (dealId) q = q.where("dealId", "==", String(dealId));
   else if (contactId) q = q.where("contactId", "==", String(contactId));
   const snap = await q.get();
@@ -467,9 +480,11 @@ async function list(req, res) {
   res.json({ ok: true, contracts });
 }
 async function fileUrl(req, res) {
-  if (!(await staff(req, res))) return;
+  const user = await staff(req, res);
+  if (!user) return;
   const { id, i = 0, which = "signed" } = req.body || {};
-  const c = (await db.collection("contracts").doc(String(id || "x")).get()).data();
+  const c0 = (await db.collection("contracts").doc(String(id || "x")).get()).data();
+  const c = c0 && orgOf(c0) === user.orgId ? c0 : null;
   const d = c?.docs?.[Number(i)];
   const path = which === "original" ? d?.sourcePath : d?.signedPath;
   if (!path) return fail(res, "Ese archivo no existe todavía", 404);
@@ -481,7 +496,7 @@ async function cancel(req, res) {
   if (!user) return;
   const ref = db.collection("contracts").doc(String(req.body?.id || "x"));
   const c = (await ref.get()).data();
-  if (!c) return fail(res, "No existe", 404);
+  if (!c || orgOf(c) !== user.orgId) return fail(res, "No existe", 404);
   if (c.status === "completed") return fail(res, "Ya está firmado: no se puede anular");
   await ref.update({ status: "cancelled", updatedAt: Date.now(), events: [...(c.events || []), { at: Date.now(), label: `Anulado por ${user.email}` }] });
   res.json({ ok: true });
@@ -503,7 +518,7 @@ async function publicView(req, res) {
   if (c.status === "sent") {
     await doc.ref.update({ status: "viewed", updatedAt: Date.now(), events: [...(c.events || []), { at: Date.now(), label: "Abierto por el cliente", ip: ipOf(req) }] });
   }
-  const ctx = await contextFor({ contactId: c.contactId, dealId: c.dealId });
+  const ctx = await contextFor({ contactId: c.contactId, dealId: c.dealId, orgId: orgOf(c) });
   const ct = ctx.contact || {}, co = ctx.company || {};
   const docs = [];
   for (const d of c.docs || []) {
@@ -548,8 +563,9 @@ async function publicSign(req, res) {
     return c;
   });
   if (!claimed) return fail(res, "Este documento ya está firmado o no está disponible", 409);
+  const orgId = orgOf(claimed);
   try {
-    const sigPath = `contracts/${DEFAULT_ORG_ID}/signatures/${doc.id}-client.png`;
+    const sigPath = `contracts/${orgId}/signatures/${doc.id}-client.png`;
     await bucket().file(sigPath).save(Buffer.from(m[1], "base64"), { contentType: "image/png", resumable: false });
     const c = {
       ...claimed,
@@ -562,7 +578,7 @@ async function publicSign(req, res) {
       const { pdf, contentHash } = await buildSignedPdf(c, d);
       // Nombre de archivo limpio: sin caracteres que los sistemas de archivos no admiten, sin espacios dobles.
       const base = String(d.name).replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || `Documento ${i + 1}`;
-      const signedPath = `contracts/${DEFAULT_ORG_ID}/signed/${doc.id}-${i}.pdf`;
+      const signedPath = `contracts/${orgId}/signed/${doc.id}-${i}.pdf`;
       await bucket().file(signedPath).save(pdf, { contentType: "application/pdf", resumable: false });
       docs.push({ ...d, signedPath, contentHash, signedHash: sha256(pdf) });
       if (d.kind === "pdf") files.push({ path: d.sourcePath, name: `${base}.pdf`, size: 0, type: "application/pdf" });
@@ -570,20 +586,21 @@ async function publicSign(req, res) {
     }
     await doc.ref.update({ client: c.client, events: c.events, docs, status: "completed", completedAt: now, updatedAt: now, signing: admin.firestore.FieldValue.delete() });
     // Copia firmada a las dos partes.
-    const s = (await SETTINGS().get()).data() || {};
+    const s = (await (await SETTINGS(orgId)).get()).data() || {};
+    const brand = await brandFor(orgId);
     const body = `Hola,<br><br>El documento <b>${esc(c.title)}</b> ha quedado firmado por las dos partes.<br><br>Te adjuntamos la copia firmada con su certificado de firma (ID ${c.code}).`;
     const sizes = await Promise.all(files.map(async (f) => (f.size ? f.size : Number((await bucket().file(f.path).getMetadata())[0].size) || 0)));
     const attachments = files.map((f, i) => ({ ...f, size: sizes[i] }));
     for (const [to, toName] of [[c.clientEmail, name], [norm(s.notifyEmail || c.provider?.email || c.sentBy), c.provider?.company]]) {
-      if (to) await queue({ to, toName, subject: `Firmado: ${c.title} · ISLAS SEM`, kind: "contract-signed", dealId: c.dealId, contactId: c.contactId, attachments, html: mailHtml("Documento firmado", body + "<!--ADJUNTOS-->", "", "") });
+      if (to) await queue(orgId, { to, toName, subject: `Firmado: ${c.title} · ${brand.name}`, kind: "contract-signed", dealId: c.dealId, contactId: c.contactId, attachments, html: mailHtml(brand, "Documento firmado", body + "<!--ADJUNTOS-->", "", "") });
     }
     // Si el cliente no tenía DNI en su ficha, se guarda el que ha confirmado al firmar.
     if (c.contactId) {
       const cref = db.collection("contacts").doc(c.contactId);
       const cd = (await cref.get()).data();
-      if (cd && !cd.dni) await cref.update({ dni, updatedAt: new Date() }).catch(() => {});
+      if (cd && orgOf(cd) === orgId && !cd.dni) await cref.update({ dni, updatedAt: new Date() }).catch(() => {});
     }
-    await addActivity(DEFAULT_ORG_ID, {
+    await addActivity(orgId, {
       type: "Documento", title: `✅ Contrato firmado: ${c.title} — ${name} (${dni})`, done: true,
       entity: c.dealId ? "deal" : "contact", entityId: c.dealId || c.contactId, contactId: c.contactId,
     });
@@ -619,7 +636,7 @@ async function sendFromRule(deal, rule, stageName) {
   const ids = (Array.isArray(rule.templateIds) ? rule.templateIds : []).filter((x) => /^[A-Za-z0-9_-]{1,64}$/.test(x)).slice(0, 10);
   if (!ids.length) return { sent: false };
   try {
-    await createContract({ contactId: deal.contactId, dealId: deal.id, title: rule.title && rule.title !== "Nueva regla" ? rule.title : "", docs: ids.map((templateId) => ({ templateId })), fromRule: rule.id || "regla" });
+    await createContract({ orgId: deal.orgId || DEFAULT_ORG_ID, contactId: deal.contactId, dealId: deal.id, title: rule.title && rule.title !== "Nueva regla" ? rule.title : "", docs: ids.map((templateId) => ({ templateId })), fromRule: rule.id || "regla" });
     return { sent: true };
   } catch (e) {
     await addActivity(deal.orgId || DEFAULT_ORG_ID, {

@@ -1,4 +1,4 @@
-// Plantillas de Meta y lo que se envía con ellas:
+// Plantillas de Meta y lo que se envía con ellas, por empresa (organizations/{org}/…):
 // - Sincronización (waTemplates/<nombre>__<idioma>): cada 5 min desde el cron, al guardar los
 //   ajustes, con el botón "Sincronizar" y al instante cuando Meta avisa por el webhook de que
 //   una plantilla se ha aprobado, rechazado, pausado…
@@ -10,27 +10,34 @@
 //   cron las envía por tandas; quien escribió BAJA no la recibe. Contadores de enviados,
 //   entregados, leídos y fallidos.
 const { admin, db } = require("./firebase");
-const { DEFAULT_ORG_ID, norm } = require("./link");
+const { norm } = require("./link");
+const { orgRef } = require("./tenant");
 const wa = require("./whatsapp");
 const cfgLib = require("./waConfig");
 
-const TPL = () => db.collection("waTemplates");
-const BC = () => db.collection("waBroadcasts");
+const TPL = (orgId) => orgRef(orgId).collection("waTemplates");
+const BC = (orgId) => orgRef(orgId).collection("waBroadcasts");
 const { clip, digits, fail, httpError } = wa;
 const VAR = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 const varsOf = (text) => [...new Set([...String(text || "").matchAll(VAR)].map((m) => m[1]))];
 const tplId = (name, lang) => `${name}__${lang}`.replace(/[^A-Za-z0-9_-]/g, "_");
 const inc = (n) => admin.firestore.FieldValue.increment(n);
+// Firestore no admite listas dentro de listas, y Meta manda así los ejemplos de las variables
+// (example.body_text: [["Ana", "IA"]]). Para enviar no hacen falta: se guardan sin ellos.
+const storable = (components) => (Array.isArray(components) ? components : []).map((c) => {
+  const { example: _e, ...rest } = c || {};
+  return JSON.parse(JSON.stringify(rest, (k, v) => (Array.isArray(v) ? v.map((x) => (Array.isArray(x) ? x.join(", ") : x)) : v)));
+});
 
 /* ------------------------------------------------------------------ sincronizar */
 
-async function syncTemplates() {
-  const s = await wa.settings(true);
+async function syncTemplates(orgId) {
+  const s = await wa.settings(orgId, true);
   if (!s.wabaId || !s.token) return { skipped: "falta el WABA ID" };
   const all = [];
   let path = `${s.wabaId}/message_templates?fields=id,name,language,status,category,components,rejected_reason,parameter_format,quality_score&limit=100`;
   for (let i = 0; path && i < 30; i++) {
-    const out = await wa.graph(path);
+    const out = await wa.graph(orgId, path);
     all.push(...(out.data || []));
     const next = out.paging?.next || "";
     path = next ? next.replace(/^https?:\/\/[^/]+\/v[\d.]+\//, "") : "";
@@ -40,14 +47,14 @@ async function syncTemplates() {
   const writes = all.map((t) => {
     const id = tplId(t.name, t.language);
     keep.add(id);
-    return [TPL().doc(id), {
-      orgId: DEFAULT_ORG_ID, metaId: String(t.id || ""), name: t.name, language: t.language, status: t.status || "",
-      category: t.category || "", components: t.components || [], paramFormat: t.parameter_format || "POSITIONAL",
+    return [TPL(orgId).doc(id), {
+      orgId, metaId: String(t.id || ""), name: t.name, language: t.language, status: t.status || "",
+      category: t.category || "", components: storable(t.components), paramFormat: t.parameter_format || "POSITIONAL",
       rejectedReason: t.rejected_reason && t.rejected_reason !== "NONE" ? t.rejected_reason : "",
       quality: t.quality_score?.score || "", syncedAt: now,
     }];
   });
-  const old = await TPL().get();
+  const old = await TPL(orgId).get();
   const dels = old.docs.filter((d) => !keep.has(d.id)).map((d) => d.ref);
   const ops = [...writes.map(([ref, data]) => (b) => b.set(ref, data)), ...dels.map((ref) => (b) => b.delete(ref))];
   for (let i = 0; i < ops.length; i += 400) {
@@ -55,34 +62,35 @@ async function syncTemplates() {
     ops.slice(i, i + 400).forEach((op) => op(batch));
     await batch.commit();
   }
-  await wa.SETTINGS().set({ templatesSyncedAt: now }, { merge: true });
-  wa.resetSettingsCache();
+  await wa.SETTINGS(orgId).set({ templatesSyncedAt: now }, { merge: true });
+  wa.resetSettingsCache(orgId);
   return { total: all.length, removed: dels.length };
 }
 
 // Aviso de Meta: plantilla aprobada / rechazada / pausada… o cambio de calidad.
-async function templateEvent(field, v) {
+async function templateEvent(orgId, field, v) {
   const name = v.message_template_name;
   const lang = v.message_template_language;
   if (!name || !lang) return;
-  const ref = TPL().doc(tplId(name, lang));
+  const ref = TPL(orgId).doc(tplId(name, lang));
   if (field === "message_template_quality_update") return ref.set({ quality: clip(v.new_quality_score, 20) }, { merge: true });
-  await ref.set({ name, language: lang, status: clip(v.event, 30), rejectedReason: v.reason && v.reason !== "NONE" ? clip(v.reason, 200) : "", orgId: DEFAULT_ORG_ID }, { merge: true });
+  await ref.set({ name, language: lang, status: clip(v.event, 30), rejectedReason: v.reason && v.reason !== "NONE" ? clip(v.reason, 200) : "", orgId }, { merge: true });
 }
 
 /* ------------------------------------------------------------------ crear / borrar */
 
 // Archivo de ejemplo para la cabecera (imagen, vídeo, documento): Meta lo pide subido con su
 // "subida reanudable" (necesita el id de la app; se averigua con el token).
-async function uploadHandle(f) {
-  const s = await wa.settings(true);
+async function uploadHandle(orgId, f) {
+  const s = await wa.settings(orgId, true);
   let appId = s.appId;
   if (!appId) {
-    appId = (await wa.graph("app").catch(() => ({})))?.id;
+    appId = (await wa.graph(orgId, "app").catch(() => ({})))?.id;
     if (!appId) throw httpError("No se pudo averiguar el identificador de la app de Meta. Escríbelo en Ajustes › Conexión (App ID).", 409);
-    await wa.SETTINGS().set({ appId: String(appId) }, { merge: true });
+    await wa.SETTINGS(orgId).set({ appId: String(appId) }, { merge: true });
+    wa.resetSettingsCache(orgId);
   }
-  const sess = await wa.graph(`${appId}/uploads?file_name=${encodeURIComponent(f.filename)}&file_length=${f.buf.length}&file_type=${encodeURIComponent(f.mime)}`, { method: "POST" });
+  const sess = await wa.graph(orgId, `${appId}/uploads?file_name=${encodeURIComponent(f.filename)}&file_length=${f.buf.length}&file_type=${encodeURIComponent(f.mime)}`, { method: "POST" });
   const r = await fetch(`${wa.GRAPH}/${wa.VERSION}/${sess.id}`, { method: "POST", headers: { Authorization: `OAuth ${s.token}`, file_offset: "0" }, body: f.buf });
   const out = await r.json().catch(() => ({}));
   if (!out.h) throw httpError(`Meta no aceptó el archivo de ejemplo: ${out.error?.message || r.status}`, 502);
@@ -94,8 +102,9 @@ const MEDIA_FORMATS = ["IMAGE", "VIDEO", "DOCUMENT"];
 async function createTemplate(req, res) {
   const user = await wa.staff(req, res);
   if (!user) return;
-  if (!(await wa.isAdmin(user.email))) return fail(res, "Solo un administrador puede crear plantillas", 403);
-  const s = await wa.settings(true);
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede crear plantillas", 403);
+  const orgId = user.orgId;
+  const s = await wa.settings(orgId, true);
   if (!s.wabaId) return fail(res, "Falta el WABA ID en Ajustes › Conexión", 409);
   const b = req.body || {};
   const name = String(b.name || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -116,7 +125,7 @@ async function createTemplate(req, res) {
     components.push({ type: "HEADER", format: "TEXT", text, ...(vs.length ? { example: { header_text: [clip(h.example, 60)] } } : {}) });
   } else if (MEDIA_FORMATS.includes(h.format)) {
     const f = wa.fileFromBody(h.file);
-    components.push({ type: "HEADER", format: h.format, example: { header_handle: [await uploadHandle(f)] } });
+    components.push({ type: "HEADER", format: h.format, example: { header_handle: [await uploadHandle(orgId, f)] } });
   }
 
   const body = String(b.body?.text || "").replace(/\r/g, "").trim();
@@ -156,12 +165,12 @@ async function createTemplate(req, res) {
   }
   if (buttons.length) components.push({ type: "BUTTONS", buttons });
 
-  const out = await wa.graph(`${s.wabaId}/message_templates`, {
+  const out = await wa.graph(orgId, `${s.wabaId}/message_templates`, {
     method: "POST", body: { name, language, category, components, ...(bv.length && !positional ? { parameter_format: "NAMED" } : {}) },
   });
-  await TPL().doc(tplId(name, language)).set({
-    orgId: DEFAULT_ORG_ID, metaId: String(out.id || ""), name, language, status: out.status || "PENDING", category: out.category || category,
-    components, paramFormat: bv.length && !positional ? "NAMED" : "POSITIONAL", rejectedReason: "", quality: "", syncedAt: Date.now(),
+  await TPL(orgId).doc(tplId(name, language)).set({
+    orgId, metaId: String(out.id || ""), name, language, status: out.status || "PENDING", category: out.category || category,
+    components: storable(components), paramFormat: bv.length && !positional ? "NAMED" : "POSITIONAL", rejectedReason: "", quality: "", syncedAt: Date.now(),
     createdBy: norm(user.email),
   });
   res.json({ ok: true, status: out.status || "PENDING" });
@@ -170,25 +179,26 @@ async function createTemplate(req, res) {
 async function deleteTemplate(req, res) {
   const user = await wa.staff(req, res);
   if (!user) return;
-  if (!(await wa.isAdmin(user.email))) return fail(res, "Solo un administrador puede borrar plantillas", 403);
-  const s = await wa.settings(true);
-  const ref = TPL().doc(clip(req.body?.id, 600) || "x");
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede borrar plantillas", 403);
+  const s = await wa.settings(user.orgId, true);
+  const ref = TPL(user.orgId).doc(clip(req.body?.id, 600) || "x");
   const t = (await ref.get()).data();
   if (!t) return fail(res, "Esa plantilla no existe", 404);
-  await wa.graph(`${s.wabaId}/message_templates?name=${encodeURIComponent(t.name)}${t.metaId ? `&hsm_id=${t.metaId}` : ""}`, { method: "DELETE" });
+  await wa.graph(user.orgId, `${s.wabaId}/message_templates?name=${encodeURIComponent(t.name)}${t.metaId ? `&hsm_id=${t.metaId}` : ""}`, { method: "DELETE" });
   await ref.delete();
   res.json({ ok: true });
 }
 
 async function sync(req, res) {
-  if (!(await wa.staff(req, res))) return;
-  res.json({ ok: true, ...(await syncTemplates()) });
+  const user = await wa.staff(req, res);
+  if (!user) return;
+  res.json({ ok: true, ...(await syncTemplates(user.orgId)) });
 }
 
 /* ------------------------------------------------------------------ enviar */
 
-async function approvedTemplate(name, language) {
-  const t = (await TPL().doc(tplId(clip(name, 512), clip(language, 10))).get()).data();
+async function approvedTemplate(orgId, name, language) {
+  const t = (await TPL(orgId).doc(tplId(clip(name, 512), clip(language, 10))).get()).data();
   if (!t) throw httpError("Esa plantilla no existe. Pulsa «Sincronizar» en Plantillas.", 404);
   if (t.status !== "APPROVED") throw httpError(`La plantilla «${t.name}» no está aprobada por Meta (estado: ${t.status}).`, 409);
   return t;
@@ -250,14 +260,14 @@ function build(t, params = {}, media, ctx) {
 }
 
 // Crea el chat si aún no existe (al escribir nosotros primero).
-async function ensureChat(waId, { contact, archived = false, assignee } = {}) {
-  const ref = wa.CHATS().doc(waId);
+async function ensureChat(orgId, waId, { contact, archived = false, assignee } = {}) {
+  const ref = wa.CHATS(orgId).doc(waId);
   const snap = await ref.get();
   if (snap.exists) return snap.data();
-  const cfg = await cfgLib.getConfig();
-  const c = contact || (await wa.findContact(waId));
+  const cfg = await cfgLib.getConfig(orgId);
+  const c = contact || (await wa.findContact(orgId, waId));
   const data = {
-    orgId: DEFAULT_ORG_ID, waId, phone: `+${waId}`, profileName: "", contactId: c?.id || "", contactName: c?.name || "",
+    orgId, waId, phone: `+${waId}`, profileName: "", contactId: c?.id || "", contactName: c?.name || "",
     assigneeEmail: assignee?.email || "", assigneeName: assignee?.name || "", teamId: "", tags: [], notes: "",
     starred: false, blocked: false, optOut: false, unread: 0, archived, lastInboundAt: 0, lastAt: Date.now(), lastText: "", lastDir: "out",
     closingDueAt: 0, createdAt: Date.now(), updatedAt: Date.now(),
@@ -272,34 +282,36 @@ async function sendTemplate(req, res) {
   const user = await wa.staff(req, res);
   if (!user) return;
   const b = req.body || {};
-  const t = await approvedTemplate(b.name, b.language);
-  const cfg = await cfgLib.getConfig();
+  const orgId = user.orgId;
+  const t = await approvedTemplate(orgId, b.name, b.language);
+  const cfg = await cfgLib.getConfig(orgId);
   let waId = digits(b.chatId);
   let contact = null;
   if (!waId) {
     if (b.contactId) {
       const cd = (await db.collection("contacts").doc(clip(b.contactId, 80)).get()).data();
-      if (!cd || cd.orgId !== DEFAULT_ORG_ID) return fail(res, "Ese contacto no existe", 404);
+      if (!cd || cd.orgId !== orgId) return fail(res, "Ese contacto no existe", 404);
       contact = { id: clip(b.contactId, 80), name: `${cd.firstName || ""} ${cd.lastName || ""}`.trim(), ...cd };
       waId = wa.toWaId(b.phone || cd.whatsapp || cd.phone, cfg.defaultCountry);
     } else waId = wa.toWaId(b.phone, cfg.defaultCountry);
     if (!waId) return fail(res, "Número no válido. Escríbelo con prefijo de país, p. ej. +34 600 000 000");
   }
-  const chat = (await wa.CHATS().doc(waId).get()).data();
+  const chat = (await wa.CHATS(orgId).doc(waId).get()).data();
   if (chat?.blocked) return fail(res, "Este número está bloqueado. Desbloquéalo para escribirle.", 409);
   let file = null;
   let media = null;
   const h = (t.components || []).find((c) => c.type === "HEADER");
   if (MEDIA_FORMATS.includes(h?.format)) {
     file = wa.fileFromBody(b.file);
-    media = { id: await wa.uploadMedia(file.buf, file.mime, file.filename), filename: file.filename };
+    media = { id: await wa.uploadMedia(orgId, file.buf, file.mime, file.filename), filename: file.filename };
   }
-  const ctx = contact || (chat?.contactId ? (await db.collection("contacts").doc(chat.contactId).get()).data() : null) || { name: chat?.profileName || "" };
+  const linked = chat?.contactId ? (await db.collection("contacts").doc(chat.contactId).get()).data() : null;
+  const ctx = contact || (linked?.orgId === orgId ? linked : null) || { name: chat?.profileName || "" };
   const { body, text } = build(t, b.params, media, ctx);
-  const d = await wa.deliver(waId, body);
-  await ensureChat(d.waId, { contact: contact && { id: contact.id, name: contact.name }, assignee: { email: norm(user.email), name: user.name || user.email } });
-  const path = file ? await wa.saveCopy(d.waId, d.wamid, file) : "";
-  const id = await wa.storeOutbound(d.waId, d.wamid, {
+  const d = await wa.deliver(orgId, waId, body);
+  await ensureChat(orgId, d.waId, { contact: contact && { id: contact.id, name: contact.name }, assignee: { email: norm(user.email), name: user.name || user.email } });
+  const path = file ? await wa.saveCopy(orgId, d.waId, d.wamid, file) : "";
+  const id = await wa.storeOutbound(orgId, d.waId, d.wamid, {
     type: "template", text, template: { name: t.name, language: t.language },
     ...(file ? { media: { mime: file.mime, filename: file.filename, path, size: file.buf.length } } : {}),
   }, user, chat?.archived ? { archived: false } : {});
@@ -311,12 +323,13 @@ async function sendTemplate(req, res) {
 async function createBroadcast(req, res) {
   const user = await wa.staff(req, res);
   if (!user) return;
-  if (!(await wa.isAdmin(user.email))) return fail(res, "Solo un administrador puede hacer difusiones", 403);
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede hacer difusiones", 403);
+  const orgId = user.orgId;
   const b = req.body || {};
   const name = clip(b.name, 100);
   if (!name) return fail(res, "Ponle un nombre a la difusión");
-  const t = await approvedTemplate(b.template?.name, b.template?.language);
-  const cfg = await cfgLib.getConfig();
+  const t = await approvedTemplate(orgId, b.template?.name, b.template?.language);
+  const cfg = await cfgLib.getConfig(orgId);
   const a = b.audience || {};
 
   // Destinatarios (sin repetir número). Quien pidió BAJA o está bloqueado, fuera.
@@ -325,7 +338,7 @@ async function createBroadcast(req, res) {
   const types = (Array.isArray(a.types) ? a.types : []).map((x) => clip(x, 60)).filter(Boolean);
   const ids = new Set((Array.isArray(a.contactIds) ? a.contactIds : []).map((x) => clip(x, 80)));
   if (types.length || ids.size) {
-    const snap = await db.collection("contacts").where("orgId", "==", DEFAULT_ORG_ID).get();
+    const snap = await db.collection("contacts").where("orgId", "==", orgId).get();
     for (const d of snap.docs) {
       const c = d.data();
       if (c.deleted) continue;
@@ -337,7 +350,7 @@ async function createBroadcast(req, res) {
   const stage = cfgLib.parseStage(cfg, a.stage);
   const tagIds = (Array.isArray(a.tagIds) ? a.tagIds : []).filter((x) => cfg.tags.some((t2) => t2.id === x));
   if (stage || tagIds.length) {
-    const snap = stage ? await wa.CHATS().where("funnelId", "==", stage.funnelId).get() : await wa.CHATS().where("orgId", "==", DEFAULT_ORG_ID).get();
+    const snap = stage ? await wa.CHATS(orgId).where("funnelId", "==", stage.funnelId).get() : await wa.CHATS(orgId).get();
     for (const d of snap.docs) {
       const c = d.data();
       if (stage && (c.stageId !== stage.stageId || c.archived)) continue;
@@ -345,8 +358,8 @@ async function createBroadcast(req, res) {
       add(d.id, { contactId: c.contactId || "", firstName: "", lastName: "", name: c.contactName || c.profileName || "", company: "", email: "", phone: c.phone || "" });
     }
   }
-  const optedOut = new Set((await wa.CHATS().where("optOut", "==", true).get()).docs.map((d) => d.id));
-  const blocked = new Set((await wa.CHATS().where("blocked", "==", true).get()).docs.map((d) => d.id));
+  const optedOut = new Set((await wa.CHATS(orgId).where("optOut", "==", true).get()).docs.map((d) => d.id));
+  const blocked = new Set((await wa.CHATS(orgId).where("blocked", "==", true).get()).docs.map((d) => d.id));
   const list = [...map.entries()].filter(([w]) => !optedOut.has(w) && !blocked.has(w));
   const skipped = map.size - list.length;
   if (!list.length) return fail(res, map.size ? "Todos los destinatarios pidieron la baja o están bloqueados" : "No hay destinatarios con teléfono válido para esa selección");
@@ -357,15 +370,15 @@ async function createBroadcast(req, res) {
   const h = (t.components || []).find((c) => c.type === "HEADER");
   if (MEDIA_FORMATS.includes(h?.format)) {
     const f = wa.fileFromBody(b.file);
-    media = { id: await wa.uploadMedia(f.buf, f.mime, f.filename), filename: f.filename };
+    media = { id: await wa.uploadMedia(orgId, f.buf, f.mime, f.filename), filename: f.filename };
   }
   // Prueba con el primero: si faltan variables, se avisa ya y no a mitad de envío.
   build(t, b.params, media, list[0][1]);
 
   const sendAt = Number(b.sendAt) > Date.now() ? Number(b.sendAt) : Date.now();
-  const ref = BC().doc();
+  const ref = BC(orgId).doc();
   await ref.set({
-    orgId: DEFAULT_ORG_ID, name, template: { name: t.name, language: t.language, category: t.category }, params: b.params || {},
+    orgId, name, template: { name: t.name, language: t.language, category: t.category }, params: b.params || {},
     media, audience: { types, contactIds: [...ids].slice(0, 500), stage: stage ? a.stage : "", tagIds, allContacts: a.allContacts === true },
     total: list.length, skipped, sent: 0, delivered: 0, read: 0, failed: 0,
     status: sendAt > Date.now() + 30e3 ? "scheduled" : "queued", sendAt, lockUntil: 0,
@@ -377,14 +390,14 @@ async function createBroadcast(req, res) {
     await batch.commit();
   }
   res.json({ ok: true, id: ref.id, total: list.length, skipped });
-  if (sendAt <= Date.now() + 30e3) processBroadcasts().catch((e) => console.error("[whatsapp] difusión:", e.message || e));
+  if (sendAt <= Date.now() + 30e3) processBroadcasts(orgId).catch((e) => console.error("[whatsapp] difusión:", e.message || e));
 }
 
 async function cancelBroadcast(req, res) {
   const user = await wa.staff(req, res);
   if (!user) return;
-  if (!(await wa.isAdmin(user.email))) return fail(res, "Solo un administrador puede cancelar difusiones", 403);
-  const ref = BC().doc(clip(req.body?.id, 60) || "x");
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede cancelar difusiones", 403);
+  const ref = BC(user.orgId).doc(clip(req.body?.id, 60) || "x");
   const bc = (await ref.get()).data();
   if (!bc) return fail(res, "Esa difusión no existe", 404);
   if (!["scheduled", "queued", "sending"].includes(bc.status)) return fail(res, "Esa difusión ya terminó");
@@ -393,9 +406,9 @@ async function cancelBroadcast(req, res) {
 }
 
 // Envía la siguiente tanda de cada difusión pendiente (cron + al crearla).
-async function processBroadcasts() {
+async function processBroadcasts(orgId) {
   const now = Date.now();
-  const snap = await BC().where("status", "in", ["scheduled", "queued", "sending"]).get();
+  const snap = await BC(orgId).where("status", "in", ["scheduled", "queued", "sending"]).get();
   let sent = 0;
   for (const d of snap.docs) {
     const bc = d.data();
@@ -409,7 +422,7 @@ async function processBroadcasts() {
     });
     if (!got) continue;
     try {
-      sent += await sendBatch(d.ref, bc);
+      sent += await sendBatch(orgId, d.ref, bc);
     } finally {
       await d.ref.update({ lockUntil: 0 }).catch(() => {});
     }
@@ -417,10 +430,10 @@ async function processBroadcasts() {
   return sent;
 }
 
-async function sendBatch(ref, bc) {
+async function sendBatch(orgId, ref, bc) {
   let t;
   try {
-    t = await approvedTemplate(bc.template.name, bc.template.language);
+    t = await approvedTemplate(orgId, bc.template.name, bc.template.language);
   } catch (e) {
     await ref.update({ status: "failed", error: e.message, finishedAt: Date.now() });
     return 0;
@@ -435,9 +448,9 @@ async function sendBatch(ref, bc) {
     const ctx = r.data();
     try {
       const { body, text } = build(t, bc.params, bc.media, ctx);
-      const dlv = await wa.deliver(r.id, body);
-      await ensureChat(dlv.waId, { contact: ctx.contactId ? { id: ctx.contactId, name: `${ctx.firstName || ""} ${ctx.lastName || ""}`.trim() || ctx.name || "" } : null, archived: true });
-      await wa.storeOutbound(dlv.waId, dlv.wamid, { type: "template", text, template: { name: t.name, language: t.language }, broadcastId: ref.id }, { auto: true, name: `Difusión «${bc.name}»` });
+      const dlv = await wa.deliver(orgId, r.id, body);
+      await ensureChat(orgId, dlv.waId, { contact: ctx.contactId ? { id: ctx.contactId, name: `${ctx.firstName || ""} ${ctx.lastName || ""}`.trim() || ctx.name || "" } : null, archived: true });
+      await wa.storeOutbound(orgId, dlv.waId, dlv.wamid, { type: "template", text, template: { name: t.name, language: t.language }, broadcastId: ref.id }, { auto: true, name: `Difusión «${bc.name}»` });
       await r.ref.update({ status: "sent", wamid: dlv.wamid, at: Date.now() });
       await ref.update({ sent: inc(1) });
       ok++;

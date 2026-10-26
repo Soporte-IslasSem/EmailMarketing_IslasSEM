@@ -9,6 +9,7 @@ const crypto = require("crypto");
 const { admin, db } = require("./firebase");
 const { DEFAULT_ORG_ID } = require("./link");
 const { staffFromReq } = require("./access");
+const { featuresOf } = require("./tenant");
 
 const ALTAS = "talentoDigitalAltas";
 const PLANTILLA = db.collection("talentoDigitalConfig").doc("plantilla");
@@ -115,9 +116,10 @@ async function recibirEmpresa(req, res) {
   res.json({ ok: true });
 }
 
+// Solo la empresa que tiene la sección (ISLAS SEM): las altas son de su directorio.
 async function requiereStaff(req, res) {
   const user = await staffFromReq(req);
-  if (!user) res.status(401).json({ ok: false, error: "Sin acceso" });
+  if (!user || !featuresOf(user.org).talentoDigital) { res.status(401).json({ ok: false, error: "Sin acceso" }); return null; }
   return user;
 }
 

@@ -130,7 +130,8 @@ export async function syncOrgRoles(orgId, employees, org = {}) {
   const adminEmails = [...new Set(employees.filter((e) => ADMIN_ROLES.includes(e.role) && e.email).map((e) => norm(e.email)))];
   const memberRoles = Object.fromEntries(employees.filter((e) => e.email).map((e) => [norm(e.email), e.role || NO_ROLE]));
   const roles = Array.isArray(org.roles) && org.roles.length ? org.roles : DEFAULT_ROLES;
-  await updateDoc(doc(db, "organizations", orgId), { adminEmails, memberRoles, roles, rolePerms: fullMatrix(org.rolePerms, roles) });
+  // memberEmails: los mismos emails en una lista, para que el servidor encuentre su empresa al entrar.
+  await updateDoc(doc(db, "organizations", orgId), { adminEmails, memberRoles, memberEmails: Object.keys(memberRoles), roles, rolePerms: fullMatrix(org.rolePerms, roles) });
 }
 
 export const saveRolesConfig = (orgId, data) => updateDoc(doc(db, "organizations", orgId), data);

@@ -7,11 +7,8 @@
 // (que verifica el token y guarda). Sin ella, escribe directo en Firestore (formSubmissions).
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "../../../config/firebaseConfig";
 import { BUILTIN_FORMS } from "./builtinForms";
 
-const DEFAULT_ORG_ID = "islas-sem";
 const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 const API_BASE = import.meta.env.VITE_API_BASE || "https://email-marketing.islassem.com/api";
 // ?embed=1: dentro de un <iframe> en otra web (incrustado, popup, barra, exit intent).
@@ -129,21 +126,15 @@ export default function PublicForm() {
     if (status === "ok") cfg.checks.forEach((c) => { data[c.k] = accepted[c.k] ? "Sí" : ""; });
     setSending(true);
     try {
-      if (RECAPTCHA_KEY) {
-        const token = await recaptchaToken();
-        const r = await fetch(`${API_BASE}/forms/submit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ formType, dealId: dealId || "", data, recaptchaToken: token }),
-        });
-        const out = await r.json().catch(() => ({}));
-        if (!r.ok || !out.ok) throw new Error(out.error || `HTTP ${r.status}`);
-      } else {
-        await addDoc(collection(db, "formSubmissions"), {
-          orgId: DEFAULT_ORG_ID, formType, dealId: dealId || "",
-          data, status: "recibido", createdAt: serverTimestamp(),
-        });
-      }
+      // Siempre por el servidor: él sabe de qué empresa es el formulario (y comprueba reCAPTCHA).
+      const token = RECAPTCHA_KEY ? await recaptchaToken() : "";
+      const r = await fetch(`${API_BASE}/forms/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formType, dealId: dealId || "", data, recaptchaToken: token }),
+      });
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok || !out.ok) throw new Error(out.error || `HTTP ${r.status}`);
       setDone(true);
       toParent({ type: "form-done" });
     } catch (err) {

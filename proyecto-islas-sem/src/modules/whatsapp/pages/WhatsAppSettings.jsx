@@ -62,13 +62,65 @@ const move = (list, i, d) => { const j = i + d; if (j < 0 || j >= list.length) r
 
 /* ------------------------------------------------------------------ conexión */
 
+// SDK de Facebook (solo para el botón «Conectar con Facebook»), cargado una vez.
+let fbReady = null;
+function loadFacebook(appId, version) {
+  if (fbReady) return fbReady;
+  fbReady = new Promise((resolve, reject) => {
+    window.fbAsyncInit = () => { window.FB.init({ appId, autoLogAppEvents: true, xfbml: false, version }); resolve(window.FB); };
+    const s = document.createElement("script");
+    s.src = "https://connect.facebook.net/es_ES/sdk.js";
+    s.async = true; s.defer = true; s.crossOrigin = "anonymous";
+    s.onerror = () => { fbReady = null; reject(new Error("No se pudo cargar Facebook. Revisa que el navegador no lo bloquee.")); };
+    document.body.appendChild(s);
+  });
+  return fbReady;
+}
+
+// Alta con un botón (Embedded Signup de Meta): la empresa entra con su Facebook, elige o crea su
+// cuenta de WhatsApp Business y su número, y Meta nos devuelve un código y los identificadores.
+function connectWithFacebook(embedded, coexistence) {
+  return new Promise((resolve, reject) => {
+    let ids = null;
+    let code = null;
+    const done = () => { if (code && ids) { window.removeEventListener("message", onMsg); resolve({ code, ...ids }); } };
+    const onMsg = (ev) => {
+      if (!/(^|\.)facebook\.com$/.test(new URL(ev.origin).hostname)) return;
+      let data;
+      try { data = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data; } catch { return; }
+      if (data?.type !== "WA_EMBEDDED_SIGNUP") return;
+      if (data.event === "CANCEL") { window.removeEventListener("message", onMsg); reject(new Error(data.data?.current_step ? "Has cerrado la ventana de Meta antes de terminar." : "Conexión cancelada.")); return; }
+      if (data.event === "ERROR") { window.removeEventListener("message", onMsg); reject(new Error(data.data?.error_message || "Meta devolvió un error.")); return; }
+      if (String(data.event || "").startsWith("FINISH")) { ids = { phoneNumberId: data.data?.phone_number_id || "", wabaId: data.data?.waba_id || "" }; done(); }
+    };
+    window.addEventListener("message", onMsg);
+    loadFacebook(embedded.appId, embedded.version).then((FB) => {
+      FB.login((resp) => {
+        if (!resp?.authResponse?.code) { window.removeEventListener("message", onMsg); reject(new Error("No se completó el inicio de sesión con Facebook.")); return; }
+        code = resp.authResponse.code;
+        // A veces el aviso con los identificadores llega después: se espera un poco.
+        setTimeout(() => { if (!ids) { window.removeEventListener("message", onMsg); reject(new Error("Meta no devolvió el número conectado. Vuelve a intentarlo.")); } }, 15000);
+        done();
+      }, {
+        config_id: embedded.configId, response_type: "code", override_default_response_type: true,
+        extras: { setup: {}, sessionInfoVersion: "3", ...(coexistence ? { featureType: "whatsapp_business_app_onboarding" } : {}) },
+      });
+    }).catch((e) => { window.removeEventListener("message", onMsg); reject(e); });
+  });
+}
+
 function Connection({ admin }) {
   const [s, setS] = useState(null);
+  const [embedded, setEmbedded] = useState(null);
   const [f, setF] = useState({ phoneNumberId: "", wabaId: "", appId: "", token: "", appSecret: "", verifyToken: "" });
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [coex, setCoex] = useState(false);
+  const [manual, setManual] = useState(false);
   const load = () => waApi("settings").then((r) => {
     setS(r.settings);
+    setEmbedded(r.embedded || null);
+    setManual((m) => m || (!r.embedded || (r.settings.hasToken && !r.settings.platformApp)));
     setF((x) => ({ ...x, phoneNumberId: r.settings.phoneNumberId, wabaId: r.settings.wabaId, appId: r.settings.appId, verifyToken: r.settings.verifyToken, token: "", appSecret: "" }));
   }).catch((e) => setMsg({ err: true, text: e.message }));
   useEffect(() => { load(); }, []);
@@ -82,6 +134,23 @@ function Connection({ admin }) {
     } catch (e) { setMsg({ err: true, text: e.message }); }
     setSaving(false);
   };
+  const facebook = async () => {
+    setSaving(true); setMsg({ text: "Sigue los pasos en la ventana de Meta…" });
+    try {
+      const r = await connectWithFacebook(embedded, coex);
+      setMsg({ text: "Conectando tu número…" });
+      const out = await waApi("embedded-signup", { ...r, coexistence: coex });
+      setMsg({ text: `¡Listo! WhatsApp conectado${out.displayPhone ? `: ${out.displayPhone}` : ""}. Ya puedes recibir y enviar mensajes.` });
+      await load();
+    } catch (e) { setMsg({ err: true, text: e.message }); }
+    setSaving(false);
+  };
+  const disconnect = async () => {
+    if (!window.confirm("¿Desconectar WhatsApp? Dejarás de recibir y enviar mensajes desde aquí (los chats se conservan).")) return;
+    setSaving(true); setMsg(null);
+    try { await waApi("disconnect", {}); setMsg({ text: "WhatsApp desconectado." }); await load(); } catch (e) { setMsg({ err: true, text: e.message }); }
+    setSaving(false);
+  };
   const copy = (t) => navigator.clipboard?.writeText(t).then(() => setMsg({ text: "Copiado." })).catch(() => {});
   if (!s) return <p>{msg?.text || "Cargando…"}</p>;
   const connected = s.hasToken && s.phoneNumberId && s.displayPhone;
@@ -90,40 +159,68 @@ function Connection({ admin }) {
       <div className={`wa-status ${connected ? "ok" : ""}`}>
         {connected
           ? <>✅ Conectado: <b>{s.displayPhone}</b> {s.verifiedName && <>({s.verifiedName})</>} {s.quality && <> · calidad {s.quality}</>} {s.messagingLimit && <> · límite {s.messagingLimit.replace("TIER_", "")} conversaciones/día</>}{s.templatesSyncedAt ? <> · plantillas sincronizadas {dateTime(s.templatesSyncedAt)}</> : null}</>
-          : <>⚪ Sin conectar. Sigue los pasos de abajo.</>}
+          : <>⚪ Sin conectar.</>}
       </div>
-      <div className="wa-card">
-        <h3>1 · Datos de la app de Meta</h3>
-        <label>Identificador del número de teléfono (Phone number ID)<input value={f.phoneNumberId} onChange={set("phoneNumberId")} disabled={!admin} placeholder="p. ej. 123456789012345" /></label>
-        <label>Identificador de la cuenta de WhatsApp Business (WABA ID) · necesario para plantillas<input value={f.wabaId} onChange={set("wabaId")} disabled={!admin} placeholder="p. ej. 102938475610293" /></label>
-        <label>Identificador de la app (App ID) · opcional, para plantillas con imagen/vídeo/PDF<input value={f.appId} onChange={set("appId")} disabled={!admin} placeholder="Se averigua solo; escríbelo si falla" /></label>
-        <label>Token de acceso {s.hasToken && <span className="wa-ok">· guardado (déjalo vacío para mantenerlo)</span>}
-          <input type="password" autoComplete="off" value={f.token} onChange={set("token")} disabled={!admin} placeholder={s.hasToken ? "••••••••" : "Token permanente del usuario del sistema"} /></label>
-        <label>Clave secreta de la app (App secret) {s.hasAppSecret && <span className="wa-ok">· guardada</span>}
-          <input type="password" autoComplete="off" value={f.appSecret} onChange={set("appSecret")} disabled={!admin} placeholder={s.hasAppSecret ? "••••••••" : "Configuración de la app › Básica › Clave secreta"} /></label>
-        {admin && <button className="crm-btn" onClick={save} disabled={saving}>{saving ? "Comprobando con Meta…" : "Guardar y probar conexión"}</button>}
-        {msg && <p className={msg.err ? "wa-err" : "wa-ok"} style={{ marginTop: 10 }}>{msg.text}</p>}
-      </div>
-      <div className="wa-card">
-        <h3>2 · Webhook (para recibir los mensajes)</h3>
-        <p className="wa-hint">En Meta for Developers › tu app › WhatsApp › Configuración › Webhook, pega estos dos valores y suscríbete a los campos <b>messages</b> y <b>message_template_status_update</b>.</p>
-        <label>URL de devolución de llamada (Callback URL)
-          <div className="wa-copy"><input readOnly value={s.webhookUrl} /><button className="crm-btn ghost sm" onClick={() => copy(s.webhookUrl)}>Copiar</button></div></label>
-        <label>Token de verificación (Verify token)
-          <div className="wa-copy"><input readOnly={!admin} value={f.verifyToken} onChange={set("verifyToken")} placeholder="Se genera solo al guardar" /><button className="crm-btn ghost sm" onClick={() => copy(f.verifyToken)} disabled={!f.verifyToken}>Copiar</button></div></label>
-        <p className="wa-hint">Guarda primero el paso 1: hasta entonces Meta no podrá verificar el webhook.</p>
-      </div>
-      <div className="wa-card">
-        <h3>Cómo conseguir los datos (una sola vez)</h3>
-        <ol className="wa-steps">
-          <li>Entra en <b>developers.facebook.com</b> con la cuenta de Meta Business de ISLAS SEM › <b>Mis apps › Crear app</b> › tipo <b>Empresa</b> › añade el producto <b>WhatsApp</b>.</li>
-          <li>En <b>WhatsApp › Configuración de la API</b> verás el <b>Phone number ID</b> y el <b>WABA ID</b>. Para probar, Meta da un número de prueba gratis; el número real se añade en esa misma pantalla.</li>
-          <li>Token permanente: en <b>business.facebook.com › Configuración del negocio › Usuarios del sistema</b> crea un usuario (Administrador), asígnale la app y la cuenta de WhatsApp, y genera un token con los permisos <code>whatsapp_business_messaging</code> y <code>whatsapp_business_management</code> (caducidad: nunca).</li>
-          <li>La <b>clave secreta</b> y el <b>App ID</b> están en tu app › <b>Configuración › Básica</b>.</li>
-          <li>Pega todo en el paso 1, guarda, y después configura el webhook (paso 2).</li>
-        </ol>
-        <p className="wa-hint">Un número solo puede estar conectado a un sitio. Mientras el número real siga en ManyContacts, prueba con el número de prueba de Meta. Si el número real pasa aquí con la misma cuenta de WhatsApp Business, sus plantillas aprobadas aparecen solas.</p>
-      </div>
+      {embedded && (
+        <div className="wa-card">
+          <h3>{connected && s.platformApp ? "Tu número de WhatsApp" : "Conectar con Facebook (recomendado)"}</h3>
+          {connected && s.platformApp ? (
+            <>
+              <p className="wa-hint">Conectado con tu cuenta de Meta{s.connectedVia === "embedded-coexistence" ? " (también sigues usándolo en la app WhatsApp Business del móvil)" : ""}. Los mensajes, plantillas y difusiones funcionan con tu propia cuenta de WhatsApp Business.</p>
+              {admin && <button className="crm-btn ghost" onClick={disconnect} disabled={saving}>Desconectar WhatsApp</button>}
+            </>
+          ) : (
+            <>
+              <p className="wa-hint">Pulsa el botón, entra con el Facebook que administra tu empresa, elige (o crea) tu cuenta de WhatsApp Business y tu número, y verifícalo con el código que te llega por SMS o llamada. No tienes que crear apps ni copiar tokens.</p>
+              <label className="wa-check"><input type="checkbox" checked={coex} onChange={(e) => setCoex(e.target.checked)} disabled={!admin} /> Mi número ya está en la app <b>WhatsApp Business</b> del móvil y quiero seguir usándolo allí también</label>
+              {admin
+                ? <button className="crm-btn wa-fb" onClick={facebook} disabled={saving}>{saving ? "Conectando…" : "Conectar con Facebook"}</button>
+                : <p className="wa-hint">Pide a un administrador que conecte el número.</p>}
+              <p className="wa-hint" style={{ marginTop: 8 }}>Requisitos: un número que pueda recibir SMS o llamadas y que no esté conectado a otra plataforma (si lo está, desconéctalo allí primero). Lo que Meta cobra por cada conversación lo paga tu empresa directamente en su cuenta de Meta.</p>
+            </>
+          )}
+        </div>
+      )}
+      {msg && <p className={msg.err ? "wa-err" : "wa-ok"} style={{ margin: "10px 0" }}>{msg.text}</p>}
+      {embedded && !manual && (
+        <p className="wa-hint"><button className="wa-link" onClick={() => setManual(true)}>Conectar con mi propia app de Meta (avanzado)</button></p>
+      )}
+      {manual && (
+        <>
+          <div className="wa-card">
+            <h3>{embedded ? "Avanzado · " : ""}1 · Datos de tu app de Meta</h3>
+            <label>Identificador del número de teléfono (Phone number ID)<input value={f.phoneNumberId} onChange={set("phoneNumberId")} disabled={!admin} placeholder="p. ej. 123456789012345" /></label>
+            <label>Identificador de la cuenta de WhatsApp Business (WABA ID) · necesario para plantillas<input value={f.wabaId} onChange={set("wabaId")} disabled={!admin} placeholder="p. ej. 102938475610293" /></label>
+            <label>Identificador de la app (App ID) · opcional, para plantillas con imagen/vídeo/PDF<input value={f.appId} onChange={set("appId")} disabled={!admin} placeholder="Se averigua solo; escríbelo si falla" /></label>
+            <label>Token de acceso {s.hasToken && !s.platformApp && <span className="wa-ok">· guardado (déjalo vacío para mantenerlo)</span>}
+              <input type="password" autoComplete="off" value={f.token} onChange={set("token")} disabled={!admin} placeholder={s.hasToken && !s.platformApp ? "••••••••" : "Token permanente del usuario del sistema"} /></label>
+            <label>Clave secreta de la app (App secret) {s.hasAppSecret && <span className="wa-ok">· guardada</span>}
+              <input type="password" autoComplete="off" value={f.appSecret} onChange={set("appSecret")} disabled={!admin} placeholder={s.hasAppSecret ? "••••••••" : "Configuración de la app › Básica › Clave secreta"} /></label>
+            {admin && <button className="crm-btn" onClick={save} disabled={saving}>{saving ? "Comprobando con Meta…" : "Guardar y probar conexión"}</button>}
+            {admin && connected && !s.platformApp && <button className="crm-btn ghost" style={{ marginLeft: 8 }} onClick={disconnect} disabled={saving}>Desconectar</button>}
+          </div>
+          <div className="wa-card">
+            <h3>2 · Webhook (para recibir los mensajes)</h3>
+            <p className="wa-hint">En Meta for Developers › tu app › WhatsApp › Configuración › Webhook, pega estos dos valores y suscríbete a los campos <b>messages</b> y <b>message_template_status_update</b>.</p>
+            <label>URL de devolución de llamada (Callback URL)
+              <div className="wa-copy"><input readOnly value={s.webhookUrl} /><button className="crm-btn ghost sm" onClick={() => copy(s.webhookUrl)}>Copiar</button></div></label>
+            <label>Token de verificación (Verify token)
+              <div className="wa-copy"><input readOnly={!admin} value={f.verifyToken} onChange={set("verifyToken")} placeholder="Se genera solo al guardar" /><button className="crm-btn ghost sm" onClick={() => copy(f.verifyToken)} disabled={!f.verifyToken}>Copiar</button></div></label>
+            <p className="wa-hint">Guarda primero el paso 1: hasta entonces Meta no podrá verificar el webhook.</p>
+          </div>
+          <div className="wa-card">
+            <h3>Cómo conseguir los datos (una sola vez)</h3>
+            <ol className="wa-steps">
+              <li>Entra en <b>developers.facebook.com</b> con la cuenta de Meta Business de tu empresa › <b>Mis apps › Crear app</b> › tipo <b>Empresa</b> › añade el producto <b>WhatsApp</b>.</li>
+              <li>En <b>WhatsApp › Configuración de la API</b> verás el <b>Phone number ID</b> y el <b>WABA ID</b>. Para probar, Meta da un número de prueba gratis; el número real se añade en esa misma pantalla.</li>
+              <li>Token permanente: en <b>business.facebook.com › Configuración del negocio › Usuarios del sistema</b> crea un usuario (Administrador), asígnale la app y la cuenta de WhatsApp, y genera un token con los permisos <code>whatsapp_business_messaging</code> y <code>whatsapp_business_management</code> (caducidad: nunca).</li>
+              <li>La <b>clave secreta</b> y el <b>App ID</b> están en tu app › <b>Configuración › Básica</b>.</li>
+              <li>Pega todo en el paso 1, guarda, y después configura el webhook (paso 2).</li>
+            </ol>
+            <p className="wa-hint">Un número solo puede estar conectado a un sitio a la vez. Si tu número está en otra plataforma, prueba primero con el número de prueba de Meta. Si el número pasa aquí con la misma cuenta de WhatsApp Business, sus plantillas aprobadas aparecen solas.</p>
+          </div>
+        </>
+      )}
     </>
   );
 }

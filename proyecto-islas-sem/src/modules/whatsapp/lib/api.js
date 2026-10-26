@@ -1,11 +1,12 @@
-// WhatsApp: la app lee chats, mensajes, configuración, plantillas y difusiones en tiempo real
-// (Firestore) y todo lo que escribe (enviar, asignar, mover, archivar, ajustes…) pasa por el
-// servidor.
+// WhatsApp: la app lee chats, mensajes, configuración, plantillas y difusiones de SU empresa en
+// tiempo real (Firestore, organizations/{orgId}/…) y todo lo que escribe (enviar, asignar, mover,
+// archivar, ajustes…) pasa por el servidor.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, doc, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { auth, db } from "../../../config/firebaseConfig";
 import { useCrmCollection } from "../../crm/lib/crm";
 import { usePerms } from "../../crm/lib/permissions";
+import { useOrg } from "../../crm/lib/useOrg";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "https://email-marketing.islassem.com/api";
 
@@ -77,13 +78,17 @@ export const DEFAULT_CONFIG = {
 
 // Configuración común (embudos, equipos, etiquetas…) en tiempo real.
 export function useWaConfig() {
+  const { orgId } = useOrg();
   const [cfg, setCfg] = useState(null);
-  useEffect(() => onSnapshot(doc(db, "waConfig", "main"), (s) => {
-    const d = s.data() || {};
-    const c = { ...DEFAULT_CONFIG, ...d, autoReply: { ...DEFAULT_CONFIG.autoReply, ...(d.autoReply || {}) }, chatbot: { ...DEFAULT_CONFIG.chatbot, ...(d.chatbot || {}) } };
-    if (!Array.isArray(c.funnels) || !c.funnels.length) c.funnels = DEFAULT_CONFIG.funnels;
-    setCfg(c);
-  }, () => setCfg(DEFAULT_CONFIG)), []);
+  useEffect(() => {
+    if (!orgId) return undefined;
+    return onSnapshot(doc(db, "organizations", orgId, "waConfig", "main"), (s) => {
+      const d = s.data() || {};
+      const c = { ...DEFAULT_CONFIG, ...d, autoReply: { ...DEFAULT_CONFIG.autoReply, ...(d.autoReply || {}) }, chatbot: { ...DEFAULT_CONFIG.chatbot, ...(d.chatbot || {}) } };
+      if (!Array.isArray(c.funnels) || !c.funnels.length) c.funnels = DEFAULT_CONFIG.funnels;
+      setCfg(c);
+    }, () => setCfg(DEFAULT_CONFIG));
+  }, [orgId]);
   return cfg;
 }
 export const saveConfig = (section, value) => waApi("config", { section, value });
@@ -97,10 +102,14 @@ export function stageLabel(cfg, chat) {
 export const tagOf = (cfg, id) => cfg?.tags.find((t) => t.id === id);
 export const newId = () => Math.random().toString(36).slice(2, 10);
 
-// Colección en tiempo real (plantillas, difusiones).
+// Colección de la empresa en tiempo real (plantillas, difusiones).
 export function useWaCollection(name) {
+  const { orgId } = useOrg();
   const [items, setItems] = useState(null);
-  useEffect(() => onSnapshot(collection(db, name), (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setItems([])), [name]);
+  useEffect(() => {
+    if (!orgId) return undefined;
+    return onSnapshot(collection(db, "organizations", orgId, name), (s) => setItems(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setItems([]));
+  }, [name, orgId]);
   return items;
 }
 
@@ -135,13 +144,17 @@ export const EMOJIS = "😀 😂 😊 😍 😘 😉 🙂 🤗 🤔 😅 😢 �
 
 // Todos los chats (los 1000 más recientes) en tiempo real.
 export function useChats() {
+  const { orgId } = useOrg();
   const [chats, setChats] = useState(null);
   const [error, setError] = useState("");
-  useEffect(() => onSnapshot(
-    query(collection(db, "waChats"), orderBy("lastAt", "desc"), limit(1000)),
-    (s) => { setChats(s.docs.map((d) => ({ id: d.id, ...d.data() }))); setError(""); },
-    (e) => { setChats([]); setError(e.code === "permission-denied" ? "No tienes permiso para ver los chats." : e.message); },
-  ), []);
+  useEffect(() => {
+    if (!orgId) return undefined;
+    return onSnapshot(
+      query(collection(db, "organizations", orgId, "waChats"), orderBy("lastAt", "desc"), limit(1000)),
+      (s) => { setChats(s.docs.map((d) => ({ id: d.id, ...d.data() }))); setError(""); },
+      (e) => { setChats([]); setError(e.code === "permission-denied" ? "No tienes permiso para ver los chats." : e.message); },
+    );
+  }, [orgId]);
   return { chats, error };
 }
 

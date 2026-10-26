@@ -29,6 +29,7 @@ const contratos = require("./lib/contracts");
 const whatsapp = require("./lib/whatsapp");
 const waTemplates = require("./lib/waTemplates");
 const waAuto = require("./lib/waAuto");
+const orgMail = require("./lib/orgMail");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -97,8 +98,12 @@ api.post("/google/settings", safe(gcal.settings));
 api.post("/google/disconnect", safe(gcal.disconnect));
 api.post("/google/events", safe(gcal.pushEvent));
 
-// --- Acceso: tras registrarse/entrar, ¿este email puede usar la app? ---
+// --- Acceso: tras registrarse/entrar, ¿este email puede usar la app (y de qué empresa es)? ---
 api.post("/access/check", safe(checkAccess));
+
+// --- Empresa: correo de salida/entrada (Ajustes › Correo) ---
+api.get("/org/mail", safe(orgMail.getMail));
+api.post("/org/mail", safe(orgMail.saveMail));
 
 // --- Talento Digital: altas que llegan del directorio (clave compartida) y su correo ---
 api.post("/talento-digital/empresa", safe(talento.recibirEmpresa));
@@ -132,6 +137,8 @@ api.post("/whatsapp/file-url", whatsapp.fileUrl);
 api.post("/whatsapp/chat", whatsapp.updateChat);
 api.get("/whatsapp/settings", whatsapp.getSettings);
 api.post("/whatsapp/settings", whatsapp.saveSettings);
+api.post("/whatsapp/embedded-signup", whatsapp.embeddedSignup);
+api.post("/whatsapp/disconnect", whatsapp.disconnect);
 api.post("/whatsapp/bulk", whatsapp.bulk);
 api.post("/whatsapp/block", whatsapp.block);
 api.get("/whatsapp/config", whatsapp.getConfig);
@@ -212,7 +219,9 @@ async function runAll() {
   const flow = await runStageFlow().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
   // Un fallo de Google Calendar no debe frenar el resto de tareas del cron.
   const calendar = await gcal.syncCalendar().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
-  return { mail, replies, forms, deleted, automations, sla, flow, calendar };
+  // WhatsApp: mensajes al archivar, plantillas de Meta y difusiones (programadas o en curso).
+  const whatsapp = await waAuto.runCron().catch((e) => ({ error: String(e.message || e).slice(0, 200) }));
+  return { mail, replies, forms, deleted, automations, sla, flow, calendar, whatsapp };
 }
 
 // Endpoint protegido por CRON_SECRET (para el cron de Plesk o un cron externo).

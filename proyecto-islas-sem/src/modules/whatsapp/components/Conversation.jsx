@@ -31,10 +31,10 @@ export default function Conversation({ chat, cfg, onBack, onClose }) {
   const me = (auth.currentUser?.email || "").toLowerCase();
 
   useEffect(() => onSnapshot(
-    query(collection(db, "waChats", chat.id, "messages"), orderBy("at", "desc"), limit(300)),
+    query(collection(db, "organizations", chat.orgId, "waChats", chat.id, "messages"), orderBy("at", "desc"), limit(300)),
     (s) => setMsgs(s.docs.map((d) => ({ id: d.id, ...d.data() })).reverse()),
     () => setMsgs([]),
-  ), [chat.id]);
+  ), [chat.id, chat.orgId]);
   // Al abrirlo (o si llega algo mientras está abierto) se marca como leído.
   useEffect(() => { if (chat.unread) waApi("chat", { chatId: chat.id, read: true }).catch(() => {}); }, [chat.id, chat.unread]);
   useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [msgs?.length]);
@@ -210,7 +210,7 @@ function ChatPanel({ chat, cfg, msgs, update, setError, onClose }) {
   const exportChat = async () => {
     setBusy("export");
     try {
-      const s = await getDocs(query(collection(db, "waChats", chat.id, "messages"), orderBy("at", "asc")));
+      const s = await getDocs(query(collection(db, "organizations", chat.orgId, "waChats", chat.id, "messages"), orderBy("at", "asc")));
       const lines = s.docs.map((d) => d.data()).map((m) => `[${dateTime(m.at)}] ${m.dir === "out" ? (m.byName || "Empresa") : chatName(chat)}: ${m.text || ""}${m.media ? ` <${m.media.filename || m.type}>` : ""}`);
       const blob = new Blob([`Conversación de WhatsApp con ${chatName(chat)} (${chat.phone})\n\n${lines.join("\n")}\n`], { type: "text/plain;charset=utf-8" });
       const a = document.createElement("a");

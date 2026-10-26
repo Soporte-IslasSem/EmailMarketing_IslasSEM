@@ -8,6 +8,7 @@
 //   las listas que no son del CRM.
 const { admin, db } = require("./firebase");
 const { DEFAULT_ORG_ID, norm } = require("./link");
+const { usersOfOrg } = require("./tenant");
 
 const FV = admin.firestore.FieldValue;
 const stateRef = () => db.collection("system").doc("listCleanup");
@@ -26,8 +27,10 @@ async function processDeletedContacts() {
     if ((await db.collection("contacts").doc(r.docId).get()).exists) continue; // restaurado
     const same = await db.collection("contacts").where("orgId", "==", r.orgId || DEFAULT_ORG_ID).where("email", "==", email).limit(1).get();
     if (!same.empty) continue; // otra ficha con el mismo email sigue en el CRM
+    // Solo las listas de los usuarios de la empresa del contacto.
     const subs = await db.collection("subscribers").where("email", "==", email).get();
-    for (const s of subs.docs) {
+    const mine = await usersOfOrg(r.orgId || DEFAULT_ORG_ID);
+    for (const s of subs.docs.filter((x) => mine.has(x.data().userId))) {
       const listRef = db.collection("lists").doc(String(s.data().listId || "x"));
       const list = (await listRef.get()).data();
       if (!list?.crm || list.bajas || list.crmKey === "companies") continue;

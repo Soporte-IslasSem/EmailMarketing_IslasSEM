@@ -73,8 +73,8 @@ function BroadcastDetail({ b, onClose }) {
   const [rows, setRows] = useState(null);
   const [filter, setFilter] = useState("all");
   useEffect(() => {
-    getDocs(query(collection(db, "waBroadcasts", b.id, "recipients"), limit(2000))).then((s) => setRows(s.docs.map((d) => ({ id: d.id, ...d.data() })))).catch(() => setRows([]));
-  }, [b.id]);
+    getDocs(query(collection(db, "organizations", b.orgId, "waBroadcasts", b.id, "recipients"), limit(2000))).then((s) => setRows(s.docs.map((d) => ({ id: d.id, ...d.data() })))).catch(() => setRows([]));
+  }, [b.id, b.orgId]);
   const shown = (rows || []).filter((r) => filter === "all" || r.status === filter);
   const name = (r) => `${r.firstName || ""} ${r.lastName || ""}`.trim() || r.name || "";
   return (
