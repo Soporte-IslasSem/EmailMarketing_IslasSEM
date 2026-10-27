@@ -34,7 +34,7 @@ async function afterInbound({ orgId, chat, isNew, newConversation, msg, cfg }) {
     else {
       if (cfg.routing.enabled && !chat.assigneeEmail) {
         const a = await cfgLib.pickAssignee(orgId, cfg, "");
-        if (a) await ref.update(a);
+        if (a) { await ref.update(a); await wa.logEvent(orgId, waId, `Asignada automáticamente a ${a.assigneeName}`, "assign"); }
       }
       if (isNew && ar.welcome?.enabled && ar.welcome.text && !outOfHours) await wa.sendAutoText(orgId, waId, ar.welcome.text, "Bienvenida automática");
     }
@@ -72,7 +72,11 @@ async function applyOption(orgId, ref, chat, opt, cfg) {
     const a = await cfgLib.pickAssignee(orgId, cfg, "");
     if (a) Object.assign(patch, a);
   }
-  if (Object.keys(patch).length) await ref.update(patch);
+  if (Object.keys(patch).length) {
+    await ref.update(patch);
+    const done = [patch.funnelId && wa.stageText(cfg, patch.funnelId, patch.stageId), patch.assigneeName && `asignada a ${patch.assigneeName}`].filter(Boolean).join(" · ");
+    await wa.logEvent(orgId, chat.id, `Chatbot («${opt.label}»)${done ? `: ${done}` : ""}`, "stage");
+  }
   if (opt.reply) await wa.sendAutoText(orgId, chat.id, opt.reply, "Chatbot");
 }
 

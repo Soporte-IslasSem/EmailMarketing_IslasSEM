@@ -59,6 +59,7 @@ api.post("/whatsapp/send-media", express.json({ limit: "25mb" }), whatsapp.sendM
 api.post("/whatsapp/send-template", express.json({ limit: "25mb" }), waTemplates.sendTemplate);
 api.post("/whatsapp/templates/create", express.json({ limit: "25mb" }), waTemplates.createTemplate);
 api.post("/whatsapp/broadcasts/create", express.json({ limit: "25mb" }), waTemplates.createBroadcast);
+api.post("/whatsapp/profile", express.json({ limit: "8mb" }), whatsapp.saveProfile); // foto de perfil en base64
 api.post("/org/profile", express.json({ limit: "2mb" }), (req, res) => orgs.saveProfile(req, res).catch((e) => {
   console.error("[api] POST /org/profile:", e.message || e);
   if (!res.headersSent) res.status(500).json({ ok: false, error: "Error interno" });
@@ -169,6 +170,8 @@ api.get("/whatsapp/settings", whatsapp.getSettings);
 api.post("/whatsapp/settings", whatsapp.saveSettings);
 api.post("/whatsapp/embedded-signup", whatsapp.embeddedSignup);
 api.post("/whatsapp/disconnect", whatsapp.disconnect);
+api.get("/whatsapp/profile", whatsapp.getProfile);
+api.get("/whatsapp/health", whatsapp.health);
 api.post("/whatsapp/bulk", whatsapp.bulk);
 api.post("/whatsapp/block", whatsapp.block);
 api.get("/whatsapp/config", whatsapp.getConfig);

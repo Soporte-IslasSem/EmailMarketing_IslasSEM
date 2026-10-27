@@ -476,7 +476,7 @@ async function sendBatch(orgId, ref, bc) {
 }
 
 module.exports = {
-  syncTemplates, templateEvent, processBroadcasts, build, varsOf,
+  syncTemplates, templateEvent, processBroadcasts, build, varsOf, uploadHandle,
   sync: wa.route(sync), createTemplate: wa.route(createTemplate), deleteTemplate: wa.route(deleteTemplate),
   sendTemplate: wa.route(sendTemplate), createBroadcast: wa.route(createBroadcast), cancelBroadcast: wa.route(cancelBroadcast),
 };

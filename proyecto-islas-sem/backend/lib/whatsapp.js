@@ -300,8 +300,11 @@ async function inbound(orgId, m, profileName) {
     if (p.type === "text" && /^\s*(baja|stop|unsubscribe)\s*[.!]?\s*$/i.test(p.text)) patch.optOut = true;
     if (p.type === "text" && /^\s*(alta|start)\s*[.!]?\s*$/i.test(p.text)) patch.optOut = false;
     tx.set(chatRef, patch, { merge: true });
-    return { chat: { ...(chat || {}), ...patch, id: waId }, isNew, newConversation: isNew || reentry || reopened };
+    const moved = place && (place.funnelId !== chat?.funnelId || place.stageId !== chat?.stageId);
+    return { chat: { ...(chat || {}), ...patch, id: waId }, isNew, newConversation: isNew || reentry || reopened, placed: moved ? place : null, reopenedOnly: reopened && !moved };
   });
+  if (r.placed) await logEvent(orgId, waId, `Automático: ${stageText(cfg, r.placed.funnelId, r.placed.stageId)}`, "stage");
+  else if (r.reopenedOnly) await logEvent(orgId, waId, "Conversación reabierta: el cliente ha vuelto a escribir", "archive");
   if (p.media) await saveInboundMedia(orgId, msgRef, waId, id, p.media).catch(async (e) => {
     console.error("[whatsapp] archivo:", e.message || e);
     await msgRef.update({ "media.pending": false, "media.error": clip(e.message, 200) }).catch(() => {});
@@ -354,6 +357,27 @@ async function statusUpdate(orgId, st) {
     }
     tx.update(ref, patch);
   });
+}
+
+/* ------------------------------------------------------------------ avisos en la conversación */
+
+// Como ManyContacts: lo que pasa con el chat (archivar, mover de columna, asignar, bloquear…)
+// queda en su historial como un aviso. No cuenta como mensaje nuevo ni cambia el último mensaje.
+async function logEvent(orgId, waId, text, kind = "info") {
+  const at = Date.now();
+  await CHATS(orgId).doc(waId).collection("messages").add({ orgId, chatId: waId, dir: "event", type: "event", kind, text: clip(text, 300), at, createdAt: at })
+    .catch((e) => console.warn("[whatsapp] aviso:", e.message));
+}
+// "Embudo → Columna" de un chat.
+function stageText(cfg, funnelId, stageId) {
+  const f = cfg.funnels.find((x) => x.id === funnelId);
+  const s = f?.stages.find((x) => x.id === stageId);
+  return f && s ? `${f.name} → ${s.name}` : "";
+}
+// Nombre de quien hace el cambio (el de Empleados/Accesos; si no, su email).
+async function actorName(orgId, email) {
+  const p = (await cfgLib.people(orgId)).find((x) => x.email === norm(email));
+  return p?.name || email;
 }
 
 /* ------------------------------------------------------------------ enviar */
@@ -522,6 +546,23 @@ async function updateChat(req, res) {
   patch.updatedAt = Date.now();
   await ref.update(patch);
   res.json({ ok: true });
+  // Avisos en el historial (después de responder: no retrasan la app).
+  const who = await actorName(user.orgId, user.email).catch(() => user.email);
+  const waId = ref.id;
+  if (typeof b.archived === "boolean" && b.archived !== !!chat.archived) await logEvent(user.orgId, waId, `Conversación ${b.archived ? "archivada" : "desarchivada"} por ${who}`, "archive");
+  if ("stage" in b && (patch.funnelId !== chat.funnelId || patch.stageId !== chat.stageId)) {
+    await logEvent(user.orgId, waId, patch.funnelId ? `${who}: ${stageText(cfg, patch.funnelId, patch.stageId)}` : `${who} lo ha sacado de los embudos`, "stage");
+  }
+  if ("assigneeEmail" in b && patch.assigneeEmail !== (chat.assigneeEmail || "")) {
+    await logEvent(user.orgId, waId, patch.assigneeEmail ? `Asignada a ${patch.assigneeName || patch.assigneeEmail} por ${who}` : `${who} ha quitado la asignación`, "assign");
+  }
+  if ("teamId" in b && patch.teamId !== (chat.teamId || "")) {
+    const t = cfg.teams.find((x) => x.id === patch.teamId);
+    await logEvent(user.orgId, waId, t ? `Equipo ${t.name} (por ${who})` : `${who} ha quitado el equipo`, "assign");
+  }
+  if ("contactId" in b && patch.contactId !== (chat.contactId || "")) {
+    await logEvent(user.orgId, waId, patch.contactId ? `Ligado al contacto ${patch.contactName || ""} por ${who}` : `${who} ha desligado el contacto`, "contact");
+  }
 }
 
 // Acciones de columna del embudo: mover o archivar los míos / todos, o vaciar la columna.
@@ -555,6 +596,9 @@ async function bulk(req, res) {
     await batch.commit();
   }
   res.json({ ok: true, count: docs.length });
+  const who = await actorName(user.orgId, user.email).catch(() => user.email);
+  const text = action === "move" ? `${who}: ${stageText(cfg, to.funnelId, to.stageId)}` : action === "archive" ? `Conversación archivada por ${who}` : `${who} lo ha sacado de los embudos`;
+  for (const d of docs) await logEvent(user.orgId, d.id, text, action === "archive" ? "archive" : "stage");
 }
 
 // Bloquear / desbloquear un número (Meta deja de entregarnos sus mensajes).
@@ -569,6 +613,7 @@ async function block(req, res) {
   await graph(user.orgId, `${s.phoneNumberId}/block_users`, { method: blocked ? "POST" : "DELETE", body: { messaging_product: "whatsapp", block_users: [{ user: waId }] } });
   await ref.update({ blocked, updatedAt: Date.now(), ...(blocked ? { archived: true } : {}) });
   res.json({ ok: true });
+  await logEvent(user.orgId, waId, `Número ${blocked ? "bloqueado" : "desbloqueado"} por ${await actorName(user.orgId, user.email).catch(() => user.email)}`, "block");
 }
 
 /* ------------------------------------------------------------------ configuración */
@@ -741,6 +786,79 @@ async function disconnect(req, res) {
   res.json({ ok: true });
 }
 
+/* ------------------------------------------------------------------ perfil y estado del número */
+
+const PROFILE_FIELDS = "about,address,description,email,profile_picture_url,websites,vertical";
+const VERTICALS = ["UNDEFINED", "OTHER", "AUTO", "BEAUTY", "APPAREL", "EDU", "ENTERTAIN", "EVENT_PLAN", "FINANCE", "GROCERY", "GOVT", "HOTEL", "HEALTH", "NONPROFIT", "PROF_SERVICES", "RETAIL", "TRAVEL", "RESTAURANT", "NOT_A_BIZ"];
+
+// GET /whatsapp/profile — el perfil de empresa que ven los clientes en WhatsApp.
+async function getProfile(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  const s = await settings(user.orgId);
+  if (!s.phoneNumberId || !s.token) return fail(res, "Conecta primero el número", 409);
+  const out = await graph(user.orgId, `${s.phoneNumberId}/whatsapp_business_profile?fields=${PROFILE_FIELDS}`);
+  res.json({ ok: true, admin: user.isAdmin, profile: out.data?.[0] || {}, verticals: VERTICALS });
+}
+
+// POST /whatsapp/profile { about, description, address, email, websites[], vertical, photo?: { data, mime } }
+async function saveProfile(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  if (!user.isAdmin) return fail(res, "Solo un administrador puede cambiar el perfil de WhatsApp", 403);
+  const s = await settings(user.orgId);
+  if (!s.phoneNumberId || !s.token) return fail(res, "Conecta primero el número", 409);
+  const b = req.body || {};
+  const email = clip(b.email, 128);
+  if (email && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) return fail(res, "El email no es válido");
+  const websites = (Array.isArray(b.websites) ? b.websites : []).map((w) => clip(w, 256)).filter(Boolean).slice(0, 2);
+  if (websites.some((w) => !/^https?:\/\//i.test(w))) return fail(res, "Las webs tienen que empezar por https://");
+  const body = {
+    messaging_product: "whatsapp", about: clip(b.about, 139), description: clip(b.description, 512), address: clip(b.address, 256),
+    email, websites, ...(VERTICALS.includes(b.vertical) ? { vertical: b.vertical } : {}),
+  };
+  if (b.photo?.data) {
+    const mime = ["image/jpeg", "image/png"].includes(b.photo.mime) ? b.photo.mime : "";
+    if (!mime) return fail(res, "La foto tiene que ser JPG o PNG");
+    const f = fileFromBody({ ...b.photo, mime, name: `perfil.${mime.split("/")[1]}` });
+    if (f.buf.length > 5 * 1024 * 1024) return fail(res, "La foto tiene que pesar menos de 5 MB");
+    body.profile_picture_handle = await require("./waTemplates").uploadHandle(user.orgId, f);
+  }
+  await graph(user.orgId, `${s.phoneNumberId}/whatsapp_business_profile`, { method: "POST", body });
+  res.json({ ok: true });
+}
+
+// GET /whatsapp/health — estado del número y de la cuenta en Meta (como «Comprobar estado de la red»).
+async function health(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  const s = await settings(user.orgId);
+  if (!s.phoneNumberId || !s.token) return fail(res, "Conecta primero el número", 409);
+  const phone = await graph(user.orgId, `${s.phoneNumberId}?fields=display_phone_number,verified_name,status,quality_rating,messaging_limit_tier,name_status,code_verification_status,throughput,health_status`);
+  const waba = s.wabaId ? await graph(user.orgId, `${s.wabaId}?fields=name,account_review_status,business_verification_status,health_status`).catch(() => ({})) : {};
+  // Lo que bloquea enviar, en cristiano (Meta lo devuelve en health_status.entities[].errors).
+  const problems = [];
+  for (const e of [...(phone.health_status?.entities || []), ...(waba.health_status?.entities || [])]) {
+    for (const x of e.errors || []) problems.push(clip(x.error_description || x.possible_solution || x.error_code, 300));
+  }
+  await SETTINGS(user.orgId).set({ quality: clip(phone.quality_rating, 20), messagingLimit: clip(phone.messaging_limit_tier, 30), checkedAt: Date.now() }, { merge: true });
+  resetSettingsCache(user.orgId);
+  res.json({
+    ok: true,
+    phone: {
+      number: phone.display_phone_number || "", name: phone.verified_name || "", status: phone.status || "", quality: phone.quality_rating || "",
+      limit: phone.messaging_limit_tier || "", nameStatus: phone.name_status || "", verification: phone.code_verification_status || "",
+      throughput: phone.throughput?.level || "", canSend: phone.health_status?.can_send_message || "",
+    },
+    account: { name: waba.name || "", review: waba.account_review_status || "", businessVerification: waba.business_verification_status || "", canSend: waba.health_status?.can_send_message || "" },
+    problems: [...new Set(problems)],
+    links: s.wabaId ? {
+      manager: `https://business.facebook.com/wa/manage/home/?waba_id=${s.wabaId}`,
+      payments: `https://business.facebook.com/billing_hub/accounts/details/?asset_id=${s.wabaId}`,
+    } : null,
+  });
+}
+
 // Empresas con WhatsApp conectado (para el cron).
 async function connectedOrgs() {
   const snap = await INDEX().where("kind", "==", "phone").get();
@@ -759,8 +877,9 @@ module.exports = {
   fileUrl: route(fileUrl), updateChat: route(updateChat), bulk: route(bulk), block: route(block),
   getConfig: route(getConfig), saveConfig: route(saveConfig),
   getSettings: route(getSettings), saveSettings: route(saveSettings), embeddedSignup: route(embeddedSignup), disconnect: route(disconnect),
+  getProfile: route(getProfile), saveProfile: route(saveProfile), health: route(health),
   // para waAuto / waTemplates
-  route, staff, settings, graph, deliver, storeOutbound, sendAuto, sendAutoText, openChat, findContact,
+  route, staff, settings, graph, deliver, storeOutbound, logEvent, stageText, sendAuto, sendAutoText, openChat, findContact,
   uploadMedia, fileFromBody, saveCopy, toWaId, clip, digits, fail, httpError, msgDocId, CHATS, SETTINGS, INDEX, WINDOW_MS, KIND_OF, GRAPH, VERSION,
   resetSettingsCache, indexOrg, connectedOrgs,
   // para las pruebas

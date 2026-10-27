@@ -182,6 +182,8 @@ function Connection({ admin }) {
         </div>
       )}
       {msg && <p className={msg.err ? "wa-err" : "wa-ok"} style={{ margin: "10px 0" }}>{msg.text}</p>}
+      {connected && <HealthCard />}
+      {connected && <ProfileCard admin={admin} />}
       {embedded && !manual && (
         <p className="wa-hint"><button className="wa-link" onClick={() => setManual(true)}>Conectar con mi propia app de Meta (avanzado)</button></p>
       )}
@@ -189,13 +191,13 @@ function Connection({ admin }) {
         <>
           <div className="wa-card">
             <h3>{embedded ? "Avanzado · " : ""}1 · Datos de tu app de Meta</h3>
-            <label>Identificador del número de teléfono (Phone number ID)<input value={f.phoneNumberId} onChange={set("phoneNumberId")} disabled={!admin} placeholder="p. ej. 123456789012345" /></label>
-            <label>Identificador de la cuenta de WhatsApp Business (WABA ID) · necesario para plantillas<input value={f.wabaId} onChange={set("wabaId")} disabled={!admin} placeholder="p. ej. 102938475610293" /></label>
-            <label>Identificador de la app (App ID) · opcional, para plantillas con imagen/vídeo/PDF<input value={f.appId} onChange={set("appId")} disabled={!admin} placeholder="Se averigua solo; escríbelo si falla" /></label>
+            <label>Identificador del número de teléfono (Phone number ID)<input name="wa-phone-id" autoComplete="off" value={f.phoneNumberId} onChange={set("phoneNumberId")} disabled={!admin} placeholder="p. ej. 123456789012345" /></label>
+            <label>Identificador de la cuenta de WhatsApp Business (WABA ID) · necesario para plantillas<input name="wa-waba-id" autoComplete="off" value={f.wabaId} onChange={set("wabaId")} disabled={!admin} placeholder="p. ej. 102938475610293" /></label>
+            <label>Identificador de la app (App ID) · opcional, para plantillas con imagen/vídeo/PDF<input name="wa-app-id" autoComplete="off" value={f.appId} onChange={set("appId")} disabled={!admin} placeholder="Se averigua solo; escríbelo si falla" /></label>
             <label>Token de acceso {s.hasToken && !s.platformApp && <span className="wa-ok">· guardado (déjalo vacío para mantenerlo)</span>}
-              <input type="password" autoComplete="off" value={f.token} onChange={set("token")} disabled={!admin} placeholder={s.hasToken && !s.platformApp ? "••••••••" : "Token permanente del usuario del sistema"} /></label>
+              <input type="password" name="wa-token" autoComplete="new-password" data-lpignore="true" value={f.token} onChange={set("token")} disabled={!admin} placeholder={s.hasToken && !s.platformApp ? "••••••••" : "Token permanente del usuario del sistema"} /></label>
             <label>Clave secreta de la app (App secret) {s.hasAppSecret && <span className="wa-ok">· guardada</span>}
-              <input type="password" autoComplete="off" value={f.appSecret} onChange={set("appSecret")} disabled={!admin} placeholder={s.hasAppSecret ? "••••••••" : "Configuración de la app › Básica › Clave secreta"} /></label>
+              <input type="password" name="wa-app-secret" autoComplete="new-password" data-lpignore="true" value={f.appSecret} onChange={set("appSecret")} disabled={!admin} placeholder={s.hasAppSecret ? "••••••••" : "Configuración de la app › Básica › Clave secreta"} /></label>
             {admin && <button className="crm-btn" onClick={save} disabled={saving}>{saving ? "Comprobando con Meta…" : "Guardar y probar conexión"}</button>}
             {admin && connected && !s.platformApp && <button className="crm-btn ghost" style={{ marginLeft: 8 }} onClick={disconnect} disabled={saving}>Desconectar</button>}
           </div>
@@ -222,6 +224,104 @@ function Connection({ admin }) {
         </>
       )}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ estado y perfil del número */
+
+const QUALITY = { GREEN: ["Alta", "ok"], YELLOW: ["Media", "wait"], RED: ["Baja", "bad"] };
+const LIMIT = (t) => ({ TIER_250: "250", TIER_1K: "1.000", TIER_10K: "10.000", TIER_100K: "100.000", TIER_UNLIMITED: "sin límite" }[t] || t || "—");
+
+// «Comprobar estado de la red de WhatsApp»: calidad, límite de envíos, si puede enviar y por qué no.
+function HealthCard() {
+  const [h, setH] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const check = async () => {
+    setBusy(true); setErr("");
+    try { setH(await waApi("health")); } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  const q = QUALITY[h?.phone.quality];
+  return (
+    <div className="wa-card">
+      <h3>Estado del número</h3>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="crm-btn ghost" onClick={check} disabled={busy}>{busy ? "Comprobando…" : "✔ Comprobar estado de la red de WhatsApp"}</button>
+        {h?.links && <a className="crm-btn ghost" href={h.links.payments} target="_blank" rel="noreferrer">💳 Gestionar métodos de pago en Meta</a>}
+        {h?.links && <a className="crm-btn ghost" href={h.links.manager} target="_blank" rel="noreferrer">Abrir WhatsApp Manager</a>}
+      </div>
+      {err && <p className="wa-err">{err}</p>}
+      {h && (
+        <table className="crm-table" style={{ marginTop: 12 }}>
+          <tbody>
+            <tr><td>Número</td><td><b>{h.phone.number}</b> · {h.phone.name}</td></tr>
+            <tr><td>Calidad de la cuenta</td><td><span className={`wa-st-${q?.[1] || ""}`}>{q?.[0] || h.phone.quality || "—"}</span> {h.phone.quality && <small>({h.phone.quality})</small>}</td></tr>
+            <tr><td>Conversaciones nuevas al día</td><td>{LIMIT(h.phone.limit)}</td></tr>
+            <tr><td>¿Puede enviar mensajes?</td><td>{h.phone.canSend === "AVAILABLE" ? "✅ Sí" : h.phone.canSend === "LIMITED" ? "⚠️ Con limitaciones" : h.phone.canSend === "BLOCKED" ? "⛔ No" : h.phone.canSend || "—"}</td></tr>
+            <tr><td>Nombre visible</td><td>{h.phone.nameStatus === "APPROVED" ? "✅ Aprobado" : h.phone.nameStatus || "—"}</td></tr>
+            <tr><td>Verificación de la empresa en Meta</td><td>{h.account.businessVerification === "verified" ? "✅ Verificada" : h.account.businessVerification || "—"}</td></tr>
+            <tr><td>Revisión de la cuenta</td><td>{h.account.review === "APPROVED" ? "✅ Aprobada" : h.account.review || "—"}</td></tr>
+          </tbody>
+        </table>
+      )}
+      {h?.problems.length > 0 && <div className="wa-err" style={{ marginTop: 10 }}><b>Meta avisa de:</b><ul style={{ margin: "6px 0 0 18px" }}>{h.problems.map((p) => <li key={p}>{p}</li>)}</ul></div>}
+    </div>
+  );
+}
+
+const VERTICAL_ES = { UNDEFINED: "Sin definir", OTHER: "Otro", AUTO: "Automoción", BEAUTY: "Belleza y estética", APPAREL: "Ropa y moda", EDU: "Educación", ENTERTAIN: "Ocio", EVENT_PLAN: "Eventos", FINANCE: "Finanzas", GROCERY: "Alimentación", GOVT: "Administración pública", HOTEL: "Hostelería y alojamiento", HEALTH: "Salud", NONPROFIT: "Sin ánimo de lucro", PROF_SERVICES: "Servicios profesionales", RETAIL: "Comercio", TRAVEL: "Viajes", RESTAURANT: "Restauración", NOT_A_BIZ: "No es una empresa" };
+
+// «Cambiar perfil de WhatsApp»: lo que ven los clientes al abrir el perfil de la empresa.
+function ProfileCard({ admin }) {
+  const [p, setP] = useState(null);
+  const [verticals, setVerticals] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => waApi("profile").then((r) => {
+    setVerticals(r.verticals);
+    setP({ about: r.profile.about || "", description: r.profile.description || "", address: r.profile.address || "", email: r.profile.email || "",
+      web1: r.profile.websites?.[0] || "", web2: r.profile.websites?.[1] || "", vertical: r.profile.vertical || "", picture: r.profile.profile_picture_url || "" });
+  }).catch((e) => setMsg({ err: true, text: e.message }));
+  const set = (k) => (e) => setP((x) => ({ ...x, [k]: e.target.value }));
+  const pick = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = () => setPhoto({ data: String(fr.result).split(",")[1], mime: file.type, preview: fr.result });
+    fr.readAsDataURL(file);
+  };
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      await waApi("profile", { about: p.about, description: p.description, address: p.address, email: p.email, websites: [p.web1, p.web2].filter(Boolean), vertical: p.vertical, ...(photo ? { photo: { data: photo.data, mime: photo.mime } } : {}) });
+      setMsg({ text: "Perfil actualizado en WhatsApp." }); setPhoto(null); await load();
+    } catch (e) { setMsg({ err: true, text: e.message }); }
+    setBusy(false);
+  };
+  return (
+    <div className="wa-card">
+      <h3>Perfil de WhatsApp</h3>
+      {!open ? <button className="crm-btn" onClick={() => { setOpen(true); load(); }}>Cambiar perfil de WhatsApp</button> : !p ? <p>{msg?.text || "Cargando…"}</p> : (
+        <>
+          <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 8 }}>
+            {(photo?.preview || p.picture) ? <img src={photo?.preview || p.picture} alt="" style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--crm-line)" }} /> : <span className="wa-avatar lg">?</span>}
+            {admin && <label className="crm-btn ghost sm" style={{ cursor: "pointer" }}>Cambiar foto (JPG/PNG, cuadrada)<input type="file" accept="image/jpeg,image/png" hidden onChange={pick} /></label>}
+          </div>
+          <label>Info (frase corta, máx. 139)<input maxLength={139} value={p.about} onChange={set("about")} disabled={!admin} /></label>
+          <label>Descripción de la empresa (máx. 512)<textarea className="wa-notes" rows={3} maxLength={512} value={p.description} onChange={set("description")} disabled={!admin} /></label>
+          <label>Dirección<input maxLength={256} value={p.address} onChange={set("address")} disabled={!admin} /></label>
+          <label>Email<input type="email" value={p.email} onChange={set("email")} disabled={!admin} /></label>
+          <label>Web 1<input value={p.web1} onChange={set("web1")} placeholder="https://" disabled={!admin} /></label>
+          <label>Web 2<input value={p.web2} onChange={set("web2")} placeholder="https://" disabled={!admin} /></label>
+          <label>Sector<select className="wa-select" value={p.vertical} onChange={set("vertical")} disabled={!admin}><option value="">—</option>{verticals.map((v) => <option key={v} value={v}>{VERTICAL_ES[v] || v}</option>)}</select></label>
+          {admin && <button className="crm-btn" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar perfil"}</button>}
+        </>
+      )}
+      {msg && <p className={msg.err ? "wa-err" : "wa-ok"}>{msg.text}</p>}
+    </div>
   );
 }
 

@@ -206,3 +206,21 @@ export function usePeople() {
     return list.sort((x, y) => x.name.localeCompare(y.name));
   }, [items, org]);
 }
+
+/* ------------------------------------------------------------------ país del número */
+
+// Prefijo internacional → país (código ISO), para la bandera de cada chat. Gana el prefijo más largo.
+const DIAL = {
+  1: "us", 7: "ru", 20: "eg", 27: "za", 30: "gr", 31: "nl", 32: "be", 33: "fr", 34: "es", 36: "hu", 39: "it", 40: "ro", 41: "ch", 43: "at", 44: "gb",
+  45: "dk", 46: "se", 47: "no", 48: "pl", 49: "de", 51: "pe", 52: "mx", 53: "cu", 54: "ar", 55: "br", 56: "cl", 57: "co", 58: "ve", 60: "my",
+  61: "au", 62: "id", 63: "ph", 64: "nz", 65: "sg", 66: "th", 81: "jp", 82: "kr", 84: "vn", 86: "cn", 90: "tr", 91: "in", 92: "pk", 212: "ma",
+  213: "dz", 216: "tn", 221: "sn", 225: "ci", 233: "gh", 234: "ng", 237: "cm", 238: "cv", 240: "gq", 244: "ao", 245: "gw", 254: "ke", 351: "pt",
+  352: "lu", 353: "ie", 354: "is", 356: "mt", 357: "cy", 358: "fi", 359: "bg", 370: "lt", 371: "lv", 372: "ee", 373: "md", 380: "ua", 381: "rs",
+  385: "hr", 386: "si", 387: "ba", 420: "cz", 421: "sk", 502: "gt", 503: "sv", 504: "hn", 505: "ni", 506: "cr", 507: "pa", 509: "ht", 591: "bo",
+  593: "ec", 595: "py", 598: "uy", 971: "ae", 972: "il", 974: "qa", 966: "sa", 1809: "do", 1829: "do", 1849: "do", 1787: "pr",
+};
+export function countryOf(phone) {
+  const d = String(phone || "").replace(/\D/g, "");
+  for (const n of [4, 3, 2, 1]) if (DIAL[d.slice(0, n)]) return DIAL[d.slice(0, n)];
+  return "";
+}

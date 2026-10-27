@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { auth } from "../../../config/firebaseConfig";
 import Conversation, { NewChatModal } from "../components/Conversation";
-import { chatName, initial, shortTime, useWaConfig, saveConfig, stageLabel, tagOf, inWindow, useChats, useUnreadAlert } from "../lib/api";
+import { chatName, initial, shortTime, useWaConfig, saveConfig, stageLabel, tagOf, inWindow, useChats, useUnreadAlert, waApi } from "../lib/api";
+import { WaIcon, Flag } from "../components/WaBits";
 import "../../crm/crm.styles.css";
 import "../whatsapp.css";
 
@@ -95,24 +96,28 @@ export default function WhatsApp() {
 }
 
 export function ChatItem({ c, cfg, on, onClick }) {
+  const star = (e) => { e.stopPropagation(); waApi("chat", { chatId: c.id, starred: !c.starred }).catch(() => {}); };
+  const stage = cfg && stageLabel(cfg, c);
   return (
-    <button className={`wa-item ${on ? "on" : ""}`} onClick={onClick}>
+    <div role="button" tabIndex={0} className={`wa-item ${on ? "on" : ""} ${c.unread ? "unread" : ""}`} onClick={onClick} onKeyDown={(e) => e.key === "Enter" && onClick()}>
       <span className="wa-avatar">{initial(c)}{inWindow(c) && <i className="wa-online" title="Ventana de 24 h abierta" />}</span>
       <span className="wa-item__body">
-        <span className="wa-item__top"><b>{c.starred ? "★ " : ""}{chatName(c)}</b><small className={c.unread ? "new" : ""}>{shortTime(c.lastAt)}</small></span>
-        <span className="wa-item__bottom">
-          <span className="wa-item__text">{c.lastDir === "out" ? "Tú: " : ""}{c.lastText}</span>
+        <span className="wa-item__top"><b>{chatName(c)}</b><small className={c.unread ? "new" : ""}>{shortTime(c.lastAt)}</small></span>
+        <span className="wa-item__agent">
+          {c.assigneeName ? <span className="wa-agent">👤 {c.assigneeName}</span> : <span className="wa-agent free">Sin asignar</span>}
           {c.unread > 0 && <span className="wa-badge">{c.unread}</span>}
         </span>
-        <span className="wa-item__meta">
-          {!c.contactId && <span className="wa-tag">Sin ligar</span>}
-          {c.assigneeName && <span className="wa-tag">👤 {c.assigneeName.split(" ")[0]}</span>}
-          {cfg && stageLabel(cfg, c) && <span className="wa-tag ok">{stageLabel(cfg, c).split(" › ")[1]}</span>}
-          {(c.tags || []).map((id) => { const t = tagOf(cfg, id); return t ? <span key={id} className="wa-tag" style={{ background: t.color, color: "#fff" }}>{t.name}</span> : null; })}
+        <span className="wa-item__text">{c.lastDir === "out" ? "Tú: " : ""}{c.lastText}</span>
+        <span className="wa-item__foot">
+          <Flag phone={c.phone} />
+          <WaIcon />
+          {(c.tags || []).map((id) => { const t = tagOf(cfg, id); return t ? <i key={id} className="wa-dot" style={{ background: t.color }} title={t.name} /> : null; })}
+          {stage && <span className="wa-stage" title={stage}>{stage.split(" › ")[1]}</span>}
           {c.blocked && <span className="wa-tag bad">Bloqueado</span>}
+          <button className={`wa-star ${c.starred ? "on" : ""}`} title={c.starred ? "Quitar de destacados" : "Destacar"} onClick={star}>★</button>
         </span>
       </span>
-    </button>
+    </div>
   );
 }
 

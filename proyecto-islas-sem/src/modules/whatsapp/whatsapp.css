@@ -285,3 +285,49 @@
 .wa-fb { background: #1877f2 !important; border-color: #1877f2 !important; color: #fff !important; }
 .wa-fb:hover { filter: brightness(1.08); }
 .wa-link { border: none; background: none; color: var(--crm-primary, #0e7c7b); cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline; }
+
+/* ---- tarjeta de la lista como ManyContacts ---- */
+.wa-list__items .wa-item { width: auto; box-sizing: border-box; margin: 6px 10px; border: 1px solid var(--crm-line); border-radius: 10px; cursor: pointer; align-items: flex-start; }
+.wa-list__items .wa-item.on { border-color: var(--crm-teal, #1a9190); box-shadow: 0 0 0 1px var(--crm-teal, #1a9190) inset; background: #e6f4f3; }
+.wa-item.unread .wa-item__top b { font-weight: 800; }
+.wa-item__agent { display: flex; align-items: center; gap: 6px; }
+.wa-agent { background: #eef1f4; color: #4a5560; border-radius: 6px; padding: 1px 7px; font-size: 11.5px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-agent.free { background: #fbf3dc; color: #8a6a10; }
+.wa-item__foot { display: flex; align-items: center; gap: 6px; margin-top: 3px; min-height: 18px; }
+.wa-flag { border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.wa-chan { flex: none; vertical-align: -2px; }
+.wa-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.wa-stage { font-size: 11px; color: var(--crm-teal-dark); background: #e6f4f3; border-radius: 6px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+.wa-star { margin-left: auto; border: none; background: none; color: #c9cfd6; font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1; }
+.wa-star.on, .wa-star:hover { color: #E2B83C; }
+
+/* ---- avisos en la conversación (banda azul) ---- */
+.wa-event { align-self: stretch; display: flex; align-items: center; gap: 10px; background: #d7efed; color: #12403e; border-left: 4px solid var(--crm-teal, #1a9190); border-radius: 8px; padding: 10px 14px; margin: 6px 0; font-size: 13.5px; }
+.wa-event__ic { opacity: .75; }
+.wa-event__text { flex: 1; }
+.wa-event small { color: #4c7472; font-size: 11px; align-self: flex-end; }
+
+/* ---- ficha lateral como ManyContacts ---- */
+.wa-field { display: flex; align-items: center; gap: 8px; border: 1px solid var(--crm-line); border-radius: 8px; padding: 0 10px; margin-bottom: 8px; background: #fff; min-height: 40px; }
+.wa-field > span { width: 18px; text-align: center; opacity: .7; flex: none; }
+.wa-field select, .wa-field input, .wa-field textarea { flex: 1; border: none !important; outline: none; background: transparent; font-size: 13.5px; padding: 9px 0; min-width: 0; font-family: inherit; box-shadow: none !important; }
+.wa-field.box { background: #f2f3f5; border-color: transparent; }
+.wa-field.notes { align-items: flex-start; }
+.wa-field.notes > span { padding-top: 10px; }
+.wa-field textarea { resize: vertical; font-style: italic; }
+.wa-field.stacked { flex-direction: column; align-items: stretch; gap: 0; padding-top: 4px; }
+.wa-field.stacked small { font-size: 10.5px; color: var(--crm-muted); }
+.wa-field.stacked input { padding: 2px 0 8px; }
+.wa-box { display: flex; align-items: center; gap: 8px; background: #f2f3f5; border-radius: 8px; padding: 10px; margin: 12px 0 8px; font-size: 14px; }
+.wa-twin { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 8px; }
+.wa-twin button, .wa-wide { border: 1px solid var(--crm-line); background: #fff; border-radius: 8px; padding: 9px; cursor: pointer; font-size: 14px; }
+.wa-twin button.on { background: #e6f4f3; border-color: var(--crm-teal, #1a9190); }
+.wa-twin small { color: var(--crm-muted); }
+.wa-wide { display: block; width: 100%; margin-bottom: 8px; font-weight: 600; color: #2a3a3a; }
+.wa-wide:hover, .wa-twin button:hover { background: #f6f8fa; }
+.wa-wide.danger { color: #b0304c; }
+.wa-panel__links { font-size: 12.5px; margin-top: 6px; text-align: center; }
+.wa-panel__links a { color: var(--crm-teal-dark); }
+.wa-st-ok { color: #1f8a5b; font-weight: 700; }
+.wa-st-wait { color: #8a6a10; font-weight: 700; }
+.wa-st-bad { color: #b0304c; font-weight: 700; }

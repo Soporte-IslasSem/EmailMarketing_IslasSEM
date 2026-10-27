@@ -3,7 +3,11 @@ import { Link } from "react-router-dom";
 import { collection, getDocs, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db, auth } from "../../../config/firebaseConfig";
 import CrmModal from "../../crm/components/CrmModal";
-import { useCrmCollection } from "../../crm/lib/crm";
+import TaskModal from "../../crm/components/TaskModal";
+import { useCrmCollection, crmCreate, crmUpdate } from "../../crm/lib/crm";
+import { useTaskScope, useGoogleStatus } from "../../crm/lib/tasks";
+import { useOrg } from "../../crm/lib/useOrg";
+import { WaIcon, Flag } from "./WaBits";
 import { usePerms } from "../../crm/lib/permissions";
 import { toBase64 } from "../../contracts/lib/api";
 import TemplateFields from "./TemplateFields";
@@ -78,14 +82,16 @@ export default function Conversation({ chat, cfg, onBack, onClose }) {
           {onBack && <button className="wa-back" onClick={onBack} aria-label="Volver">←</button>}
           <span className="wa-avatar">{initial(chat)}</span>
           <div className="wa-conv__who" onClick={() => setPanel((p) => !p)} style={{ cursor: "pointer" }}>
-            <b>{chatName(chat)}</b>
-            <small>{chat.phone}{chat.profileName && chat.profileName !== chatName(chat) ? ` · «${chat.profileName}»` : ""}</small>
+            <b><WaIcon size={13} /> {chatName(chat)}</b>
+            <small title={`${chat.phone}${chat.profileName && chat.profileName !== chatName(chat) ? ` · «${chat.profileName}»` : ""}`}>👤 {chat.assigneeName || "Sin asignar"}</small>
           </div>
           <div className="wa-conv__tools">
             <span className={`wa-window ${open ? "on" : ""}`} title="WhatsApp permite escribir libremente hasta 24 h después del último mensaje del cliente">
               {open ? `🟢 Ventana abierta · ${windowLeft(chat)}` : "⚪ Ventana cerrada"}
             </span>
+            <button className="wa-icon" title={chat.unread ? "Marcar como leído" : "Marcar como no leído"} onClick={() => update(chat.unread ? { read: true } : { unread: true })}>{chat.unread ? "●" : "○"}</button>
             <button className="wa-icon" title={chat.starred ? "Quitar destacado" : "Destacar"} onClick={() => update({ starred: !chat.starred })}>{chat.starred ? "★" : "☆"}</button>
+            {chat.assigneeEmail !== me && <button className="wa-icon" title="Asignármelo" onClick={() => update({ assigneeEmail: me, assigneeName: auth.currentUser?.displayName || me })}>🙋</button>}
             <button className="wa-icon" title={chat.archived ? "Desarchivar" : "Archivar"} onClick={() => update({ archived: !chat.archived })}>{chat.archived ? "📤" : "🗄️"}</button>
             <button className={`wa-icon ${panel ? "on" : ""}`} title="Ficha del chat" onClick={() => setPanel((p) => !p)}>ⓘ</button>
             {onClose && <button className="wa-icon" title="Cerrar" onClick={onClose}>✕</button>}
@@ -96,6 +102,7 @@ export default function Conversation({ chat, cfg, onBack, onClose }) {
           {msgs === null ? <p className="wa-empty">Cargando…</p> : !msgs.length ? <p className="wa-empty">Sin mensajes todavía.</p> : msgs.map((m) => {
             const day = dayLabel(m.at);
             const sep = day !== lastDay ? <div className="wa-day" key={`d${m.id}`}>{(lastDay = day)}</div> : null;
+            if (m.dir === "event") return [sep, <EventLine key={m.id} m={m} />];
             return [sep, <Bubble key={m.id} m={m} chatId={chat.id} quoted={m.replyTo ? byId[m.replyTo] : null} onReply={open && m.wamid && !String(m.wamid).startsWith("local-") ? () => { setReplyTo(m); box.current?.focus(); } : null} />];
           })}
           <div ref={bottom} />
@@ -155,6 +162,18 @@ export default function Conversation({ chat, cfg, onBack, onClose }) {
   );
 }
 
+// Aviso en el historial (archivada, movida de columna, asignada…), como la banda azul de ManyContacts.
+const EVENT_ICON = { archive: "🗄️", stage: "▥", assign: "👤", contact: "🔗", block: "🚫", info: "ℹ️" };
+function EventLine({ m }) {
+  return (
+    <div className={`wa-event ${m.kind || "info"}`}>
+      <span className="wa-event__ic">{EVENT_ICON[m.kind] || EVENT_ICON.info}</span>
+      <span className="wa-event__text">{m.text}</span>
+      <small>{hourLabel(m.at)}</small>
+    </div>
+  );
+}
+
 function Bubble({ m, chatId, quoted, onReply }) {
   const tpl = m.type === "template";
   return (
@@ -199,19 +218,83 @@ function Media({ m, chatId }) {
 function ChatPanel({ chat, cfg, msgs, update, setError, onClose }) {
   const perms = usePerms();
   const people = usePeople();
+  const { orgId } = useOrg();
   const { items: contacts } = useCrmCollection("contacts");
-  const [notes, setNotes] = useState(chat.notes || "");
+  const { items: companies } = useCrmCollection("companies");
+  const scope = useTaskScope();
+  const [google] = useGoogleStatus();
   const [linking, setLinking] = useState(false);
+  const [task, setTask] = useState(false);
+  const [showFiles, setShowFiles] = useState(false);
   const [busy, setBusy] = useState("");
-  const contact = contacts.find((c) => c.id === chat.contactId);
+  const contact = contacts.find((c) => c.id === chat.contactId) || null;
+  const company = contact?.companyId ? companies.find((c) => c.id === contact.companyId) : null;
   const files = msgs.filter((m) => m.media?.path).reverse();
   const stageRef = chat.funnelId && chat.stageId ? `${chat.funnelId}:${chat.stageId}` : "";
+  // Campos del contacto editables aquí mismo (como ManyContacts); se guardan al salir del campo.
+  const [f, setF] = useState(() => ({ name: "", email: "", notes: "", cif: "" }));
+  const [loadedFor, setLoadedFor] = useState("");
+  const key = `${contact?.id || "none"}|${company?.id || ""}`;
+  if (loadedFor !== key && (contact || !chat.contactId)) {
+    setLoadedFor(key);
+    setF({
+      name: contact ? `${contact.firstName || ""} ${contact.lastName || ""}`.trim() : chat.profileName || "",
+      email: contact?.email || "", notes: contact?.notes || chat.notes || "", cif: company ? company.cif || "" : contact?.dni || "",
+    });
+  }
+  const nextClientId = () => {
+    let max = 0;
+    contacts.forEach((c) => { const m = /^CLI-(\d+)$/.exec(c.clientId || ""); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+    return "CLI-" + String(max + 1).padStart(4, "0");
+  };
+  // Si el chat aún no es un contacto del CRM, se crea al rellenar el primer dato.
+  const ensureContact = async () => {
+    if (contact) return contact.id;
+    if (chat.contactId) return chat.contactId;
+    const [firstName, ...rest] = (f.name || chat.profileName || "").trim().split(/\s+/);
+    const ref = await crmCreate("contacts", orgId, {
+      firstName: firstName || "", lastName: rest.join(" "), phone: chat.phone, whatsapp: chat.phone, email: "",
+      clientId: nextClientId(), source: "WhatsApp", relation: "nuevo", stage: "Lead", notes: "", custom: {},
+    });
+    await update({ contactId: ref.id });
+    return ref.id;
+  };
+  const saveField = async (field) => {
+    try {
+      if (field === "name") {
+        if (!f.name.trim() && !contact) return;
+        const [firstName, ...rest] = f.name.trim().split(/\s+/);
+        const id = await ensureContact();
+        await crmUpdate("contacts", id, { firstName: firstName || "", lastName: rest.join(" ") });
+        await update({ contactId: id }); // refresca el nombre del chat
+      } else if (field === "email") {
+        const email = f.email.trim().toLowerCase();
+        if (email && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) return setError("El email no es válido");
+        if (!email && !contact) return;
+        await crmUpdate("contacts", await ensureContact(), { email });
+      } else if (field === "notes") {
+        if (!f.notes.trim() && !contact) return;
+        await crmUpdate("contacts", await ensureContact(), { notes: f.notes });
+      } else if (field === "cif") {
+        if (company) await crmUpdate("companies", company.id, { cif: f.cif.trim().toUpperCase() });
+        else if (f.cif.trim() || contact) await crmUpdate("contacts", await ensureContact(), { dni: f.cif.trim().toUpperCase() });
+      }
+    } catch (e) { setError("No se pudo guardar: " + e.message); }
+  };
+  const setCompany = async (id) => {
+    try {
+      const co = companies.find((c) => c.id === id);
+      await crmUpdate("contacts", await ensureContact(), { companyId: id || "", company: co?.name || "" });
+    } catch (e) { setError("No se pudo guardar: " + e.message); }
+  };
+  const blur = (field, cur) => () => cur !== undefined && saveField(field);
 
   const exportChat = async () => {
     setBusy("export");
     try {
       const s = await getDocs(query(collection(db, "organizations", chat.orgId, "waChats", chat.id, "messages"), orderBy("at", "asc")));
-      const lines = s.docs.map((d) => d.data()).map((m) => `[${dateTime(m.at)}] ${m.dir === "out" ? (m.byName || "Empresa") : chatName(chat)}: ${m.text || ""}${m.media ? ` <${m.media.filename || m.type}>` : ""}`);
+      const lines = s.docs.map((d) => d.data()).map((m) => (m.dir === "event" ? `[${dateTime(m.at)}] — ${m.text} —`
+        : `[${dateTime(m.at)}] ${m.dir === "out" ? (m.byName || "Empresa") : chatName(chat)}: ${m.text || ""}${m.media ? ` <${m.media.filename || m.type}>` : ""}`));
       const blob = new Blob([`Conversación de WhatsApp con ${chatName(chat)} (${chat.phone})\n\n${lines.join("\n")}\n`], { type: "text/plain;charset=utf-8" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -228,84 +311,86 @@ function ChatPanel({ chat, cfg, msgs, update, setError, onClose }) {
     setBusy("");
   };
   const fileUrl = (m) => waApi("file-url", { chatId: chat.id, id: m.id }).then((r) => window.open(r.url, "_blank", "noopener")).catch((e) => setError(e.message));
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
 
   return (
     <aside className="wa-panel">
-      <div className="wa-panel__head"><b>Ficha del chat</b><button className="wa-icon" onClick={onClose} title="Cerrar ficha">✕</button></div>
+      <div className="wa-panel__head"><b>Ficha del contacto</b><button className="wa-icon" onClick={onClose} title="Cerrar ficha">✕</button></div>
       <div className="wa-panel__body">
-        <div className="wa-panel__id">
-          <span className="wa-avatar lg">{initial(chat)}</span>
-          <b>{chatName(chat)}</b>
-          <small>{chat.phone}</small>
-          {chat.optOut && <span className="wa-tag bad">Pidió la BAJA de difusiones</span>}
-        </div>
-
-        <h4>Contacto del CRM</h4>
-        {chat.contactId ? (
-          <div className="wa-panel__contact">
-            <Link to={`/dashboard/crm/contacts/${chat.contactId}`}>👤 {chat.contactName || "Ver ficha"}</Link>
-            {contact && <small>{[contact.email, contact.company, contact.clientId].filter(Boolean).join(" · ")}</small>}
-            <button className="wa-link-btn" onClick={() => update({ contactId: "" })}>Desligar</button>
-          </div>
-        ) : <button className="crm-btn sm" onClick={() => setLinking(true)}>Ligar a un contacto</button>}
-
-        <h4>Agente</h4>
-        <select className="wa-select" value={chat.assigneeEmail || ""} onChange={(e) => {
-          const p = people.find((x) => x.email === e.target.value);
-          update({ assigneeEmail: p?.email || "", assigneeName: p?.name || "" });
-        }}>
-          <option value="">Sin asignar</option>
-          {people.map((p) => <option key={p.email} value={p.email}>{p.name}{cfg?.away?.[p.email] ? " (ausente)" : ""}</option>)}
-        </select>
-
-        {cfg?.teams.length > 0 && <>
-          <h4>Equipo</h4>
-          <select className="wa-select" value={chat.teamId || ""} onChange={(e) => update({ teamId: e.target.value })}>
-            <option value="">Sin equipo</option>
-            {cfg.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        <label className="wa-field"><span>🏢</span>
+          <select value={contact?.companyId || ""} onChange={(e) => setCompany(e.target.value)} title="Empresa del contacto">
+            <option value="">Empresa del contacto</option>
+            {companies.slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-        </>}
+        </label>
+        <label className="wa-field"><span>👤</span>
+          <select value={chat.assigneeEmail || ""} title="Agente" onChange={(e) => {
+            const p = people.find((x) => x.email === e.target.value);
+            update({ assigneeEmail: p?.email || "", assigneeName: p?.name || "" });
+          }}>
+            <option value="">Sin asignar</option>
+            {people.map((p) => <option key={p.email} value={p.email}>{p.name}{cfg?.away?.[p.email] ? " (ausente)" : ""}</option>)}
+          </select>
+        </label>
+        <label className="wa-field"><span>👥</span>
+          <select value={chat.teamId || ""} title="Equipo" onChange={(e) => update({ teamId: e.target.value })}>
+            <option value="">Selecciona un equipo</option>
+            {(cfg?.teams || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </label>
+        <label className="wa-field"><span>▥</span>
+          <select value={stageRef} title="Embudo y columna" onChange={(e) => update({ stage: e.target.value })}>
+            <option value="">Fuera de los embudos</option>
+            {cfg?.funnels.map((fu) => (
+              <optgroup key={fu.id} label={fu.name}>
+                {fu.stages.map((s) => <option key={s.id} value={`${fu.id}:${s.id}`}>{s.name}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <label className="wa-field"><span>🏷</span>
+          <select value="" title="Añade una etiqueta" onChange={(e) => e.target.value && update({ tags: [...(chat.tags || []), e.target.value] })}>
+            <option value="">{cfg?.tags.length ? "Añade una etiqueta" : "Sin etiquetas creadas"}</option>
+            {(cfg?.tags || []).filter((t) => !(chat.tags || []).includes(t.id)).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </label>
+        {(chat.tags || []).length > 0 && (
+          <div className="wa-chips" style={{ margin: "-2px 0 8px" }}>
+            {chat.tags.map((id) => { const t = cfg?.tags.find((x) => x.id === id); return t ? <button key={id} className="wa-chip on" style={{ background: t.color, borderColor: t.color }} title="Quitar" onClick={() => update({ tags: chat.tags.filter((x) => x !== id) })}>{t.name} ✕</button> : null; })}
+          </div>
+        )}
+        {!cfg?.tags.length && perms.isAdmin && <small className="wa-hint" style={{ display: "block", margin: "-4px 0 8px" }}><Link to="/dashboard/whatsapp/ajustes?tab=tags">Crear etiquetas</Link></small>}
 
-        <h4>Embudo</h4>
-        <select className="wa-select" value={stageRef} onChange={(e) => update({ stage: e.target.value })}>
-          <option value="">Fuera de los embudos</option>
-          {cfg?.funnels.map((f) => (
-            <optgroup key={f.id} label={f.name}>
-              {f.stages.map((s) => <option key={s.id} value={`${f.id}:${s.id}`}>{s.name}</option>)}
-            </optgroup>
-          ))}
-        </select>
+        <div className="wa-box"><WaIcon size={16} /> <Flag phone={chat.phone} /> <span>{chat.phone}</span></div>
+        <label className="wa-field box"><span>👤</span><input value={f.name} onChange={set("name")} onBlur={blur("name", f.name)} placeholder="Nombre del contacto" /></label>
+        <label className="wa-field box"><span>✉️</span><input value={f.email} onChange={set("email")} onBlur={blur("email", f.email)} placeholder="Email de contacto" type="email" /></label>
+        <label className="wa-field box notes"><span>📝</span><textarea rows={3} value={f.notes} onChange={set("notes")} onBlur={blur("notes", f.notes)} placeholder="Notas del contacto…" /></label>
+        <label className="wa-field box stacked"><small>{company ? `CIF de ${company.name}` : "CIF / DNI"}</small><input value={f.cif} onChange={set("cif")} onBlur={blur("cif", f.cif)} placeholder="Escribe CIF…" /></label>
+        {chat.optOut && <p className="wa-tag bad" style={{ display: "inline-block" }}>Pidió la BAJA de difusiones</p>}
 
-        <h4>Etiquetas</h4>
-        <div className="wa-chips">
-          {(cfg?.tags || []).map((t) => {
-            const on = (chat.tags || []).includes(t.id);
-            return <button key={t.id} className={`wa-chip ${on ? "on" : ""}`} style={on ? { background: t.color, borderColor: t.color } : { borderColor: t.color, color: t.color }}
-              onClick={() => update({ tags: on ? chat.tags.filter((x) => x !== t.id) : [...(chat.tags || []), t.id] })}>{t.name}</button>;
-          })}
-          {!cfg?.tags.length && <small className="wa-hint">Sin etiquetas. {perms.isAdmin && <Link to="/dashboard/whatsapp/ajustes?tab=tags">Crear</Link>}</small>}
+        <div className="wa-twin">
+          <button className={showFiles ? "on" : ""} title={`Archivos de la conversación (${files.length})`} onClick={() => setShowFiles((v) => !v)}>📎 <small>{files.length}</small></button>
+          <button title="Nueva tarea o cita con este contacto" onClick={async () => { try { setTask(await ensureContact()); } catch (e) { setError(e.message); } }}>📅</button>
         </div>
-
-        <h4>Notas internas</h4>
-        <textarea className="wa-notes" rows={4} value={notes} placeholder="Solo las ve el equipo…" onChange={(e) => setNotes(e.target.value)}
-          onBlur={() => notes !== (chat.notes || "") && update({ notes })} />
-
-        <h4>Archivos ({files.length})</h4>
-        <div className="wa-files">
-          {files.length ? files.slice(0, 30).map((m) => (
-            <button key={m.id} onClick={() => fileUrl(m)}>{m.type === "image" ? "📷" : m.type === "audio" ? "🎤" : m.type === "video" ? "🎬" : "📄"} {m.media.filename || dateTime(m.at)}</button>
-          )) : <small className="wa-hint">Ninguno.</small>}
+        {showFiles && (
+          <div className="wa-files">
+            {files.length ? files.slice(0, 50).map((m) => (
+              <button key={m.id} onClick={() => fileUrl(m)}>{m.type === "image" ? "📷" : m.type === "audio" ? "🎤" : m.type === "video" ? "🎬" : "📄"} {m.media.filename || dateTime(m.at)}</button>
+            )) : <small className="wa-hint">Ningún archivo en esta conversación.</small>}
+          </div>
+        )}
+        <button className="wa-wide" onClick={exportChat} disabled={busy === "export"}>{busy === "export" ? "Exportando…" : "⬆ Exportar conversación"}</button>
+        <button className={`wa-wide ${chat.blocked ? "" : "danger"}`} onClick={toggleBlock} disabled={busy === "block"}>{chat.blocked ? "Desbloquear" : "✋ Bloquear"}</button>
+        <div className="wa-panel__links">
+          {chat.contactId
+            ? <><Link to={`/dashboard/crm/contacts/${chat.contactId}`}>Abrir ficha completa en el CRM</Link> · <button className="wa-link-btn" onClick={() => update({ contactId: "" })}>Desligar</button></>
+            : <button className="wa-link-btn" onClick={() => setLinking(true)}>Ligar a un contacto que ya existe</button>}
         </div>
-
-        <h4>Acciones</h4>
-        <div className="wa-panel__actions">
-          <button className="crm-btn ghost sm" onClick={() => update({ unread: true })}>Marcar como no leído</button>
-          <button className="crm-btn ghost sm" onClick={exportChat} disabled={busy === "export"}>{busy === "export" ? "Exportando…" : "⬇ Exportar conversación"}</button>
-          <button className={`crm-btn sm ${chat.blocked ? "ghost" : "danger"}`} onClick={toggleBlock} disabled={busy === "block"}>{chat.blocked ? "Desbloquear número" : "🚫 Bloquear número"}</button>
-        </div>
-        <p className="wa-hint" style={{ marginTop: 10 }}>Chat creado: {dateTime(chat.createdAt)}{chat.stageAt ? <><br />En esta columna desde: {dateTime(chat.stageAt)}</> : null}</p>
+        <p className="wa-hint" style={{ marginTop: 8 }}>Chat creado: {dateTime(chat.createdAt)}{chat.stageAt ? <><br />En esta columna desde: {dateTime(chat.stageAt)}</> : null}</p>
       </div>
       {linking && <LinkContact chat={chat} onClose={() => setLinking(false)} onPick={(id) => { setLinking(false); update({ contactId: id }); }} />}
+      {task && <TaskModal orgId={orgId} task={null} scope={scope} google={google} onClose={() => setTask(false)}
+        preset={{ type: "Tarea", title: `WhatsApp: ${chatName(chat)}`, entity: "contact", entityId: task, contactId: task, link: `Contacto «${chatName(chat)}»` }} />}
     </aside>
   );
 }
