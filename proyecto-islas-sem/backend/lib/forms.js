@@ -21,7 +21,7 @@
 //    rellena queda como contacto con ese tipo: si era prospecto se convierte en contacto.
 //    Se lee la versión del formulario al procesar el envío: lo que se cambie en el CRM vale ya.
 const { db } = require("./firebase");
-const { DEFAULT_ORG_ID, norm, resolvePerson, addActivity } = require("./link");
+const { DEFAULT_ORG_ID, norm, findByEmail, resolvePerson, addActivity } = require("./link");
 const { addSubscriber } = require("./subscriptions");
 const { orgOfUser, getOrg, isActive, brandOf } = require("./tenant");
 const { getStages, flattenStages } = require("./stages");
@@ -371,6 +371,28 @@ async function fillEmptyFields(col, id, person) {
   if (Object.keys(patch).length) await ref.update({ ...patch, updatedAt: new Date() });
 }
 
+// Todo envío sale en Prospectos, también el de alguien que ya es contacto: se le crea (una vez)
+// un prospecto "Convertido" ligado a su ficha, o se reaviva el que ya tenía. Devuelve su id.
+async function leadForContact(orgId, contactId, person, label) {
+  const c = (await db.collection("contacts").doc(contactId).get()).data() || {};
+  const email = norm(person.email || c.email);
+  const byContact = await db.collection("leads").where("orgId", "==", orgId).where("convertedContactId", "==", contactId).limit(1).get();
+  const id = byContact.docs[0]?.id || (await findByEmail("leads", orgId, email))?.id || "";
+  const now = new Date();
+  if (id) {
+    await db.collection("leads").doc(id).update({ lastFormAt: now, lastFormName: label, updatedAt: now });
+    return id;
+  }
+  const ref = await db.collection("leads").add({
+    orgId, firstName: c.firstName || person.firstName || "", lastName: c.lastName || person.lastName || "", email,
+    phone: c.phone || person.phone || "", whatsapp: c.whatsapp || "", company: c.company || person.company || "",
+    source: "Formulario web", status: "Convertido", convertedContactId: contactId, responsable: c.responsable || "",
+    estimatedValue: 0, notes: `Ya es contacto${c.clientId ? ` (${c.clientId})` : ""}. Rellenó el formulario "${label}".`,
+    lastFormAt: now, lastFormName: label, createdAt: now, updatedAt: now, auto: true,
+  });
+  return ref.id;
+}
+
 async function processFormSubmissions() {
   const snap = await db.collection("formSubmissions").where("status", "==", "recibido").limit(50).get();
   let linked = 0;
@@ -421,10 +443,11 @@ async function processFormSubmissions() {
       await markRgpdSigned(orgId, s.data, contactId, doc.id).catch((e) => console.warn("[forms] rgpd:", e.message));
     }
     const subscribed = s.listId ? await subscribeToList(s.listId, person.email, [person.firstName, person.lastName].filter(Boolean).join(" "), s.formType, orgId).catch((e) => { console.warn("[forms] lista:", e.message); return false; }) : false;
-    await doc.ref.update({ contactId, leadId, dealId, status: "vinculado", linkedAt: new Date(), ...(subscribed ? { subscribedToList: subscribed } : {}) });
+    const shownLead = leadId || (contactId ? await leadForContact(orgId, contactId, person, label).catch((e) => { console.warn("[forms] prospecto:", e.message); return ""; }) : "");
+    await doc.ref.update({ contactId, leadId: shownLead, dealId, status: "vinculado", linkedAt: new Date(), ...(subscribed ? { subscribedToList: subscribed } : {}) });
     linked++;
   }
   return { linked };
 }
 
-module.exports = { ensureDeal, submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };
+module.exports = { leadForContact, ensureDeal, submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };

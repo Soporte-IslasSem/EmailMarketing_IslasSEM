@@ -70,7 +70,9 @@ export default function Leads() {
 
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
-    const rows = [...items].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    // Lo último que pasó arriba: el alta o el último formulario que rellenó.
+    const at = (l) => Math.max(l.createdAt?.seconds || 0, l.lastFormAt?.seconds || 0);
+    const rows = [...items].sort((a, b) => at(b) - at(a));
     if (!t) return rows;
     return rows.filter((l) =>
       [l.firstName, l.lastName, l.email, l.company, l.source, l.status, l.responsable]
@@ -237,10 +239,11 @@ export default function Leads() {
                     <td>{l.whatsapp || l.phone || "—"}</td>
                     <td><SourceChip source={l.source} /></td>
                     <td>{l.responsable || "—"}</td>
-                    <td>{fmtDate(l.createdAt)}</td>
+                    <td>{fmtDate(l.lastFormAt || l.createdAt)}{l.lastFormName && <div style={{ fontSize: 11.5, color: "var(--crm-muted)" }}>📋 {l.lastFormName}</div>}</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <button className="crm-btn ghost sm" onClick={() => setHistoryLead(l)} title="Correos, formularios y actividad">📜</button>{" "}
-                      {l.status !== "Convertido" && <button className="crm-btn sm" onClick={() => setConvertLead(l)}>Convertir</button>}{" "}
+                      {l.status !== "Convertido" && <button className="crm-btn sm" onClick={() => setConvertLead(l)}>Convertir</button>}
+                      {l.status === "Convertido" && l.convertedContactId && <button className="crm-btn ghost sm" onClick={() => navigate(`/dashboard/crm/contacts/${l.convertedContactId}`)}>Ver contacto</button>}{" "}
                       {perms.can("leads", "delete", l) && <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar prospecto?") && crmRemove("leads", l.id)}>✕</button>}
                     </td>
                   </tr>

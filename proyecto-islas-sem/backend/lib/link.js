@@ -36,4 +36,4 @@ async function addActivity(orgId, data) {
   });
 }
 
-module.exports = { DEFAULT_ORG_ID, norm, resolvePerson, addActivity };
+module.exports = { DEFAULT_ORG_ID, norm, findByEmail, resolvePerson, addActivity };
