@@ -9,7 +9,7 @@ import SignaturePad from "../components/SignaturePad";
 import SendContractModal from "../components/SendContractModal";
 import { useCrmCollection } from "../../crm/lib/crm";
 import { usePerms } from "../../crm/lib/permissions";
-import { contractsApi, toBase64, STATUS, fmtDate, openContractFile } from "../lib/api";
+import { contractsApi, toBase64, STATUS, statusOf, fmtDate, fmtDay, openContractFile, darDeBaja } from "../lib/api";
 import { blocksFromDocx, holesOf, holeCounts, guessSource } from "../lib/docx";
 import "../../crm/crm.styles.css";
 import "../components/contracts.css";
@@ -48,7 +48,8 @@ function AllContracts() {
   const [sendTo, setSendTo] = useState(null); // { contactId, dealId }
   const load = useCallback(() => contractsApi("list").then((r) => setItems(r.contracts)).catch((e) => { setItems([]); setError(e.message); }), []);
   useEffect(() => { load(); }, [load]);
-  const rows = useMemo(() => (items || []).filter((c) => (!status || c.status === status)
+  // Sin filtro: todos menos los dados de baja (esos se ven eligiendo "De baja").
+  const rows = useMemo(() => (items || []).filter((c) => (status ? statusOf(c) === status : !c.baja)
     && (!term || [c.title, c.clientName, c.clientEmail, c.code].join(" ").toLowerCase().includes(term.toLowerCase()))), [items, status, term]);
   return (
     <>
@@ -64,9 +65,9 @@ function AllContracts() {
       {sendTo && <SendContractModal contactId={sendTo.contactId} dealId={sendTo.dealId} onClose={() => setSendTo(null)} onSent={load} />}
       {error && <div className="cf-err">{error}</div>}
       <table className="crm-table">
-        <thead><tr><th>Documento</th><th>Cliente</th><th>Estado</th><th>Enviado</th><th>Firmado</th><th>ID</th></tr></thead>
+        <thead><tr><th>Documento</th><th>Cliente</th><th>Estado</th><th>Enviado</th><th>Recibido</th><th>Firmado</th><th>ID</th><th></th></tr></thead>
         <tbody>
-          {items === null ? <tr><td colSpan="6" className="crm-empty">Cargando…</td></tr> : rows.length ? rows.map((c) => (
+          {items === null ? <tr><td colSpan="8" className="crm-empty">Cargando…</td></tr> : rows.length ? rows.map((c) => (
             <tr key={c.id}>
               <td>
                 <div style={{ fontWeight: 600 }}>{c.title}</div>
@@ -76,12 +77,23 @@ function AllContracts() {
                 {c.contactId ? <span className="crm-link" onClick={() => navigate(`/dashboard/crm/contacts/${c.contactId}`)}>{c.clientName || c.clientEmail}</span> : c.clientName || c.clientEmail}
                 <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{c.clientEmail}</div>
               </td>
-              <td><span className={`crm-chip ${STATUS[c.status]?.cls || ""}`}>{STATUS[c.status]?.label || c.status}</span></td>
+              <td>
+                <span className={`crm-chip ${STATUS[statusOf(c)]?.cls || ""}`}>{STATUS[statusOf(c)]?.label || c.status}</span>
+                {c.baja && (
+                  <div style={{ fontSize: 12, color: "var(--crm-muted)", marginTop: 3, maxWidth: 230 }}>
+                    {fmtDate(c.baja.at)} · {c.baja.by}<br />Motivo: {c.baja.reason}<br />Estaba: {STATUS[c.status]?.label || c.status}<br />Se conserva hasta {fmtDay(c.baja.retainUntil)}
+                  </div>
+                )}
+              </td>
               <td style={{ whiteSpace: "nowrap" }}>{fmtDate(c.createdAt)}<div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{c.sentBy || (c.fromRule ? "Automático" : "")}</div></td>
+              <td style={{ whiteSpace: "nowrap" }}>{fmtDate(c.viewedAt)}</td>
               <td style={{ whiteSpace: "nowrap" }}>{fmtDate(c.completedAt)}</td>
               <td><code>{c.code}</code></td>
+              <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                {!c.baja && <button className="crm-btn ghost sm" onClick={async () => (await darDeBaja(c)) && load()}>Dar de baja</button>}
+              </td>
             </tr>
-          )) : <tr><td colSpan="6" className="crm-empty">{items.length ? "Ningún contrato con estos filtros." : "Aún no se ha enviado ningún contrato. Se envían desde la ficha del cliente, desde una negociación o con una regla de Automatización."}</td></tr>}
+          )) : <tr><td colSpan="8" className="crm-empty">{items.length ? (status ? "Ningún contrato con estos filtros." : "No hay contratos activos. Los dados de baja se ven eligiendo «De baja».") : "Aún no se ha enviado ningún contrato. Se envían desde la ficha del cliente, desde una negociación o con una regla de Automatización."}</td></tr>}
         </tbody>
       </table>
     </>
@@ -153,7 +165,8 @@ function Templates() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
-        <p style={{ margin: 0, color: "var(--crm-muted)", fontSize: 13.5 }}>Sube un <b>.docx</b> con los datos que cambian entre corchetes (ej.: [Nombre del Cliente]) o un <b>PDF</b> que se firma tal cual.</p>
+        <p style={{ margin: 0, color: "var(--crm-muted)", fontSize: 13.5 }}>Sube un <b>.docx</b> con los datos que cambian entre corchetes (ej.: [Nombre del Cliente]) o un <b>PDF</b> que se firma tal cual.<br />
+          🔒 Configurar o quitar una plantilla solo afecta a los envíos <b>nuevos</b>: cada contrato enviado o firmado guarda su propia copia del documento y no cambia.</p>
         <button className="crm-btn" onClick={() => setEdit({})}>⬆ Subir plantilla</button>
       </div>
       {error && <div className="cf-err">{error}</div>}
@@ -252,9 +265,11 @@ function TemplateEditor({ template, onClose, onSaved }) {
 function Settings() {
   const [s, setS] = useState(null);
   const [sig, setSig] = useState("");
+  const [redraw, setRedraw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  useEffect(() => { contractsApi("settings").then((r) => setS(r.settings)).catch((e) => setMsg(e.message)); }, []);
+  const load = useCallback(() => contractsApi("settings").then((r) => setS(r.settings)).catch((e) => setMsg(e.message)), []);
+  useEffect(() => { load(); }, [load]);
   if (!s) return <p>{msg || "Cargando…"}</p>;
   const set = (group, k) => (e) => setS((x) => ({ ...x, [group]: { ...(x[group] || {}), [k]: e.target.value } }));
   const save = async () => {
@@ -264,8 +279,8 @@ function Settings() {
     setBusy(true);
     try {
       await contractsApi("settings", { company: s.company, signer: s.signer, notifyEmail: s.notifyEmail, ...(sig ? { signature: sig } : {}) });
-      setS((x) => ({ ...x, hasSignature: x.hasSignature || !!sig }));
-      setSig("");
+      setSig(""); setRedraw(false);
+      await load(); // vuelve a leer lo guardado (con la firma) para enseñar lo que de verdad quedó
       setMsg("✓ Guardado");
     } catch (e) { setMsg(e.message); }
     finally { setBusy(false); }
@@ -287,10 +302,25 @@ function Settings() {
       </div>
       <div className="crm-field"><label>Enviar copia de los contratos firmados a</label><input type="email" value={s.notifyEmail || ""} onChange={(e) => setS((x) => ({ ...x, notifyEmail: e.target.value }))} placeholder="Si lo dejas vacío, al firmante (o a quien envió el contrato)" /></div>
       <h4 style={{ marginTop: 16 }}>Firma</h4>
-      <p style={{ fontSize: 13, color: "var(--crm-muted)", margin: "0 0 8px" }}>
-        {s.hasSignature ? "✓ Hay una firma guardada. Dibuja otra solo si quieres cambiarla." : "Dibuja la firma del firmante. Se pondrá en cada contrato que envíe tu empresa, junto con la huella de quién lo envía, su IP y la fecha y hora."}
-      </p>
-      <SignaturePad onChange={setSig} />
+      {s.hasSignature && !redraw ? (
+        <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ border: "1px solid var(--crm-line,#dfe8e8)", borderRadius: 10, background: "#fff", padding: 8, minWidth: 260, minHeight: 90, display: "grid", placeItems: "center" }}>
+            {s.signatureUrl ? <img src={s.signatureUrl} alt="Firma guardada" style={{ maxWidth: 320, maxHeight: 130 }} /> : <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>Firma guardada</span>}
+          </div>
+          <div>
+            <p style={{ fontSize: 13, color: "#136B68", margin: "0 0 8px" }}>✓ Esta es la firma guardada. Se pone en cada contrato que envía tu empresa.</p>
+            <button className="crm-btn ghost sm" onClick={() => { setRedraw(true); setMsg(""); }}>✏️ Cambiar firma</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p style={{ fontSize: 13, color: "var(--crm-muted)", margin: "0 0 8px" }}>
+            {s.hasSignature ? "Dibuja la nueva firma y pulsa Guardar. Si no guardas, se queda la anterior." : "Dibuja la firma del firmante. Se pondrá en cada contrato que envíe tu empresa, junto con la huella de quién lo envía, su IP y la fecha y hora."}
+          </p>
+          <SignaturePad onChange={setSig} />
+          {s.hasSignature && <button className="crm-btn ghost sm" style={{ marginTop: 6 }} onClick={() => { setRedraw(false); setSig(""); }}>Cancelar cambio de firma</button>}
+        </>
+      )}
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
         <button className="crm-btn" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar ajustes"}</button>
         {msg && <span style={{ fontSize: 13, color: msg.startsWith("✓") ? "#136B68" : "#b0304c" }}>{msg}</span>}

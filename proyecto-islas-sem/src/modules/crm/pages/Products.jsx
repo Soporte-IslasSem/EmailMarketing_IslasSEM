@@ -146,7 +146,7 @@ export default function Products() {
               public: true,
             });
             ok++;
-          } catch (_) {}
+          } catch { /* fila no válida: se salta */ }
         }
         setImporting(false);
         alert(`Importados ${ok} productos.`);

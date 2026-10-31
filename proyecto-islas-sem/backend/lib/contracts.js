@@ -342,7 +342,11 @@ async function getSettings(req, res) {
   const user = await staff(req, res);
   if (!user) return;
   const s = (await (await SETTINGS(user.orgId)).get()).data() || {};
-  res.json({ ok: true, settings: { company: s.company || {}, signer: s.signer || {}, hasSignature: !!s.signaturePath, notifyEmail: s.notifyEmail || "" } });
+  // La firma guardada se devuelve para verla (enlace temporal): sin ella parecía que se había borrado.
+  const signatureUrl = s.signaturePath
+    ? await bucket().file(s.signaturePath).getSignedUrl({ action: "read", expires: Date.now() + 30 * 60e3 }).then(([u]) => u).catch(() => "")
+    : "";
+  res.json({ ok: true, settings: { company: s.company || {}, signer: s.signer || {}, hasSignature: !!s.signaturePath, signatureUrl, notifyEmail: s.notifyEmail || "" } });
 }
 async function saveSettings(req, res) {
   const user = await staff(req, res);
@@ -461,7 +465,10 @@ async function send(req, res) {
   }
 }
 
-const STATUS_LABEL = { sent: "Enviado", viewed: "Visto por el cliente", completed: "Firmado", cancelled: "Anulado" };
+const STATUS_LABEL = { sent: "Enviado", viewed: "Recibido", completed: "Firmado", cancelled: "Anulado" };
+const RETAIN_YEARS = 10;
+// Cuándo lo abrió el cliente: viewedAt (desde el 31/10/2026) o, en los anteriores, el evento.
+const viewedAtOf = (c) => c.viewedAt || (c.events || []).find((e) => /^Abierto por el cliente/.test(e.label || ""))?.at || null;
 async function list(req, res) {
   const user = await staff(req, res);
   if (!user) return;
@@ -474,7 +481,8 @@ async function list(req, res) {
     const c = d.data();
     return {
       id: d.id, code: c.code, title: c.title, status: c.status, statusLabel: STATUS_LABEL[c.status] || c.status, clientName: c.clientName, clientEmail: c.clientEmail,
-      contactId: c.contactId, dealId: c.dealId, createdAt: c.createdAt, completedAt: c.completedAt || null, sentBy: c.sentBy, fromRule: c.fromRule || "",
+      contactId: c.contactId, dealId: c.dealId, createdAt: c.createdAt, viewedAt: viewedAtOf(c), completedAt: c.completedAt || null, sentBy: c.sentBy, fromRule: c.fromRule || "",
+      baja: c.baja ? { at: c.baja.at, by: c.baja.by, reason: c.baja.reason, retainUntil: c.baja.retainUntil } : null,
       docs: (c.docs || []).map((x, i) => ({ i, name: x.name, kind: x.kind, signed: !!x.signedPath })), events: c.events || [],
     };
   }).sort((a, b) => b.createdAt - a.createdAt);
@@ -498,9 +506,39 @@ async function cancel(req, res) {
   const ref = db.collection("contracts").doc(String(req.body?.id || "x"));
   const c = (await ref.get()).data();
   if (!c || orgOf(c) !== user.orgId) return fail(res, "No existe", 404);
-  if (c.status === "completed") return fail(res, "Ya está firmado: no se puede anular");
+  if (c.status === "completed") return fail(res, "Ya está firmado: no se puede anular (se puede dar de baja)");
+  if (c.baja) return fail(res, "Está dado de baja");
   await ref.update({ status: "cancelled", updatedAt: Date.now(), events: [...(c.events || []), { at: Date.now(), label: `Anulado por ${user.email}` }] });
   res.json({ ok: true });
+}
+
+// POST { id, reason } — dar de baja un contrato (también firmado). NUNCA se borra: queda guardado
+// con quién, cuándo y por qué, y se conserva al menos RETAIN_YEARS años. Si aún no estaba firmado,
+// su enlace de firma deja de funcionar.
+async function baja(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  const reason = clip(req.body?.reason, 300);
+  if (reason.length < 3) return fail(res, "Escribe el motivo de la baja");
+  const ref = db.collection("contracts").doc(String(req.body?.id || "x"));
+  const now = Date.now();
+  const out = await db.runTransaction(async (tx) => {
+    const c = (await tx.get(ref)).data();
+    if (!c || orgOf(c) !== user.orgId) return { code: 404, error: "No existe" };
+    if (c.baja) return { code: 400, error: "Ya está dado de baja" };
+    if (c.signing) return { code: 409, error: "El cliente lo está firmando ahora mismo; inténtalo en un momento" };
+    const base = new Date(c.completedAt || c.createdAt || now);
+    base.setFullYear(base.getFullYear() + RETAIN_YEARS);
+    const info = { at: now, by: user.email, reason, prevStatus: c.status, retainUntil: base.getTime() };
+    tx.update(ref, { baja: info, updatedAt: now, events: [...(c.events || []), { at: now, label: `Dado de baja por ${user.email}: ${reason}` }] });
+    return { c, info };
+  });
+  if (out.error) return fail(res, out.error, out.code);
+  await addActivity(user.orgId, {
+    type: "Documento", title: `🗄 Contrato dado de baja: ${out.c.title} (${out.c.code}) · ${reason}`, done: true,
+    entity: out.c.dealId ? "deal" : "contact", entityId: out.c.dealId || out.c.contactId, contactId: out.c.contactId || "",
+  }).catch(() => {});
+  res.json({ ok: true, retainUntil: out.info.retainUntil });
 }
 
 /* ------------------------------------------------------------------ rutas públicas (enlace de firma) */
@@ -515,9 +553,10 @@ async function publicView(req, res) {
   const doc = await byToken(req.params.token);
   if (!doc) return fail(res, "Este enlace no es válido", 404);
   const c = doc.data();
-  if (c.status === "cancelled") return fail(res, "Este documento ya no está disponible", 410);
+  if (c.status === "cancelled" || (c.baja && c.status !== "completed")) return fail(res, "Este documento ya no está disponible", 410);
   if (c.status === "sent") {
-    await doc.ref.update({ status: "viewed", updatedAt: Date.now(), events: [...(c.events || []), { at: Date.now(), label: "Abierto por el cliente", ip: ipOf(req) }] });
+    const now = Date.now();
+    await doc.ref.update({ status: "viewed", viewedAt: now, updatedAt: now, events: [...(c.events || []), { at: now, label: "Abierto por el cliente", ip: ipOf(req) }] });
   }
   const ctx = await contextFor({ contactId: c.contactId, dealId: c.dealId, orgId: orgOf(c) });
   const ct = ctx.contact || {}, co = ctx.company || {};
@@ -559,7 +598,7 @@ async function publicSign(req, res) {
   const claimed = await db.runTransaction(async (tx) => {
     const s = await tx.get(doc.ref);
     const c = s.data();
-    if (!c || c.status === "completed" || c.status === "cancelled" || c.signing) return null;
+    if (!c || c.status === "completed" || c.status === "cancelled" || c.baja || c.signing) return null;
     tx.update(doc.ref, { signing: true });
     return c;
   });
@@ -622,7 +661,9 @@ async function verify(req, res) {
   const c = snap.docs[0].data();
   const mask = (v) => (v ? String(v).slice(0, 2) + "****" + String(v).slice(-2) : "");
   res.set("Cache-Control", "no-store").json({
-    ok: true, code, title: c.title, status: c.status === "completed" ? "Firmado por las dos partes" : c.status === "cancelled" ? "Anulado" : "Pendiente de firma",
+    ok: true, code, title: c.title,
+    status: (c.status === "completed" ? "Firmado por las dos partes" : c.status === "cancelled" ? "Anulado" : "Pendiente de firma")
+      + (c.baja ? ` · dado de baja el ${new Date(c.baja.at).toLocaleDateString("es-ES", { timeZone: TZ })}` : ""),
     provider: c.provider ? { company: c.provider.company, name: c.provider.name, signedAt: c.provider.signedAt } : null,
     client: c.client?.signedAt ? { name: c.client.name, dni: mask(c.client.dni), company: c.client.company || "", signedAt: c.client.signedAt } : null,
     docs: (c.docs || []).map((d) => ({ name: d.name, contentHash: d.contentHash || d.sourceHash || "", signedHash: d.signedHash || "" })),
@@ -652,6 +693,6 @@ async function sendFromRule(deal, rule, stageName) {
 }
 
 module.exports = {
-  getSettings, saveSettings, listTemplates, saveTemplate, archiveTemplate, prepare, send, list, fileUrl, cancel,
+  getSettings, saveSettings, listTemplates, saveTemplate, archiveTemplate, prepare, send, list, fileUrl, cancel, baja,
   publicView, publicSign, verify, sendFromRule, buildSignedPdf, cleanBlocks, holesOf, createContract,
 };

@@ -41,10 +41,23 @@ export const toBase64 = (file) => new Promise((resolve, reject) => {
 
 export const STATUS = {
   sent: { label: "Enviado", cls: "info" },
-  viewed: { label: "Visto por el cliente", cls: "warn" },
+  viewed: { label: "Recibido", cls: "warn" },
   completed: { label: "Firmado", cls: "ok" },
   cancelled: { label: "Anulado", cls: "" },
+  baja: { label: "De baja", cls: "" },
 };
+// Estado que se enseña: "De baja" manda sobre el resto (el contrato se conserva tal cual).
+export const statusOf = (c) => (c.baja ? "baja" : c.status);
+export const fmtDay = (ms) => (ms ? new Date(ms).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
+
+// Dar de baja (pide el motivo). Devuelve true si se hizo.
+export async function darDeBaja(c) {
+  const signed = c.status === "completed";
+  const reason = window.prompt(`Dar de baja "${c.title}" (${c.code}).\n\nNo se borra: se conserva con su PDF${signed ? " firmado" : ""} al menos 10 años${signed ? "" : " y el enlace de firma deja de funcionar"}.\n\nMotivo de la baja:`);
+  if (reason === null) return false;
+  if (reason.trim().length < 3) { alert("Escribe el motivo de la baja."); return false; }
+  try { await contractsApi("baja", { id: c.id, reason: reason.trim() }); return true; } catch (e) { alert(e.message); return false; }
+}
 export const fmtDate = (ms) => (ms ? new Date(ms).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 
 // Abre el PDF de un contrato (firmado u original) con un enlace temporal.

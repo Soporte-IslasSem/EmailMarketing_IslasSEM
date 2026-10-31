@@ -166,6 +166,7 @@ api.post("/contracts/send", safe(contratos.send));
 api.get("/contracts/list", safe(contratos.list));
 api.post("/contracts/file-url", safe(contratos.fileUrl));
 api.post("/contracts/cancel", safe(contratos.cancel));
+api.post("/contracts/baja", safe(contratos.baja));
 // Públicas: el enlace personal del cliente y la verificación por código.
 api.get("/contracts/public/:token", safe(contratos.publicView));
 api.post("/contracts/public/:token/sign", safe(contratos.publicSign));
