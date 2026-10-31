@@ -54,7 +54,7 @@ function runsOfParagraph(p) {
 }
 
 // Une trozos con el mismo formato y los huecos [..] partidos en varios trozos.
-function mergeRuns(runs) {
+export function mergeRuns(runs) {
   const same = (a, b) => !!a.b === !!b.b && !!a.i === !!b.i && !!a.u === !!b.u;
   let out = [];
   for (const r of runs) {

@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CrmModal from "../../crm/components/CrmModal";
-import ContractView from "../components/ContractView";
+import DocEditor from "../components/DocEditor";
+import ClientPicker from "../components/ClientPicker";
 import TemplateFields from "../components/TemplateFields";
 import SignaturePad from "../components/SignaturePad";
 import SendContractModal from "../components/SendContractModal";
-import { useCrmCollection } from "../../crm/lib/crm";
-import { usePerms } from "../../crm/lib/permissions";
 import { contractsApi, toBase64, STATUS, statusOf, fmtDate, fmtDay, openContractFile, darDeBaja } from "../lib/api";
 import { blocksFromDocx, holesOf, holeCounts, guessSource } from "../lib/docx";
+import { downloadDocx } from "../lib/docEdit";
 import "../../crm/crm.styles.css";
 import "../components/contracts.css";
 
@@ -45,7 +45,8 @@ function AllContracts() {
   const [term, setTerm] = useState("");
   const [error, setError] = useState("");
   const [picking, setPicking] = useState(false); // elegir cliente para enviar un contrato
-  const [sendTo, setSendTo] = useState(null); // { contactId, dealId }
+  const [sendTo, setSendTo] = useState(null); // { contactId, dealId, initialUploads?, initialTitle? }
+  const [dupFrom, setDupFrom] = useState(null); // contrato que se duplica para otra persona
   const load = useCallback(() => contractsApi("list").then((r) => setItems(r.contracts)).catch((e) => { setItems([]); setError(e.message); }), []);
   useEffect(() => { load(); }, [load]);
   // Sin filtro: todos menos los dados de baja (esos se ven eligiendo "De baja").
@@ -62,7 +63,15 @@ function AllContracts() {
         <button className="crm-btn" onClick={() => setPicking(true)}>✍️ Enviar contrato</button>
       </div>
       {picking && <ClientPicker onClose={() => setPicking(false)} onPick={(x) => { setPicking(false); setSendTo(x); }} />}
-      {sendTo && <SendContractModal contactId={sendTo.contactId} dealId={sendTo.dealId} onClose={() => setSendTo(null)} onSent={load} />}
+      {dupFrom && <ClientPicker title={`Duplicar «${dupFrom.title}» · ¿para quién?`} onClose={() => setDupFrom(null)} onPick={async (x) => {
+        const from = dupFrom;
+        setDupFrom(null);
+        try {
+          const r = await contractsApi("duplicate", { id: from.id });
+          setSendTo({ ...x, initialUploads: r.docs, initialTitle: r.title });
+        } catch (e) { alert("No se pudo duplicar: " + e.message); }
+      }} />}
+      {sendTo && <SendContractModal contactId={sendTo.contactId} dealId={sendTo.dealId} initialUploads={sendTo.initialUploads} initialTitle={sendTo.initialTitle} onClose={() => setSendTo(null)} onSent={load} />}
       {error && <div className="cf-err">{error}</div>}
       <table className="crm-table">
         <thead><tr><th>Documento</th><th>Cliente</th><th>Estado</th><th>Enviado</th><th>Recibido</th><th>Firmado</th><th>ID</th><th></th></tr></thead>
@@ -90,6 +99,7 @@ function AllContracts() {
               <td style={{ whiteSpace: "nowrap" }}>{fmtDate(c.completedAt)}</td>
               <td><code>{c.code}</code></td>
               <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                <button className="crm-btn ghost sm" title="Enviar los mismos documentos a otra persona" onClick={() => setDupFrom(c)}>⧉ Duplicar</button>{" "}
                 {!c.baja && <button className="crm-btn ghost sm" onClick={async () => (await darDeBaja(c)) && load()}>Dar de baja</button>}
               </td>
             </tr>
@@ -100,159 +110,154 @@ function AllContracts() {
   );
 }
 
-// Elegir a quién se envía: el cliente (buscador) y, si se quiere, una de sus negociaciones abiertas
-// (así, al firmar, queda en esa negociación).
-function ClientPicker({ onClose, onPick }) {
-  const perms = usePerms();
-  const { items: allContacts, loading } = useCrmCollection("contacts");
-  const { items: deals } = useCrmCollection("deals");
-  const contacts = useMemo(() => perms.visible("contacts", allContacts), [perms, allContacts]);
-  const [term, setTerm] = useState("");
-  const [contact, setContact] = useState(null);
-  const [dealId, setDealId] = useState("");
-  const name = (c) => `${c.firstName || ""} ${c.lastName || ""}`.trim();
-  const found = useMemo(() => {
-    const t = term.trim().toLowerCase();
-    if (!t) return [];
-    return contacts.filter((c) => [name(c), c.email, c.company, c.clientId, c.dni].filter(Boolean).some((v) => String(v).toLowerCase().includes(t))).slice(0, 30);
-  }, [contacts, term]);
-  const open = contact ? deals.filter((d) => d.contactId === contact.id && d.status !== "ganado" && d.status !== "perdido") : [];
-  return (
-    <CrmModal title="Enviar contrato · elegir cliente" onClose={onClose} maxWidth={620}
-      footer={<><button className="crm-btn ghost" onClick={contact ? () => setContact(null) : onClose}>{contact ? "← Otro cliente" : "Cancelar"}</button>
-        {contact && <button className="crm-btn" onClick={() => onPick({ contactId: contact.id, dealId })}>Continuar →</button>}</>}>
-      {!contact ? (
-        <>
-          <input autoFocus className="crm-search" style={{ margin: "0 0 10px", width: "100%", maxWidth: "none" }} placeholder="Busca por nombre, email, empresa, ID o DNI…" value={term} onChange={(e) => setTerm(e.target.value)} />
-          {loading ? <p>Cargando clientes…</p> : !term.trim() ? <p style={{ color: "var(--crm-muted)", fontSize: 13 }}>Escribe para buscar el cliente.</p> : found.length ? found.map((c) => (
-            <div key={c.id} onClick={() => { setContact(c); setDealId(""); }} style={{ padding: "8px 6px", borderBottom: "1px solid var(--crm-line,#eef3f3)", cursor: "pointer" }}>
-              <b>{name(c) || "(sin nombre)"}</b> <span style={{ color: "var(--crm-muted)", fontSize: 12.5 }}>{c.clientId || ""}</span>
-              <div style={{ fontSize: 12.5, color: c.email ? "var(--crm-muted)" : "#b0304c" }}>{c.email || "Sin email: no se le puede enviar"}{c.company ? ` · ${c.company}` : ""}</div>
-            </div>
-          )) : <p style={{ color: "var(--crm-muted)", fontSize: 13 }}>Ningún cliente coincide.</p>}
-        </>
-      ) : (
-        <>
-          <p style={{ margin: "0 0 10px" }}><b>{name(contact) || "(sin nombre)"}</b> · {contact.email || <span style={{ color: "#b0304c" }}>sin email (añádelo en su ficha antes de enviar)</span>}</p>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>¿Va ligado a una negociación?</div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", cursor: "pointer" }}>
-            <input type="radio" style={{ width: "auto" }} checked={!dealId} onChange={() => setDealId("")} /> No, solo al cliente
-          </label>
-          {open.map((d) => (
-            <label key={d.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", cursor: "pointer" }}>
-              <input type="radio" style={{ width: "auto" }} checked={dealId === d.id} onChange={() => setDealId(d.id)} /> {d.title}
-            </label>
-          ))}
-          {!open.length && <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "4px 0 0" }}>Este cliente no tiene negociaciones abiertas.</p>}
-        </>
-      )}
-    </CrmModal>
-  );
-}
-
 /* ------------------------------------------------------------------ plantillas */
 
 function Templates() {
   const [items, setItems] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [edit, setEdit] = useState(null); // plantilla en edición (nueva o existente)
+  const [sendWith, setSendWith] = useState(null); // plantilla que se va a enviar
+  const [sendTo, setSendTo] = useState(null); // { contactId, dealId, templateId }
   const [error, setError] = useState("");
-  const load = useCallback(() => contractsApi("templates").then((r) => setItems(r.templates)).catch((e) => { setItems([]); setError(e.message); }), []);
+  const load = useCallback(() => {
+    return contractsApi(`templates${showArchived ? "?archived=1" : ""}`).then((r) => setItems(r.templates)).catch((e) => { setItems([]); setError(e.message); });
+  }, [showArchived]);
   useEffect(() => { load(); }, [load]);
   const archive = async (t) => {
-    if (!window.confirm(`¿Quitar la plantilla "${t.name}"? Los contratos ya enviados no cambian. Si alguna regla de Automatización la usa, deja de enviarla.`)) return;
+    if (!window.confirm(`¿Quitar la plantilla "${t.name}"? Los contratos ya enviados no cambian. Si alguna regla de Automatización la usa, deja de enviarla. Se puede recuperar en «Ver plantillas quitadas».`)) return;
     try { await contractsApi("templates/archive", { id: t.id }); load(); } catch (e) { alert(e.message); }
+  };
+  const restore = async (t) => {
+    try { await contractsApi("templates/restore", { id: t.id }); load(); } catch (e) { alert(e.message); }
   };
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
-        <p style={{ margin: 0, color: "var(--crm-muted)", fontSize: 13.5 }}>Sube un <b>.docx</b> con los datos que cambian entre corchetes (ej.: [Nombre del Cliente]) o un <b>PDF</b> que se firma tal cual.<br />
-          🔒 Configurar o quitar una plantilla solo afecta a los envíos <b>nuevos</b>: cada contrato enviado o firmado guarda su propia copia del documento y no cambia.</p>
-        <button className="crm-btn" onClick={() => setEdit({})}>⬆ Subir plantilla</button>
+        <p style={{ margin: 0, color: "var(--crm-muted)", fontSize: 13.5 }}>Sube un <b>.docx</b> con los datos que cambian entre corchetes (ej.: [Nombre del Cliente]) o un <b>PDF</b> que se firma tal cual. Los Word se pueden editar aquí mismo.<br />
+          🔒 Editar o quitar una plantilla solo afecta a los envíos <b>nuevos</b>: cada contrato enviado o firmado guarda su propia copia del documento y no cambia.</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="crm-btn ghost" onClick={() => { setItems(null); setShowArchived((x) => !x); }}>{showArchived ? "← Plantillas activas" : "🗂 Ver plantillas quitadas"}</button>
+          {!showArchived && <button className="crm-btn" onClick={() => setEdit({})}>⬆ Subir plantilla</button>}
+        </div>
       </div>
       {error && <div className="cf-err">{error}</div>}
       <table className="crm-table">
-        <thead><tr><th>Plantilla</th><th>Tipo</th><th>Huecos</th><th>Actualizada</th><th></th></tr></thead>
+        <thead><tr><th>{showArchived ? "Plantilla quitada" : "Plantilla"}</th><th>Tipo</th><th>Huecos</th><th>Actualizada</th><th></th></tr></thead>
         <tbody>
           {items === null ? <tr><td colSpan="5" className="crm-empty">Cargando…</td></tr> : items.length ? items.map((t) => (
             <tr key={t.id}>
-              <td style={{ fontWeight: 600 }}>{t.name}</td>
+              <td style={{ fontWeight: 600 }}>{showArchived ? t.name : <span className="crm-link" onClick={() => setEdit(t)}>{t.name}</span>}</td>
               <td>{t.kind === "pdf" ? "PDF" : "Word"}</td>
               <td>{t.kind === "pdf" ? "—" : `${(t.fields || []).length} (${(t.fields || []).filter((f) => f.source === "ask").length} se preguntan al enviar)`}</td>
               <td>{fmtDate(t.updatedAt || t.createdAt)}</td>
               <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
-                {t.kind !== "pdf" && <button className="crm-btn ghost sm" onClick={() => setEdit(t)}>Configurar</button>}{" "}
-                <button className="crm-btn ghost sm" onClick={() => archive(t)}>Quitar</button>
+                {showArchived ? <button className="crm-btn ghost sm" onClick={() => restore(t)}>↩ Recuperar</button> : (
+                  <>
+                    <button className="crm-btn sm" onClick={() => setSendWith(t)}>✍️ Enviar a firmar</button>{" "}
+                    <button className="crm-btn ghost sm" onClick={() => setEdit(t)}>{t.kind === "pdf" ? "Renombrar" : "✏️ Editar"}</button>{" "}
+                    <button className="crm-btn ghost sm" onClick={() => archive(t)}>Quitar</button>
+                  </>
+                )}
               </td>
             </tr>
-          )) : <tr><td colSpan="5" className="crm-empty">Aún no hay plantillas.</td></tr>}
+          )) : <tr><td colSpan="5" className="crm-empty">{showArchived ? "No hay plantillas quitadas." : "Aún no hay plantillas."}</td></tr>}
         </tbody>
       </table>
       {edit && <TemplateEditor template={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />}
+      {sendWith && <ClientPicker title={`Enviar «${sendWith.name}» · elegir cliente`} onClose={() => setSendWith(null)} onPick={(x) => { setSendTo({ ...x, templateId: sendWith.id }); setSendWith(null); }} />}
+      {sendTo && <SendContractModal contactId={sendTo.contactId} dealId={sendTo.dealId} initialTemplates={[sendTo.templateId]} onClose={() => setSendTo(null)} />}
     </>
   );
 }
+
+// Huecos del documento con su origen: se conserva lo ya elegido y los nuevos se proponen solos.
+const syncFields = (prev, blocks) => holesOf(blocks).map((key) => prev.find((f) => f.key === key) || { key, source: guessSource(key) });
 
 function TemplateEditor({ template, onClose, onSaved }) {
   const isNew = !template.id;
   const [name, setName] = useState(template.name || "");
   const [kind, setKind] = useState(template.kind || "");
-  const [blocks, setBlocks] = useState(template.preview || null);
+  const [blocks, setBlocks] = useState(isNew || template.kind === "pdf" ? null : undefined); // undefined = cargando
   const [fields, setFields] = useState(template.fields || []);
+  const [version, setVersion] = useState(0); // cambia al cargar o sustituir el documento
   const [pdf, setPdf] = useState(null);
-  const [preview, setPreview] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const file = useRef(null);
   const counts = useMemo(() => (blocks ? holeCounts(blocks) : {}), [blocks]);
+
+  // La plantilla COMPLETA (la lista solo trae un trozo para la vista previa).
+  useEffect(() => {
+    if (isNew || template.kind === "pdf") return;
+    contractsApi(`templates/${template.id}`)
+      .then((r) => { setBlocks(r.template.blocks); setFields(r.template.fields || []); setVersion((v) => v + 1); })
+      .catch((e) => setError(e.message));
+  }, [isNew, template.id, template.kind]);
+
+  const onBlocks = (b) => { setBlocks(b); setFields((f) => syncFields(f, b)); setDirty(true); };
 
   const pick = async (f) => {
     setError("");
     if (!f) return;
     if (f.size > 10 * 1024 * 1024) return setError("El archivo pasa de 10 MB");
     if (!name) setName(f.name.replace(/\.(docx|pdf)$/i, ""));
-    if (/\.pdf$/i.test(f.name)) { setKind("pdf"); setPdf(f); setBlocks(null); setFields([]); return; }
+    if (/\.pdf$/i.test(f.name)) {
+      if (!isNew) return setError("Una plantilla de Word solo se puede sustituir por otro Word (.docx)");
+      setKind("pdf"); setPdf(f); setBlocks(null); setFields([]); return;
+    }
     if (!/\.docx$/i.test(f.name)) return setError("Solo .docx (Word) o .pdf");
     try {
       const b = await blocksFromDocx(f);
       if (!b.length) return setError("El documento está vacío");
-      setKind("docx"); setBlocks(b);
-      setFields(holesOf(b).map((key) => ({ key, source: guessSource(key) })));
+      setKind("docx"); setBlocks(b); setFields((prev) => syncFields(prev, b)); setVersion((v) => v + 1); setDirty(true);
     } catch (e) { setError(e.message); }
+    finally { if (file.current) file.current.value = ""; }
   };
+
+  const close = () => { if (!dirty || window.confirm("Hay cambios sin guardar. ¿Cerrar sin guardar?")) onClose(); };
 
   const save = async () => {
     setError("");
     if (!name.trim()) return setError("Ponle un nombre");
     if (isNew && !kind) return setError("Elige el archivo");
+    if (kind === "docx" && !(blocks || []).length) return setError("El documento está vacío");
     setBusy(true);
     try {
       await contractsApi("templates", isNew
         ? { name, kind, ...(kind === "pdf" ? { data: await toBase64(pdf) } : { blocks, fields }) }
-        : { id: template.id, name, fields });
+        : { id: template.id, name, ...(kind === "docx" ? { blocks, fields } : {}) });
       onSaved();
     } catch (e) { setError(e.message); setBusy(false); }
   };
 
   return (
-    <CrmModal title={isNew ? "Subir plantilla" : `Configurar · ${template.name}`} onClose={onClose} maxWidth={820}
-      footer={<><button className="crm-btn ghost" onClick={onClose}>Cancelar</button><button className="crm-btn" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar plantilla"}</button></>}>
-      <div className="crm-field"><label>Nombre de la plantilla</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej.: Hoja de Encargo · Wikipedia" /></div>
-      {isNew && (
+    <CrmModal title={isNew ? "Subir plantilla" : `Editar plantilla · ${template.name}`} onClose={close} maxWidth={980}
+      footer={<><button className="crm-btn ghost" onClick={close}>Cancelar</button><button className="crm-btn" onClick={save} disabled={busy || blocks === undefined}>{busy ? "Guardando…" : "Guardar plantilla"}</button></>}>
+      <div className="crm-field"><label>Nombre de la plantilla</label><input value={name} onChange={(e) => { setName(e.target.value); setDirty(true); }} placeholder="Ej.: Hoja de Encargo · Wikipedia" /></div>
+      <input ref={file} type="file" hidden accept={isNew ? ".docx,.pdf" : ".docx"} onChange={(e) => pick(e.target.files?.[0])} />
+      {isNew && !kind && (
         <div className="crm-field">
           <label>Documento</label>
-          <input ref={file} type="file" accept=".docx,.pdf" onChange={(e) => pick(e.target.files?.[0])} />
+          <button className="crm-btn ghost" onClick={() => file.current?.click()}>⬆ Elegir archivo (.docx o .pdf)</button>
         </div>
       )}
-      {kind === "pdf" && <p style={{ fontSize: 13, color: "var(--crm-muted)" }}>PDF: se enviará tal cual. Al firmar se añade una hoja de firmas con la huella y el certificado.</p>}
+      {kind === "pdf" && <p style={{ fontSize: 13, color: "var(--crm-muted)" }}>PDF: se enviará tal cual. Al firmar se añade una hoja de firmas con la huella y el certificado. Para poder editar el texto, súbelo como Word (.docx).</p>}
+      {blocks === undefined && !error && <p>Cargando el documento…</p>}
       {kind === "docx" && blocks && (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "6px 0" }}>
-            <b style={{ fontSize: 13.5 }}>¿De dónde sale cada dato?</b>
-            <button className="crm-btn ghost sm" onClick={() => setPreview((p) => !p)}>{preview ? "Ocultar documento" : "👁 Ver documento"}</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "4px 0 8px" }}>
+            <b style={{ fontSize: 13.5 }}>✏️ Documento: escribe directamente sobre él</b>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className="crm-btn ghost sm" onClick={() => downloadDocx(blocks, name).catch((e) => setError(e.message))}>⬇ Descargar en Word (.docx)</button>
+              <button className="crm-btn ghost sm" onClick={() => file.current?.click()}>⬆ Sustituir por otro .docx</button>
+            </div>
           </div>
-          <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "0 0 8px" }}>El sistema propone el origen de cada hueco; revísalo y cámbialo si hace falta. Lo que elijas se usará cada vez que envíes esta plantilla (al enviar a mano siempre se puede cambiar).</p>
-          <TemplateFields fields={fields} counts={counts} onChange={setFields} />
-          {preview && <div className="ctr-public__paper" style={{ marginTop: 10 }}><ContractView blocks={blocks} values={{}} /></div>}
+          <DocEditor blocks={blocks} version={version} onChange={onBlocks} />
+          <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "6px 0 14px" }}>Los datos que cambian en cada envío van entre corchetes, p. ej. <b>[Nombre del Cliente]</b> (botón «[ ] Hueco»). Al guardar, los envíos nuevos usan este texto; los contratos ya enviados no cambian.</p>
+          <b style={{ fontSize: 13.5 }}>¿De dónde sale cada dato?</b>
+          <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "4px 0 8px" }}>El sistema propone el origen de cada hueco; revísalo y cámbialo si hace falta. Lo que elijas se usará cada vez que envíes esta plantilla (al enviar a mano siempre se puede cambiar).</p>
+          <TemplateFields fields={fields} counts={counts} onChange={(f) => { setFields(f); setDirty(true); }} />
         </>
       )}
       {error && <div className="cf-err" style={{ marginTop: 10 }}>{error}</div>}

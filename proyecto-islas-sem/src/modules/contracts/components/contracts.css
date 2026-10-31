@@ -27,3 +27,19 @@
 .ctr-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12.5px; color: #6b7d7d; }
 .ctr-ok { text-align: center; padding: 30px 10px; }
 .ctr-ok h2 { color: #136B68; }
+
+/* Editor tipo Word de las plantillas */
+.doc-editor { border: 1px solid #d6e2e2; border-radius: 10px; overflow: hidden; background: #f3f6f6; }
+.doc-editor__bar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px 8px; background: #fff; border-bottom: 1px solid #e3eaea; position: sticky; top: 0; z-index: 1; }
+.doc-editor__bar button { border: 1px solid #dbe5e5; background: #fff; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; cursor: pointer; color: #24302f; min-width: 28px; }
+.doc-editor__bar button:hover { background: #e9f4f3; border-color: #9fcfcd; }
+.doc-editor__sep { width: 1px; height: 20px; background: #e3eaea; margin: 0 3px; }
+.doc-editor__page { background: #fff; margin: 14px auto; max-width: 760px; min-height: 420px; max-height: 60vh; overflow: auto; padding: 36px 44px; box-shadow: 0 1px 6px rgba(0,0,0,.08); outline: none; }
+.doc-editor__page:focus { box-shadow: 0 0 0 2px #9fcfcd, 0 1px 6px rgba(0,0,0,.08); }
+.doc-editor__page h1, .doc-editor__page h2, .doc-editor__page h3 { color: #136B68; font-weight: 700; margin: 14px 0 6px; }
+.doc-editor__page h1 { font-size: 19px; } .doc-editor__page h2 { font-size: 16px; } .doc-editor__page h3 { font-size: 14.5px; }
+.doc-editor__page ul, .doc-editor__page ol { margin: 0 0 9px 22px; padding: 0; }
+.doc-editor__page li { margin: 0 0 4px; }
+.doc-editor__page mark.doc-hole { background: #fff1d6; color: #8a5a00; border-radius: 3px; padding: 0 2px; }
+@media (max-width: 640px) { .doc-editor__page { padding: 18px 14px; } }
+.doc-editor__page p { text-align: justify; }

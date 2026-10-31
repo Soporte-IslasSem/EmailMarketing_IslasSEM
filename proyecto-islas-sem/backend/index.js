@@ -161,12 +161,15 @@ api.post("/contracts/settings", safe(contratos.saveSettings));
 api.get("/contracts/templates", safe(contratos.listTemplates));
 api.post("/contracts/templates", safe(contratos.saveTemplate));
 api.post("/contracts/templates/archive", safe(contratos.archiveTemplate));
+api.post("/contracts/templates/restore", safe(contratos.restoreTemplate));
+api.get("/contracts/templates/:id", safe(contratos.getTemplate));
 api.post("/contracts/prepare", safe(contratos.prepare));
 api.post("/contracts/send", safe(contratos.send));
 api.get("/contracts/list", safe(contratos.list));
 api.post("/contracts/file-url", safe(contratos.fileUrl));
 api.post("/contracts/cancel", safe(contratos.cancel));
 api.post("/contracts/baja", safe(contratos.baja));
+api.post("/contracts/duplicate", safe(contratos.duplicate));
 // Públicas: el enlace personal del cliente y la verificación por código.
 api.get("/contracts/public/:token", safe(contratos.publicView));
 api.post("/contracts/public/:token/sign", safe(contratos.publicSign));

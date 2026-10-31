@@ -62,6 +62,16 @@ function cleanBlocks(blocks) {
     return { t, runs: cleanRuns(b.runs), ...(t === "h" ? { level: Math.min(3, Math.max(1, Number(b.level) || 1)) } : {}), ...(["center", "right", "justify"].includes(b.align) ? { align: b.align } : {}), ...(b.ordered ? { ordered: true } : {}) };
   });
 }
+// Firestore no admite listas dentro de listas: las tablas (rows: [[runs]]) se guardan como
+// trows: [{ c: [{ r: runs }] }]. enc* antes de escribir, dec* después de leer (acepta los dos).
+const encBlocks = (blocks) => (blocks || []).map((b) => (b?.t === "table" && Array.isArray(b.rows)
+  ? { t: "table", trows: b.rows.map((row) => ({ c: (row || []).map((runs) => ({ r: runs || [] })) })) } : b));
+const decBlocks = (blocks) => (blocks || []).map((b) => (b?.t === "table" && !Array.isArray(b.rows)
+  ? { t: "table", rows: (b.trows || []).map((row) => (row?.c || []).map((cell) => cell?.r || [])) } : b));
+const encDocs = (docs) => (docs || []).map((d) => (d.blocks ? { ...d, blocks: encBlocks(d.blocks) } : d));
+const decDocs = (docs) => (docs || []).map((d) => (d.blocks ? { ...d, blocks: decBlocks(d.blocks) } : d));
+const readTpl = (t) => (t ? { ...t, blocks: decBlocks(t.blocks) } : t);
+const readContract = (c) => (c ? { ...c, docs: decDocs(c.docs) } : c);
 const blockText = (b) => (b.t === "table" ? b.rows.flat().flat().map((r) => r.text).join(" ") : (b.runs || []).map((r) => r.text).join(""));
 function holesOf(blocks) {
   const out = new Set();
@@ -266,6 +276,15 @@ const queue = (orgId, item) => db.collection("outbox").add({
 /* ------------------------------------------------------------------ crear y enviar */
 
 // docs de entrada: [{ templateId, values? } | { upload: { name, kind, blocks?, data? (pdf base64) }, values? }]
+// PDF original de un documento de otro contrato (misma empresa): { sourcePath, sourceHash } o null.
+async function pdfOfContract(orgId, ref) {
+  const id = String(ref?.contractId || "");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
+  const c = (await db.collection("contracts").doc(id).get()).data();
+  const d = c && orgOf(c) === orgId ? c.docs?.[Number(ref.i)] : null;
+  return d?.kind === "pdf" && d.sourcePath ? { sourcePath: d.sourcePath, sourceHash: d.sourceHash || "" } : null;
+}
+
 async function createContract({ orgId, contactId, dealId, title, docs, manual = {}, by, ip, ua, fromRule = "" }) {
   const ctx = await contextFor({ contactId, dealId, orgId });
   const s = ctx.settings;
@@ -278,15 +297,20 @@ async function createContract({ orgId, contactId, dealId, title, docs, manual = 
   const missing = [];
   for (const [i, d] of (docs || []).slice(0, 10).entries()) {
     if (d.templateId) {
-      const t = (await db.collection("contractTemplates").doc(String(d.templateId)).get()).data();
+      const t = readTpl((await db.collection("contractTemplates").doc(String(d.templateId)).get()).data());
       if (!t || t.archived || orgOf(t) !== orgId) throw new Error("Una de las plantillas ya no existe");
       if (t.kind === "pdf") { out.push({ name: t.name, kind: "pdf", sourcePath: t.sourcePath, sourceHash: t.sourceHash, templateId: d.templateId }); continue; }
       const r = resolveValues(t.fields, ctx, { ...manual, ...(d.values || {}) });
       r.missing.forEach((k) => missing.push(`${t.name}: ${k}`));
-      out.push({ name: t.name, kind: "docx", blocks: t.blocks, values: r.values, templateId: d.templateId });
+      out.push({ name: t.name, kind: "docx", blocks: t.blocks, fields: t.fields || [], values: r.values, templateId: d.templateId });
     } else if (d.upload) {
       const name = clip(d.upload.name || `Documento ${i + 1}`, 120);
-      if (d.upload.kind === "pdf") {
+      if (d.upload.kind === "pdf" && d.upload.copyOf) {
+        // "Duplicar para otra persona": el mismo PDF de otro contrato de la empresa (original, sin firmas).
+        const src = await pdfOfContract(orgId, d.upload.copyOf);
+        if (!src) throw new Error(`"${name}": el documento original ya no está disponible`);
+        out.push({ name, kind: "pdf", sourcePath: src.sourcePath, sourceHash: src.sourceHash });
+      } else if (d.upload.kind === "pdf") {
         const buf = Buffer.from(String(d.upload.data || ""), "base64");
         if (!buf.length || buf.length > 10 * 1024 * 1024 || buf.subarray(0, 4).toString() !== "%PDF") throw new Error(`"${name}" no es un PDF válido (máx. 10 MB)`);
         const path = `contracts/${orgId}/originals/${Date.now()}-${crypto.randomBytes(4).toString("hex")}.pdf`;
@@ -297,7 +321,7 @@ async function createContract({ orgId, contactId, dealId, title, docs, manual = 
         const fields = cleanFields(d.upload.fields, holesOf(blocks));
         const r = resolveValues(fields, ctx, { ...manual, ...(d.values || {}) });
         r.missing.forEach((k) => missing.push(`${name}: ${k}`));
-        out.push({ name, kind: "docx", blocks, values: r.values });
+        out.push({ name, kind: "docx", blocks, fields, values: r.values });
       }
     }
   }
@@ -310,7 +334,7 @@ async function createContract({ orgId, contactId, dealId, title, docs, manual = 
     title: clip(title || out.map((d) => d.name).join(" + "), 200), status: "sent",
     contactId: ctx.contactId, dealId: ctx.dealId, companyId: c.companyId || "",
     clientName: [c.firstName, c.lastName].filter(Boolean).join(" ") || ctx.deal?.contact || "", clientEmail: email,
-    docs: out,
+    docs: encDocs(out),
     provider: {
       name: s.signer.name, dni: s.signer.dni || "", role: s.signer.role || "", company: s.company.name, cif: s.company.cif || "",
       email: s.signer.email || by || "", signaturePath: s.signaturePath, signedAt: now, ip: ip || "servidor", by: by || "automatización",
@@ -374,7 +398,8 @@ async function listTemplates(req, res) {
   const user = await staff(req, res);
   if (!user) return;
   const snap = await db.collection("contractTemplates").where("orgId", "==", user.orgId).get();
-  const templates = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.archived)
+  const archived = req.query?.archived === "1";
+  const templates = snap.docs.map((d) => ({ id: d.id, ...readTpl(d.data()) })).filter((t) => !!t.archived === archived)
     .map(({ blocks, ...t }) => ({ ...t, preview: (blocks || []).slice(0, 400) }))
     .sort((a, b) => String(a.name).localeCompare(String(b.name)));
   res.json({ ok: true, templates });
@@ -388,14 +413,15 @@ async function saveTemplate(req, res) {
   const name = clip(b.name, 120);
   if (!name) return fail(res, "Ponle un nombre a la plantilla");
   const ref = b.id ? db.collection("contractTemplates").doc(String(b.id)) : db.collection("contractTemplates").doc();
-  const cur = b.id ? (await ref.get()).data() : null;
+  const cur = b.id ? readTpl((await ref.get()).data()) : null;
   if (b.id && (!cur || orgOf(cur) !== orgId)) return fail(res, "La plantilla no existe", 404);
   const kind = cur?.kind || (b.kind === "pdf" ? "pdf" : "docx");
   const data = { orgId, name, kind, updatedAt: Date.now(), updatedBy: user.email };
   if (kind === "docx") {
     const blocks = b.blocks ? cleanBlocks(b.blocks) : cur?.blocks || [];
     if (!blocks.length) return fail(res, "El documento está vacío");
-    Object.assign(data, { blocks, fields: cleanFields(b.fields, holesOf(blocks)) });
+    // Sin «fields» en la petición (p. ej. solo cambia el nombre) se conserva lo elegido para cada hueco.
+    Object.assign(data, { blocks: encBlocks(blocks), fields: cleanFields(Array.isArray(b.fields) ? b.fields : cur?.fields, holesOf(blocks)) });
   } else if (!cur) {
     const buf = Buffer.from(String(b.data || ""), "base64");
     if (!buf.length || buf.length > 10 * 1024 * 1024 || buf.subarray(0, 4).toString() !== "%PDF") return fail(res, "No es un PDF válido (máx. 10 MB)");
@@ -407,13 +433,33 @@ async function saveTemplate(req, res) {
   await ref.set(data, { merge: true });
   res.json({ ok: true, id: ref.id });
 }
+// GET /contracts/templates/:id — la plantilla COMPLETA (para editarla; la lista solo trae un trozo).
+async function getTemplate(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  const id = String(req.params.id || "");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return fail(res, "La plantilla no existe", 404);
+  const t = readTpl((await db.collection("contractTemplates").doc(id).get()).data());
+  if (!t || orgOf(t) !== user.orgId) return fail(res, "La plantilla no existe", 404);
+  res.json({ ok: true, template: { id, name: t.name, kind: t.kind, blocks: t.blocks || [], fields: t.fields || [], archived: !!t.archived, updatedAt: t.updatedAt || t.createdAt || null } });
+}
+async function restoreTemplate(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  const ref = db.collection("contractTemplates").doc(String(req.body?.id || "x"));
+  const cur = (await ref.get()).data();
+  if (!cur || orgOf(cur) !== user.orgId) return fail(res, "La plantilla no existe", 404);
+  await ref.set({ archived: false, updatedAt: Date.now(), updatedBy: user.email }, { merge: true });
+  res.json({ ok: true });
+}
+
 async function archiveTemplate(req, res) {
   const user = await staff(req, res);
   if (!user) return;
   const ref = db.collection("contractTemplates").doc(String(req.body?.id || "x"));
   const cur = (await ref.get()).data();
   if (!cur || orgOf(cur) !== user.orgId) return fail(res, "La plantilla no existe", 404);
-  await ref.set({ archived: true, updatedAt: Date.now() }, { merge: true });
+  await ref.set({ archived: true, updatedAt: Date.now(), updatedBy: user.email }, { merge: true });
   res.json({ ok: true });
 }
 
@@ -426,13 +472,13 @@ async function prepare(req, res) {
   const out = [];
   for (const d of (Array.isArray(docs) ? docs : []).slice(0, 10)) {
     if (d.templateId) {
-      const t = (await db.collection("contractTemplates").doc(String(d.templateId)).get()).data();
+      const t = readTpl((await db.collection("contractTemplates").doc(String(d.templateId)).get()).data());
       if (!t || orgOf(t) !== user.orgId) continue;
-      out.push(t.kind === "pdf" ? { name: t.name, kind: "pdf", fields: [] } : { name: t.name, kind: "docx", fields: t.fields, ...resolveValues(t.fields, ctx) });
+      out.push(t.kind === "pdf" ? { name: t.name, kind: "pdf", fields: [] } : { name: t.name, kind: "docx", blocks: t.blocks || [], fields: t.fields, ...resolveValues(t.fields, ctx) });
     } else if (d.upload && d.upload.kind !== "pdf") {
       const blocks = cleanBlocks(d.upload.blocks);
       const fields = cleanFields(d.upload.fields, holesOf(blocks));
-      out.push({ name: clip(d.upload.name, 120), kind: "docx", fields, ...resolveValues(fields, ctx) });
+      out.push({ name: clip(d.upload.name, 120), kind: "docx", blocks, fields, ...resolveValues(fields, ctx) });
     } else out.push({ name: clip(d.upload?.name, 120), kind: "pdf", fields: [] });
   }
   const c = ctx.contact || {};
@@ -450,19 +496,33 @@ async function send(req, res) {
     for (const d of (b.docs || []).filter((x) => x.upload && x.saveAsTemplate)) {
       const ref = db.collection("contractTemplates").doc();
       if (d.upload.kind === "pdf") {
-        const buf = Buffer.from(String(d.upload.data || ""), "base64");
+        const src = d.upload.copyOf ? await pdfOfContract(orgId, d.upload.copyOf) : null;
+        const buf = src ? (await bucket().file(src.sourcePath).download())[0] : Buffer.from(String(d.upload.data || ""), "base64");
         const path = `contracts/${orgId}/templates/${ref.id}.pdf`;
         await bucket().file(path).save(buf, { contentType: "application/pdf", resumable: false });
         await ref.set({ orgId, name: clip(d.upload.name, 120), kind: "pdf", sourcePath: path, sourceHash: sha256(buf), fields: [], createdAt: Date.now(), createdBy: user.email });
       } else {
         const blocks = cleanBlocks(d.upload.blocks);
-        await ref.set({ orgId, name: clip(d.upload.name, 120), kind: "docx", blocks, fields: cleanFields(d.upload.fields, holesOf(blocks)), createdAt: Date.now(), createdBy: user.email });
+        await ref.set({ orgId, name: clip(d.upload.name, 120), kind: "docx", blocks: encBlocks(blocks), fields: cleanFields(d.upload.fields, holesOf(blocks)), createdAt: Date.now(), createdBy: user.email });
       }
     }
     res.json({ ok: true, ...r });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message, missing: e.missing || [] });
   }
+}
+
+// POST /contracts/duplicate { id } — los documentos de un contrato, tal y como se enviaron, para
+// mandarlos a otra persona (los huecos se vuelven a rellenar con los datos del nuevo cliente).
+async function duplicate(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  const c = readContract((await db.collection("contracts").doc(String(req.body?.id || "x")).get()).data());
+  if (!c || orgOf(c) !== user.orgId) return fail(res, "No existe", 404);
+  const docs = (c.docs || []).map((d, i) => (d.kind === "pdf"
+    ? { name: d.name, kind: "pdf", copyOf: { contractId: String(req.body.id), i } }
+    : { name: d.name, kind: "docx", blocks: d.blocks || [], fields: d.fields?.length ? d.fields : cleanFields([], holesOf(d.blocks || [])), guess: !d.fields?.length }));
+  res.json({ ok: true, title: c.title, docs });
 }
 
 const STATUS_LABEL = { sent: "Enviado", viewed: "Recibido", completed: "Firmado", cancelled: "Anulado" };
@@ -552,7 +612,7 @@ async function byToken(token) {
 async function publicView(req, res) {
   const doc = await byToken(req.params.token);
   if (!doc) return fail(res, "Este enlace no es válido", 404);
-  const c = doc.data();
+  const c = readContract(doc.data());
   if (c.status === "cancelled" || (c.baja && c.status !== "completed")) return fail(res, "Este documento ya no está disponible", 410);
   if (c.status === "sent") {
     const now = Date.now();
@@ -600,7 +660,7 @@ async function publicSign(req, res) {
     const c = s.data();
     if (!c || c.status === "completed" || c.status === "cancelled" || c.baja || c.signing) return null;
     tx.update(doc.ref, { signing: true });
-    return c;
+    return readContract(c);
   });
   if (!claimed) return fail(res, "Este documento ya está firmado o no está disponible", 409);
   const orgId = orgOf(claimed);
@@ -624,7 +684,7 @@ async function publicSign(req, res) {
       if (d.kind === "pdf") files.push({ path: d.sourcePath, name: `${base}.pdf`, size: 0, type: "application/pdf" });
       files.push({ path: signedPath, name: d.kind === "pdf" ? `${base} - Hoja de firmas.pdf` : `${base} - firmado.pdf`, size: pdf.length, type: "application/pdf" });
     }
-    await doc.ref.update({ client: c.client, events: c.events, docs, status: "completed", completedAt: now, updatedAt: now, signing: admin.firestore.FieldValue.delete() });
+    await doc.ref.update({ client: c.client, events: c.events, docs: encDocs(docs), status: "completed", completedAt: now, updatedAt: now, signing: admin.firestore.FieldValue.delete() });
     // Copia firmada a las dos partes.
     const s = (await (await SETTINGS(orgId)).get()).data() || {};
     const brand = await brandFor(orgId);
@@ -693,6 +753,6 @@ async function sendFromRule(deal, rule, stageName) {
 }
 
 module.exports = {
-  getSettings, saveSettings, listTemplates, saveTemplate, archiveTemplate, prepare, send, list, fileUrl, cancel, baja,
+  getSettings, saveSettings, listTemplates, getTemplate, saveTemplate, archiveTemplate, restoreTemplate, prepare, send, list, fileUrl, cancel, baja, duplicate,
   publicView, publicSign, verify, sendFromRule, buildSignedPdf, cleanBlocks, holesOf, createContract,
 };

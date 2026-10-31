@@ -9,12 +9,18 @@ import { contractsApi, toBase64 } from "../lib/api";
 import { blocksFromDocx, holesOf, guessSource } from "../lib/docx";
 import "./contracts.css";
 
-export default function SendContractModal({ contactId, dealId, onClose, onSent }) {
+// initialTemplates: plantillas ya marcadas (botón «Enviar a firmar» de una plantilla).
+// initialUploads: documentos de otro contrato («Duplicar para otra persona»): Word con sus bloques
+// y huecos, o PDF { copyOf: { contractId, i } } que el servidor reutiliza.
+export default function SendContractModal({ contactId, dealId, onClose, onSent, initialTemplates = [], initialUploads = [], initialTitle = "" }) {
   const [step, setStep] = useState("choose");
   const [templates, setTemplates] = useState(null);
-  const [picked, setPicked] = useState([]); // ids de plantillas
-  const [uploads, setUploads] = useState([]); // { key, name, kind, blocks?, fields?, file?, saveAsTemplate }
-  const [title, setTitle] = useState("");
+  const [picked, setPicked] = useState(initialTemplates); // ids de plantillas
+  const [uploads, setUploads] = useState(() => initialUploads.map((u, i) => ({
+    key: `dup${i}`, name: u.name, kind: u.kind, saveAsTemplate: false,
+    ...(u.kind === "pdf" ? { copyOf: u.copyOf } : { blocks: u.blocks, fields: (u.fields || []).map((f) => (u.guess ? { ...f, source: guessSource(f.key) } : f)) }),
+  }))); // { key, name, kind, blocks?, fields?, file?, copyOf?, saveAsTemplate }
+  const [title, setTitle] = useState(initialTitle);
   const [prepared, setPrepared] = useState(null); // { docs, client, ready }
   const [values, setValues] = useState({}); // por documento: { idx: { hueco: valor } }
   const [preview, setPreview] = useState(-1);
@@ -48,7 +54,7 @@ export default function SendContractModal({ contactId, dealId, onClose, onSent }
   const docsPayload = (withData) => Promise.all([
     ...picked.map((templateId) => ({ templateId })),
     ...uploads.map(async (u) => ({
-      upload: { name: u.name, kind: u.kind, ...(u.kind === "docx" ? { blocks: u.blocks, fields: u.fields } : {}), ...(withData && u.kind === "pdf" ? { data: await toBase64(u.file) } : {}) },
+      upload: { name: u.name, kind: u.kind, ...(u.kind === "docx" ? { blocks: u.blocks, fields: u.fields } : {}), ...(u.copyOf ? { copyOf: u.copyOf } : withData && u.kind === "pdf" ? { data: await toBase64(u.file) } : {}) },
       saveAsTemplate: u.saveAsTemplate,
     })),
   ]);
@@ -82,10 +88,8 @@ export default function SendContractModal({ contactId, dealId, onClose, onSent }
     finally { setBusy(""); }
   };
 
-  const blocksOf = (i) => {
-    if (i < picked.length) return templates?.find((t) => t.id === picked[i])?.preview || [];
-    return uploads[i - picked.length]?.blocks || [];
-  };
+  // Vista previa con el documento completo (lo devuelve el servidor al preparar el envío).
+  const blocksOf = (i) => prepared?.docs?.[i]?.blocks || (i < picked.length ? templates?.find((t) => t.id === picked[i])?.preview : uploads[i - picked.length]?.blocks) || [];
 
   const footer = step === "done"
     ? <button className="crm-btn" onClick={onClose}>Cerrar</button>
@@ -104,6 +108,7 @@ export default function SendContractModal({ contactId, dealId, onClose, onSent }
         <>
           <div className="crm-field"><label>Título del envío (opcional)</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Si lo dejas vacío, se usan los nombres de los documentos" /></div>
           <div style={{ fontWeight: 700, fontSize: 13, margin: "10px 0 6px" }}>Plantillas</div>
+          {picked.filter((id) => templates && !templates.some((t) => t.id === id)).length > 0 && <p className="cf-err" style={{ margin: "0 0 6px" }}>Una de las plantillas elegidas ya no está disponible (se quitó). Recupérala en Plantillas o elige otra.</p>}
           {templates === null ? <p>Cargando…</p> : templates.length ? templates.map((t) => (
             <label key={t.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", cursor: "pointer" }}>
               <input type="checkbox" style={{ width: "auto" }} checked={picked.includes(t.id)} onChange={(e) => setPicked((p) => (e.target.checked ? [...p, t.id] : p.filter((x) => x !== t.id)))} />
@@ -112,6 +117,7 @@ export default function SendContractModal({ contactId, dealId, onClose, onSent }
           )) : <p style={{ color: "var(--crm-muted)", fontSize: 13, margin: 0 }}>Aún no hay plantillas (se crean en Ventas › Contratos › Plantillas).</p>}
 
           <div style={{ fontWeight: 700, fontSize: 13, margin: "14px 0 6px" }}>Documentos solo para este cliente</div>
+          {uploads.some((u) => u.key.startsWith("dup")) && <p style={{ fontSize: 12.5, color: "var(--crm-muted)", margin: "0 0 6px" }}>Copiados del contrato que estás duplicando: los datos [..] se rellenan con los del nuevo cliente en el paso siguiente.</p>}
           {uploads.map((u, i) => (
             <div key={u.key} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", flexWrap: "wrap" }}>
               <span>{u.kind === "pdf" ? "📄" : "📝"}</span>
