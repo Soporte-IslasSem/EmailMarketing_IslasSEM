@@ -33,6 +33,7 @@ const orgMail = require("./lib/orgMail");
 const orgs = require("./lib/orgs");
 const billing = require("./lib/billing");
 const platform = require("./lib/platform");
+const products = require("./lib/products");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -42,6 +43,11 @@ const api = express.Router();
 api.post("/automations/adjunto", express.json({ limit: "15mb" }), (req, res) => adjuntos.upload(req, res).catch((e) => {
   console.error("[api] POST /automations/adjunto:", e.message || e);
   if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar el archivo" });
+}));
+// Imagen de producto (1080×1080, ya recortada en el navegador).
+api.post("/products/image", express.json({ limit: "5mb" }), (req, res) => products.uploadImage(req, res).catch((e) => {
+  console.error("[api] POST /products/image:", e.message || e);
+  if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar la imagen" });
 }));
 // Contratos: plantillas (.DOCX convertido / PDF), documentos subidos y firmas dibujadas → 15 MB.
 api.use("/contracts", express.json({ limit: "15mb" }));
@@ -119,6 +125,9 @@ api.post("/orgs/create", safe(orgs.createOrg));
 api.get("/org/profile", safe(orgs.getProfile));
 api.post("/org/invite", safe(orgs.invite));
 api.get("/org/logo/:orgId", safe(orgs.logo));
+
+// --- Productos: imagen pública (las páginas /p y /c van fuera de /api) ---
+api.get("/products/img/:id", safe(products.image));
 
 // --- Suscripción (Stripe) ---
 api.post("/billing/checkout", safe(billing.checkout));
@@ -276,6 +285,14 @@ api.all("/tasks/run", async (req, res) => {
 
 app.use("/api", api);
 app.use("/api", (_req, res) => res.status(404).json({ error: "not found" }));
+
+// --- Páginas públicas de producto y catálogo (con vista previa para WhatsApp) ---
+const page = (fn) => (req, res) => fn(req, res).catch((e) => {
+  console.error(`[web] ${req.path}:`, e.message || e);
+  if (!res.headersSent) res.status(500).send("Error interno");
+});
+app.get("/p/:id", page(products.productPage));
+app.get("/c/:id", page(products.catalogPage));
 
 // --- Web (SPA): archivos estáticos + cualquier otra ruta devuelve index.html ---
 const WEB = path.join(__dirname, "public");

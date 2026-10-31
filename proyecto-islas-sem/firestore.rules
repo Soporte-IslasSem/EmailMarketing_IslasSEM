@@ -156,6 +156,13 @@ service cloud.firestore {
       allow update: if canEdit('products');
       allow delete: if canDelete('products');
     }
+    // Catálogos para compartir (varios productos en una página pública /c/:id, que sirve el servidor).
+    match /catalogs/{docId} {
+      allow read: if canRead('products');
+      allow create: if canCreate('products');
+      allow update: if canEdit('products');
+      allow delete: if canDelete('products');
+    }
     match /quotes/{docId} {
       allow read: if canRead('quotes');
       allow create: if canCreate('quotes');
