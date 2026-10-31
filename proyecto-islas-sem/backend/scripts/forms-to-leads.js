@@ -13,6 +13,8 @@ const LABEL = { sepa: "Orden de Domiciliación SEPA", juridicos: "Datos Jurídic
   for (const d of subs.docs.sort((a, b) => a.data().createdAt.toMillis() - b.data().createdAt.toMillis())) {
     const s = d.data();
     if (s.status !== "vinculado" || !s.contactId || s.leadId) continue;
+    // Si el contacto se borró después (está en la papelera), no se le crea prospecto.
+    if (!(await db.collection("contacts").doc(s.contactId).get()).exists) continue;
     const id = await leadForContact(s.orgId || "islas-sem", s.contactId, pickPerson(s.data), LABEL[s.formType] || s.formName || s.formType);
     await d.ref.update({ leadId: id });
     await db.collection("leads").doc(id).update({ lastFormAt: s.createdAt.toDate() });
