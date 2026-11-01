@@ -4,9 +4,13 @@ import { OUTBOX_STATUS, requeueEmail } from "../lib/outbox";
 import "../crm.styles.css";
 
 const KIND_LABEL = {
-  offer: "Presupuesto", sepa: "SEPA", contract: "Contrato",
+  offer: "Presupuesto", sepa: "SEPA", contract: "Contrato", "contract-signed": "Contrato firmado", invoice: "Factura",
   form: "Formulario", campaign: "Campaña", notification: "Aviso", email: "Correo", "talento-digital": "Talento Digital",
 };
+
+// Los correos de contratos ya enviados son la prueba del envío/firma: no se pueden borrar
+// (las reglas de Firestore también lo impiden).
+const isLocked = (m) => (m.kind === "contract" || m.kind === "contract-signed") && m.status === "sent";
 
 export default function Outbox() {
   const { items, loading } = useCrmCollection("outbox");
@@ -63,13 +67,15 @@ export default function Outbox() {
                   <td>{KIND_LABEL[m.kind] || m.kind}</td>
                   <td>{m.to || <span style={{ color: "var(--crm-muted)" }}>— sin email —</span>}{m.toName ? <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{m.toName}</div> : null}</td>
                   <td>{m.subject}</td>
-                  <td>{m.attachment ? "📎 PDF" : "—"}</td>
+                  <td>{m.attachment || m.attachments?.length ? "📎 PDF" : "—"}</td>
                   <td>{fmtDate(m.createdAt)}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     {(m.status === "failed" || m.status === "skipped") && (
                       <button className="crm-btn sm" onClick={() => requeueEmail(m.id)} title="Volver a poner en cola">↻ Reintentar</button>
                     )}{" "}
-                    <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar de la cola?") && crmRemove("outbox", m.id)}>✕</button>
+                    {isLocked(m)
+                      ? <span title="Contrato enviado: no se puede borrar" style={{ color: "var(--crm-muted)" }}>🔒</span>
+                      : <button className="crm-btn ghost sm" onClick={() => window.confirm("¿Eliminar de la cola?") && crmRemove("outbox", m.id)}>✕</button>}
                   </td>
                 </tr>
               );

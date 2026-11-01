@@ -34,7 +34,8 @@ const safeName = (name) => String(name || "archivo").normalize("NFC").replace(/[
 // Para subir/ver/borrar desde la app, solo adjuntos de automatizaciones de su empresa.
 const validPath = (p, orgId) => typeof p === "string" && !!orgId && p.startsWith(`${PREFIX}${orgId}/`) && !p.includes("..") && p.length < 400;
 // Para enviar por correo: también los contratos firmados de esa empresa (los pone el propio servidor).
-const mailPath = (p, orgId) => validPath(p, orgId) || (typeof p === "string" && !!orgId && p.startsWith(`contracts/${orgId}/`) && !p.includes("..") && p.length < 400);
+// …y los PDF de facturas de esa empresa.
+const mailPath = (p, orgId) => validPath(p, orgId) || (typeof p === "string" && !!orgId && (p.startsWith(`contracts/${orgId}/`) || p.startsWith(`invoices/${orgId}/`)) && !p.includes("..") && p.length < 400);
 
 // POST /api/automations/adjunto { name, data: base64 } → { ok, file: { path, name, size, type } }
 async function upload(req, res) {

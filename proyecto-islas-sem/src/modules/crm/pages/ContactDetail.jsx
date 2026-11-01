@@ -8,6 +8,7 @@ import { useOrg } from "../lib/useOrg";
 import { CustomFieldsForm, CustomFieldsView } from "../components/CustomFields";
 import { CreateFieldModal, ExtraFieldsEditor } from "../components/DealFields";
 import ContractsPanel from "../../contracts/components/ContractsPanel";
+import { openInvoicePdf } from "../lib/invoicesApi";
 import "../crm.styles.css";
 import { submissionLabel, submissionEntries } from "../../forms/public/builtinForms";
 
@@ -27,6 +28,7 @@ export default function ContactDetail() {
 
   const { items: activities } = useCrmCollection("activities");
   const { items: deals } = useCrmCollection("deals");
+  const { items: invoices } = useCrmCollection("invoices");
   const perms = usePerms();
   const { items: formSubs } = useCrmCollection("formSubmissions");
 
@@ -225,6 +227,20 @@ export default function ContactDetail() {
           </div>
 
           <ContractsPanel contactId={id} canSend={!ro} />
+
+          {invoices.some((q) => q.contactId === id) && (
+            <div className="crm-panel">
+              <h4>🧾 Facturas ({invoices.filter((q) => q.contactId === id).length})</h4>
+              {invoices.filter((q) => q.contactId === id).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((q) => (
+                <div key={q.id} className="crm-dl">
+                  <div className="row">
+                    <dt>{q.number}{q.concept ? ` · ${q.concept}` : ""} <span className="crm-chip">{q.status}</span>{q.sentAt ? <span style={{ fontSize: 12, color: "var(--crm-muted)" }}> ✉ {fmtDate(q.sentAt)}</span> : null}</dt>
+                    <dd>{money(q.amount)} {q.pdf && <button className="crm-btn ghost sm" onClick={() => openInvoicePdf(q.pdf).catch((e) => alert(e.message))}>📎 PDF</button>}</dd>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="crm-panel">
             <h4>Negocios relacionados ({relatedDeals.length})</h4>

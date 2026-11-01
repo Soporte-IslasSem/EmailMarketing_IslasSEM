@@ -175,8 +175,11 @@ service cloud.firestore {
       allow update: if canEdit('invoices');
       allow delete: if canDelete('invoices');
     }
+    // Correos de contratos ya enviados (envío a firmar y copia firmada): prueba legal, no se tocan.
     match /outbox/{docId} {
-      allow read, update, delete: if ownDocOrg();
+      allow read: if ownDocOrg();
+      allow update, delete: if ownDocOrg()
+        && !(resource.data.get('kind', '') in ['contract', 'contract-signed'] && resource.data.get('status', '') == 'sent');
       allow create: if createInMyOrg();
     }
     // Envíos de formularios PÚBLICOS: los guarda el servidor (/api/forms/submit, con reCAPTCHA y

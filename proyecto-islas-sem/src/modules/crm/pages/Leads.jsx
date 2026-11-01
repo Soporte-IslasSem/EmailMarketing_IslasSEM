@@ -117,7 +117,9 @@ export default function Leads() {
       phone: lead.phone || lead.whatsapp || "",
       company: lead.company || "",
       companyId,
-      clientType: "",
+      // Tipo(s) de cliente del formulario que rellenó siendo prospecto (lo guarda el servidor).
+      clientTypes: Array.isArray(lead.clientTypes) ? lead.clientTypes.filter(Boolean) : lead.clientType ? [lead.clientType] : [],
+      clientType: (Array.isArray(lead.clientTypes) && lead.clientTypes[0]) || lead.clientType || "",
       relation: "nuevo",
       stage: "Lead",
       notes: lead.notes || "",

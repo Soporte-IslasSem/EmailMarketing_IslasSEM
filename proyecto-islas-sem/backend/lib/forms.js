@@ -315,9 +315,10 @@ async function formClientType(formType) {
 
 const typesOf = (d) => (Array.isArray(d.clientTypes) ? d.clientTypes.filter(Boolean) : d.clientType ? [d.clientType] : []);
 
-// Le pone el tipo al contacto. Si la persona solo era prospecto, se convierte en contacto con
-// ese tipo (como "Convertir" en Prospectos) y sus negociaciones pasan al contacto.
-async function applyClientType(orgId, typeId, { contactId, leadId, person, label }) {
+// Le pone el tipo al contacto. Si la persona solo es prospecto (primera vez que rellena un
+// formulario), SIGUE siendo prospecto: el tipo se le guarda en el prospecto y se le pondrá al
+// contacto cuando alguien lo convierta en Prospectos (decisión del cliente, 01/11/2026).
+async function applyClientType(orgId, typeId, { contactId, leadId }) {
   if (!contactId && leadId) {
     const leadRef = db.collection("leads").doc(leadId);
     const lead = (await leadRef.get()).data();
@@ -326,22 +327,9 @@ async function applyClientType(orgId, typeId, { contactId, leadId, person, label
     if (prev?.exists) {
       contactId = prev.id;
     } else {
-      const all = await db.collection("contacts").where("orgId", "==", orgId).select("clientId").get();
-      let n = 0;
-      all.docs.forEach((d) => { const m = /^CLI-(\d+)$/.exec(d.data().clientId || ""); if (m) n = Math.max(n, parseInt(m[1], 10)); });
-      const ref = await db.collection("contacts").add({
-        orgId, firstName: lead.firstName || person.firstName || "", lastName: lead.lastName || person.lastName || "",
-        email: norm(lead.email || person.email), phone: lead.phone || person.phone || "", whatsapp: lead.whatsapp || "",
-        company: lead.company || person.company || "", clientTypes: [typeId], clientType: typeId,
-        clientId: "CLI-" + String(n + 1).padStart(4, "0"), relation: "nuevo", stage: "Lead", source: lead.source || "Formulario web",
-        notes: lead.notes || "", responsable: lead.responsable || "", custom: lead.custom || {}, fromLeadId: leadId,
-        createdAt: new Date(), updatedAt: new Date(),
-      });
-      await leadRef.update({ status: "Convertido", convertedContactId: ref.id, updatedAt: new Date() });
-      const deals = await db.collection("deals").where("orgId", "==", orgId).where("leadId", "==", leadId).get();
-      for (const d of deals.docs) if (!d.data().contactId) await d.ref.update({ contactId: ref.id, updatedAt: new Date() });
-      await addActivity(orgId, { type: "Nota", title: `Prospecto convertido en contacto al rellenar "${label}"`, entity: "contact", entityId: ref.id, contactId: ref.id, leadId });
-      return { contactId: ref.id, leadId };
+      const cur = typesOf(lead);
+      if (!cur.includes(typeId)) await leadRef.update({ clientTypes: [...cur, typeId], clientType: cur[0] || typeId, updatedAt: new Date() });
+      return { contactId, leadId };
     }
   }
   if (!contactId) return { contactId, leadId };
@@ -421,7 +409,8 @@ async function processFormSubmissions() {
     await fillEmptyFields(contactId ? "contacts" : "leads", contactId || leadId, person)
       .catch((e) => console.warn("[forms] completar ficha:", e.message));
     let dealCreated = false;
-    if (!dealId) {
+    // Primera vez (solo prospecto): no se crea negociación; la crea el equipo al convertirlo.
+    if (!dealId && contactId) {
       const r = await ensureDeal(orgId, { ...s, id: doc.id }, { contactId, leadId, person, label })
         .catch((e) => { console.warn("[forms] negociación:", e.message); return { dealId: "", created: false }; });
       dealId = r.dealId; dealCreated = r.created;

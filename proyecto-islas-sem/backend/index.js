@@ -34,6 +34,7 @@ const orgs = require("./lib/orgs");
 const billing = require("./lib/billing");
 const platform = require("./lib/platform");
 const products = require("./lib/products");
+const invoices = require("./lib/invoices");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -43,6 +44,11 @@ const api = express.Router();
 api.post("/automations/adjunto", express.json({ limit: "15mb" }), (req, res) => adjuntos.upload(req, res).catch((e) => {
   console.error("[api] POST /automations/adjunto:", e.message || e);
   if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar el archivo" });
+}));
+// PDF de una factura (hasta 10 MB → ~14 MB en base64).
+api.post("/invoices/pdf", express.json({ limit: "15mb" }), (req, res) => invoices.uploadPdf(req, res).catch((e) => {
+  console.error("[api] POST /invoices/pdf:", e.message || e);
+  if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar el PDF" });
 }));
 // Imagen de producto (1080×1080, ya recortada en el navegador).
 api.post("/products/image", express.json({ limit: "5mb" }), (req, res) => products.uploadImage(req, res).catch((e) => {
@@ -154,6 +160,8 @@ api.post("/talento-digital/enviar", safe(talento.enviar));
 api.post("/talento-digital/archivar", safe(talento.archivar));
 api.post("/automations/adjunto-url", safe(adjuntos.link));
 api.post("/automations/adjunto-borrar", safe(adjuntos.remove));
+api.post("/invoices/pdf-url", safe(invoices.pdfUrl));
+api.post("/invoices/send", safe(invoices.send));
 
 // --- Contratos con firma electrónica (CRM › Ventas › Contratos) ---
 api.get("/contracts/settings", safe(contratos.getSettings));
