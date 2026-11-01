@@ -59,9 +59,9 @@ export const DEFAULT_PERMS = {
 const norm = (s) => String(s || "").trim().toLowerCase();
 
 // Módulos de la empresa según su plan (igual que el servidor, lib/tenant.js featuresOf).
-const FEATURE_DEFAULTS = { whatsapp: true, contracts: true, gcal: true, talentoDigital: false, restaurants: false };
+const FEATURE_DEFAULTS = { whatsapp: true, contracts: true, gcal: true, talentoDigital: false, restaurants: false, school: false };
 export function featuresOf(orgId, org) {
-  const own = orgId === "islas-sem" ? { talentoDigital: true, restaurants: true } : {};
+  const own = orgId === "islas-sem" ? { talentoDigital: true, restaurants: true, school: true } : {};
   return { ...FEATURE_DEFAULTS, ...own, ...(org?.features || {}) };
 }
 // Ruta → módulo que hace falta tener.
@@ -69,6 +69,7 @@ const ROUTE_FEATURE = [
   [/^\/dashboard\/whatsapp/, "whatsapp"],
   [/^\/dashboard\/talento-digital/, "talentoDigital"],
   [/^\/dashboard\/restaurantes/, "restaurants"],
+  [/^\/dashboard\/escuela/, "school"],
   [/^\/dashboard\/crm\/contracts/, "contracts"],
 ];
 
@@ -121,6 +122,8 @@ export function usePerms() {
       if (/^\/dashboard\/campaigns\/create/.test(path)) return level("campaigns", "add") > 0;
       // Talento Digital: redactar y enviar correos, como crear campañas.
       if (/^\/dashboard\/talento-digital/.test(path)) return level("campaigns", "add") > 0;
+      // Escuela: alumnado y empresas de prácticas, para quien ve los contactos del CRM.
+      if (/^\/dashboard\/escuela/.test(path)) return level("contacts", "read") > 0;
       // WhatsApp: los chats son de los contactos (en Ajustes, lo común solo lo cambia un administrador).
       if (/^\/dashboard\/whatsapp/.test(path)) return level("contacts", "read") > 0;
       if (/^\/dashboard\/campaigns\/edit/.test(path)) return level("campaigns", "edit") > 0;

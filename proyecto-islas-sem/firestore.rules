@@ -225,6 +225,31 @@ service cloud.firestore {
       allow read, update, delete: if ownDocOrg();
       allow create: if createInMyOrg();
     }
+    // Escuela › Alumnado prácticas. Las altas públicas las guarda el servidor (/api/school/apply);
+    // el equipo gestiona alumnos, cursos y empresas de prácticas de su organización.
+    match /students/{docId} {
+      allow read, delete: if ownDocOrg();
+      allow update: if ownDocOrg() && request.resource.data.orgId == resource.data.orgId;
+      allow create: if createInMyOrg();
+    }
+    match /schoolCourses/{docId} {
+      allow read, delete: if ownDocOrg();
+      allow update: if ownDocOrg() && request.resource.data.orgId == resource.data.orgId;
+      allow create: if createInMyOrg();
+    }
+    match /schoolPlacements/{docId} {
+      allow read, delete: if ownDocOrg();
+      allow update: if ownDocOrg() && request.resource.data.orgId == resource.data.orgId;
+      allow create: if createInMyOrg();
+    }
+    // Solicitudes de entrevista: las crea el servidor desde la página pública de la empresa.
+    match /schoolInterviews/{docId} {
+      allow read, delete: if ownDocOrg();
+      allow update: if ownDocOrg() && request.resource.data.orgId == resource.data.orgId;
+    }
+    match /schoolSettings/{orgId} {
+      allow read, write: if isMember(orgId);
+    }
     // Ajustes de Restaurantes (nombre de la marca): un documento por organización
     match /restaurantSettings/{orgId} {
       allow read, write: if isMember(orgId);

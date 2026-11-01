@@ -35,7 +35,7 @@ const safeName = (name) => String(name || "archivo").normalize("NFC").replace(/[
 const validPath = (p, orgId) => typeof p === "string" && !!orgId && p.startsWith(`${PREFIX}${orgId}/`) && !p.includes("..") && p.length < 400;
 // Para enviar por correo: también los contratos firmados de esa empresa (los pone el propio servidor).
 // …y los PDF de facturas de esa empresa.
-const mailPath = (p, orgId) => validPath(p, orgId) || (typeof p === "string" && !!orgId && (p.startsWith(`contracts/${orgId}/`) || p.startsWith(`invoices/${orgId}/`)) && !p.includes("..") && p.length < 400);
+const mailPath = (p, orgId) => validPath(p, orgId) || (typeof p === "string" && !!orgId && (p.startsWith(`contracts/${orgId}/`) || p.startsWith(`invoices/${orgId}/`) || p.startsWith(`school/${orgId}/`)) && !p.includes("..") && p.length < 400);
 
 // POST /api/automations/adjunto { name, data: base64 } → { ok, file: { path, name, size, type } }
 async function upload(req, res) {

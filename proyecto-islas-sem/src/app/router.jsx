@@ -89,6 +89,11 @@ import Pipeline from "../modules/crm/pages/Pipeline.jsx";
 import Activities from "../modules/crm/pages/Activities.jsx";
 import Outbox from "../modules/crm/pages/Outbox.jsx";
 import TalentoDigital from "../modules/talentoDigital/TalentoDigital.jsx";
+import SchoolStudents from "../modules/school/pages/Students.jsx";
+import SchoolPlacements from "../modules/school/pages/Placements.jsx";
+import SchoolCourses from "../modules/school/pages/Courses.jsx";
+import SchoolApply from "../modules/school/public/SchoolApply.jsx";
+import SchoolMatch from "../modules/school/public/SchoolMatch.jsx";
 import WhatsApp from "../modules/whatsapp/pages/WhatsApp.jsx";
 import WhatsAppSettings from "../modules/whatsapp/pages/WhatsAppSettings.jsx";
 import WhatsAppFunnels from "../modules/whatsapp/pages/Funnels.jsx";
@@ -150,6 +155,9 @@ const router = createBrowserRouter([
   { path: "/firmar/:token", element: <SignContract /> },
   { path: "/verificar", element: <VerifyContract /> },
   { path: "/verificar/:code", element: <VerifyContract /> },
+  // Escuela: alta pública del alumnado y página de cada empresa de prácticas
+  { path: "/alumnado", element: <SchoolApply /> },
+  { path: "/practicas/:token", element: <SchoolMatch /> },
   // Página pública de clientela: un botón por cada formulario publicado.
   { path: "/clientela", element: <ClientArea /> },
 
@@ -235,6 +243,9 @@ const router = createBrowserRouter([
       { path: "crm/analytics", element: <Analytics /> },
       { path: "crm/outbox", element: <Outbox /> },
       { path: "talento-digital", element: <TalentoDigital /> },
+      { path: "escuela", element: <SchoolStudents /> },
+      { path: "escuela/empresas", element: <SchoolPlacements /> },
+      { path: "escuela/cursos", element: <SchoolCourses /> },
       { path: "whatsapp", element: <WhatsApp /> },
       { path: "whatsapp/ajustes", element: <WhatsAppSettings /> },
       { path: "whatsapp/embudos", element: <WhatsAppFunnels /> },

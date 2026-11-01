@@ -134,9 +134,9 @@ async function brandFor(orgId) {
 const footerText = (b) => [b.legalName || b.name, b.place, b.website].filter(Boolean).join(" · ");
 
 // Módulos por empresa. ISLAS SEM tiene los suyos propios (Talento Digital, Restaurantes).
-const FEATURE_DEFAULTS = { whatsapp: true, contracts: true, gcal: true, talentoDigital: false, restaurants: false };
+const FEATURE_DEFAULTS = { whatsapp: true, contracts: true, gcal: true, talentoDigital: false, restaurants: false, school: false };
 function featuresOf(org) {
-  const own = org?.id === DEFAULT_ORG_ID ? { talentoDigital: true, restaurants: true } : {};
+  const own = org?.id === DEFAULT_ORG_ID ? { talentoDigital: true, restaurants: true, school: true } : {};
   return { ...FEATURE_DEFAULTS, ...own, ...(org?.features || {}) };
 }
 

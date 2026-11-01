@@ -35,6 +35,7 @@ const billing = require("./lib/billing");
 const platform = require("./lib/platform");
 const products = require("./lib/products");
 const invoices = require("./lib/invoices");
+const school = require("./lib/school");
 
 const app = express();
 app.set("trust proxy", true); // Plesk/nginx delante: IP real para reCAPTCHA
@@ -44,6 +45,11 @@ const api = express.Router();
 api.post("/automations/adjunto", express.json({ limit: "15mb" }), (req, res) => adjuntos.upload(req, res).catch((e) => {
   console.error("[api] POST /automations/adjunto:", e.message || e);
   if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar el archivo" });
+}));
+// Alta pública de alumnado (el CV va en el cuerpo: algo más que el límite general).
+api.post("/school/apply", express.json({ limit: "300kb" }), (req, res) => school.apply(req, res).catch((e) => {
+  console.error("[api] POST /school/apply:", e.message || e);
+  if (!res.headersSent) res.status(500).json({ ok: false, error: "No se pudo guardar la inscripción" });
 }));
 // PDF de una factura (hasta 10 MB → ~14 MB en base64).
 api.post("/invoices/pdf", express.json({ limit: "15mb" }), (req, res) => invoices.uploadPdf(req, res).catch((e) => {
@@ -161,6 +167,14 @@ api.post("/talento-digital/archivar", safe(talento.archivar));
 api.post("/automations/adjunto-url", safe(adjuntos.link));
 api.post("/automations/adjunto-borrar", safe(adjuntos.remove));
 api.post("/invoices/pdf-url", safe(invoices.pdfUrl));
+// --- Escuela › Alumnado prácticas (formulario público de alta, página de cada empresa y CV) ---
+api.get("/school/courses", safe(school.publicCourses));
+api.get("/school/match/:token", safe(school.match));
+api.get("/school/match/:token/cv/:id", safe(school.matchCv));
+api.post("/school/match/:token/interview", safe(school.interview));
+api.post("/school/cv-url", safe(school.cvUrl));
+api.post("/school/cv-regenerate", safe(school.cvRegenerate));
+api.post("/school/placement-token", safe(school.placementToken));
 api.post("/invoices/send", safe(invoices.send));
 
 // --- Contratos con firma electrónica (CRM › Ventas › Contratos) ---

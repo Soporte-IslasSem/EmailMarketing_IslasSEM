@@ -1,0 +1,43 @@
+/* Escuela › Alumnado prácticas */
+.sc-cv label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: #33403f; margin-bottom: 10px; }
+.sc-cv label small { font-weight: 400; color: #6b7d7d; }
+.sc-cv input, .sc-cv textarea, .sc-cv select { font: inherit; font-weight: 400; padding: 9px 11px; border: 1px solid #d8e2e2; border-radius: 8px; background: #fff; color: #1f2a2a; width: 100%; box-sizing: border-box; }
+.sc-cv input[type="range"] { padding: 0; border: 0; }
+.sc-cv input:focus, .sc-cv textarea:focus, .sc-cv select:focus { outline: 2px solid #1a9190; outline-offset: -1px; border-color: transparent; }
+.sc-cv .sc-check { flex-direction: row; align-items: center; gap: 8px; padding-top: 22px; font-weight: 500; }
+.sc-cv .sc-check input { width: auto; }
+.sc-fs { border: 1px solid #e3eaea; border-radius: 12px; padding: 12px 14px 4px; margin: 0 0 14px; background: #fff; }
+.sc-fs legend { font-weight: 700; font-size: 14px; padding: 0 6px; color: #136b68; }
+.sc-hint { margin: 0 0 8px; font-size: 12.5px; color: #6b7d7d; }
+.sc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 640px) { .sc-two { grid-template-columns: 1fr; } }
+.sc-row { display: flex; gap: 8px; align-items: flex-start; border-top: 1px dashed #e3eaea; padding-top: 10px; margin-bottom: 4px; }
+.sc-row:first-of-type { border-top: 0; padding-top: 0; }
+.sc-row__body { flex: 1; min-width: 0; }
+.sc-x { border: 0; background: #f4f7f7; color: #b0304c; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; margin-top: 20px; }
+.sc-add { border: 1px dashed #9cc9c7; background: #f4fbfa; color: #136b68; border-radius: 8px; padding: 7px 12px; font-weight: 600; cursor: pointer; margin: 4px 0 10px; }
+
+/* Página pública (alta y empresa) */
+.sc-page { min-height: 100vh; background: #f5f7f7; color: #1f2a2a; font-family: inherit; }
+.sc-hero { background: linear-gradient(135deg, var(--sc-c, #136b68), #0d2f2e); color: #fff; padding: 42px 20px 70px; text-align: center; }
+.sc-hero img { max-height: 46px; margin-bottom: 14px; }
+.sc-hero h1 { margin: 6px 0 8px; font-size: clamp(26px, 4vw, 40px); line-height: 1.15; }
+.sc-hero p { margin: 0 auto; max-width: 640px; opacity: .9; }
+.sc-pill { display: inline-block; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); border-radius: 999px; padding: 5px 13px; font-size: 12.5px; margin: 3px; }
+.sc-tag { display: inline-block; background: rgba(255,255,255,.95); color: var(--sc-c, #136b68); border-radius: 999px; padding: 4px 12px; font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.sc-body { max-width: 860px; margin: -40px auto 40px; padding: 0 16px; }
+.sc-card { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(15, 47, 46, .08); padding: 22px; margin-bottom: 16px; }
+.sc-btn { border: 0; border-radius: 999px; padding: 10px 18px; font-weight: 700; cursor: pointer; background: var(--sc-c, #136b68); color: #fff; font: inherit; font-weight: 700; }
+.sc-btn.dark { background: #1f2a2a; }
+.sc-btn.ghost { background: #fff; color: #1f2a2a; border: 1px solid #d8e2e2; }
+.sc-btn:disabled { opacity: .6; cursor: default; }
+.sc-err { background: #fdeef1; color: #b0304c; padding: 10px 12px; border-radius: 8px; font-size: 14px; margin: 10px 0; }
+.sc-cand { display: flex; gap: 16px; align-items: center; border: 1px solid #e8eeee; border-radius: 14px; padding: 16px; margin-bottom: 12px; position: relative; background: #fff; }
+.sc-cand__av { width: 64px; height: 64px; border-radius: 14px; background: linear-gradient(135deg, var(--sc-c, #136b68), #1a9190); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 22px; flex: none; }
+.sc-cand__main { flex: 1; min-width: 0; }
+.sc-cand__main h3 { margin: 0 0 6px; font-size: 17px; }
+.sc-chip { display: inline-block; border: 1px solid #e3eaea; background: #f7fafa; border-radius: 999px; padding: 3px 10px; font-size: 12px; margin: 0 4px 4px 0; }
+.sc-new { position: absolute; top: -9px; left: 14px; background: #e2b83c; color: #1f2a2a; font-size: 10px; font-weight: 800; letter-spacing: .1em; padding: 3px 8px; border-radius: 999px; }
+.sc-meta { font-size: 12.5px; color: #6b7d7d; }
+.sc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 640px) { .sc-cand { flex-wrap: wrap; } .sc-actions { width: 100%; } }
