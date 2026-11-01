@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../../../config/firebaseConfig";
@@ -22,7 +22,7 @@ const PAGE = 50;
 
 const emptyForm = {
   firstName: "", lastName: "", email: "", phone: "", whatsapp: "",
-  company: "", role: "", area: "", clientType: "", relation: "nuevo", stage: "Lead",
+  company: "", role: "", area: "", website: "", clientType: "", relation: "nuevo", stage: "Lead",
   tags: "", responsable: "", dni: "", address: "", city: "", province: "", notes: "",
 };
 
@@ -44,6 +44,16 @@ function Th({ k, sort, onSort, children }) {
 }
 
 export default function Contacts() {
+  // Alto de la cabecera fija: la fila de títulos de la tabla se queda justo debajo.
+  const stickyRef = useRef(null);
+  const [stickyH, setStickyH] = useState(0);
+  useEffect(() => {
+    const el = stickyRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(() => setStickyH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const { items: all, loading, orgId } = useCrmCollection("contacts");
   const perms = usePerms();
   // "Propios": solo los contactos que lleva, creó o tiene asignados.
@@ -235,6 +245,8 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
 
   return (
     <div className="crm">
+      {/* Cabecera fija (título, botones, tipos, filtros y selección): no se va al bajar por la lista. */}
+      <div ref={stickyRef} style={{ position: "sticky", top: -28, zIndex: 20, background: "#F5F7F7", margin: "-28px -2px 0", padding: "28px 2px 2px", boxShadow: "0 6px 8px -8px rgba(0,0,0,.18)" }}>
       <div className="crm__top">
         <div>
           <h1>Contactos</h1>
@@ -245,7 +257,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
           {perms.can("contacts", "export") && (
             <button className="crm-btn ghost" onClick={() => exportCsv("contactos", filtered, [
               ["ID", (c) => c.clientId], ["Nombre", (c) => c.firstName], ["Apellidos", (c) => c.lastName], ["Email", (c) => c.email],
-              ["Teléfono", (c) => c.phone || c.whatsapp], ["Empresa", (c) => c.company], ["Cargo", (c) => c.role],
+              ["Teléfono", (c) => c.phone || c.whatsapp], ["Empresa", (c) => c.company], ["Cargo", (c) => c.role], ["Página web", (c) => c.website],
               ["Tipo de cliente", (c) => typesOf(c).map((id) => typeOf(types, id)?.label).join(", ")], ["Relación", (c) => c.relation],
               ["Responsable", (c) => c.ownerName || c.responsable], ["Etapa", (c) => c.stage], ["Etiquetas", (c) => c.tags],
               ["Ciudad", (c) => c.city], ["Provincia", (c) => c.province], ["DNI/NIF", (c) => c.dni], ["Alta", (c) => fmtDate(c.createdAt)],
@@ -314,12 +326,13 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
           )}
         </div>
       )}
+      </div>
 
       {loading ? (
         <div className="crm-loading">Cargando contactos…</div>
       ) : (
         <>
-          <table className="crm-table">
+          <table className="crm-table under-sticky" style={{ "--stick": `${stickyH}px` }}>
             <thead>
               <tr>
                 <th style={{ width: 30 }}><input type="checkbox" checked={allVisible} onChange={toggleAll} title="Seleccionar esta página" /></th>
@@ -412,6 +425,7 @@ Irán a la Papelera de reciclaje (CRM › Más), desde donde se pueden restaurar
             <div className="crm-field"><label>Área / Departamento</label><input value={form.area} onChange={set("area")} placeholder="Ej. Marketing" /></div>
             <div className="crm-field"><label>Responsable</label><input value={form.responsable} onChange={set("responsable")} /></div>
           </div>
+          <div className="crm-field"><label>Página web</label><input value={form.website} onChange={set("website")} placeholder="Ej. www.empresa.com" /></div>
           <div className="crm-two">
             <div className="crm-field"><label>Etapa</label>
               <select value={form.stage} onChange={set("stage")}>{STAGES.map((s) => <option key={s}>{s}</option>)}</select>

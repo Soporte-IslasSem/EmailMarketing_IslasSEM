@@ -102,6 +102,8 @@
 }
 /* Dentro de ventanas (modales) el margen es otro: ahí la cabecera no se fija. */
 .crm-modal .crm-table thead th { position: static; box-shadow: none; }
+/* Tabla bajo una cabecera fija (Contactos): sus títulos se quedan justo debajo de ella. */
+.crm-table.under-sticky thead th { top: calc(var(--stick, 0px) - 28px); z-index: 15; }
 .crm-table th,
 .crm-table td {
   text-align: left;

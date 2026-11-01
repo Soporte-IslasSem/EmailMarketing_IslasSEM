@@ -89,3 +89,16 @@ export function searchRestaurants(items, term) {
 // Ajustes de la sección (nombre de la marca), un documento por organización.
 export const SETTINGS_COLLECTION = "restaurantSettings";
 export const DEFAULT_BRAND = "ISLAS SEM CRM";
+
+// Columnas del archivo de Exportar/Importar (mismo orden y nombres en los dos sentidos).
+// [campo, cabecera]. "ID" permite actualizar la ficha exacta al volver a importar.
+export const CSV_COLUMNS = [
+  ["id", "ID"], ["name", "Restaurante"], ["city", "Ciudad"], ["cuisine", "Tipo de cocina"], ["website", "Web"],
+  ["maps", "Ubicación"], ["tour360", "Visita 360º"], ["instagram", "Instagram"], ["facebook", "Facebook"],
+  ["tiktok", "TikTok"], ["tripadvisor", "TripAdvisor"], ["otherSocial", "Otras redes"], ["freeToilets", "Baños gratis"],
+  ["menuText", "Carta y precios"], ["menuLink", "Enlace del menú"], ["phoneLandline", "Teléfono fijo"],
+  ["phoneMobile", "Teléfono móvil"], ["whatsapp", "WhatsApp"], ["email", "Email de contacto"], ["bookingCalendar", "Calendario de reservas"],
+  ["customerCount", "Base de clientela"], ["birthdayAutomation", "Automatización cumpleaños"],
+  ["nfcUnits", "NFC (unidades)"], ["reviewsGoogle", "Reseñas Google"], ["reviewsTripadvisor", "Reseñas TripAdvisor"],
+  ["timeTracking", "Control horario"], ["rgpdLink", "RGPD"], ["tpvStatus", "Integración TPV"],
+];

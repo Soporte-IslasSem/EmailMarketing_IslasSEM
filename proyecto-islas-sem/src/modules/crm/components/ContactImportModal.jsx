@@ -7,12 +7,11 @@
 // Con los que ya existen se puede: no tocarlos, completar solo sus campos vacíos o
 // actualizarlos con lo que trae el archivo (una celda vacía nunca borra un dato).
 import { useRef, useState } from "react";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "../../../config/firebaseConfig";
 import CrmModal from "./CrmModal";
 import { typesOf, typeFields } from "../lib/clientTypes";
+import { readFile } from "../lib/readSheet";
 
 const FIELDS = {
   id: /^(id|id ?cliente|client ?id|c[oó]digo)$/i,
@@ -22,6 +21,7 @@ const FIELDS = {
   phone: /^(tel[eé]fono|m[oó]vil|movil|phone|celular|whatsapp)$/i,
   company: /^(empresa|compa[nñ][ií]a|company|organizaci[oó]n)$/i,
   role: /^(cargo|puesto|position|job ?title)$/i,
+  website: /^(web|p[aá]gina( web)?|sitio( web)?|website|url)$/i,
   dni: /^(dni|nif|dni\/nif|cif|documento)$/i,
   address: /^(direcci[oó]n|address)$/i,
   city: /^(ciudad|localidad|municipio|city)$/i,
@@ -31,7 +31,7 @@ const FIELDS = {
   notes: /^(notas?|comentarios?|observaciones|notes)$/i,
 };
 const LABEL = {
-  id: "ID", firstName: "Nombre", lastName: "Apellidos", email: "Email", phone: "Teléfono", company: "Empresa", role: "Cargo",
+  id: "ID", firstName: "Nombre", lastName: "Apellidos", email: "Email", phone: "Teléfono", company: "Empresa", role: "Cargo", website: "Página web",
   dni: "DNI/NIF", address: "Dirección", city: "Ciudad", province: "Provincia", clientType: "Tipo de cliente", tags: "Etiquetas", notes: "Notas",
 };
 const norm = (v) => String(v ?? "").trim();
@@ -53,16 +53,6 @@ function mapColumns(headers) {
     if (key && !map[key]) map[key] = h;
   });
   return map;
-}
-
-async function readFile(file) {
-  if (/\.(xlsx|xls)$/i.test(file.name)) {
-    const wb = XLSX.read(await file.arrayBuffer());
-    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
-  }
-  return new Promise((resolve, reject) =>
-    Papa.parse(file, { header: true, skipEmptyLines: true, complete: (r) => resolve(r.data), error: reject })
-  );
 }
 
 // existing: contactos actuales (todos); types: tipos de cliente; canSetType: solo administradores.
@@ -103,7 +93,7 @@ export default function ContactImportModal({ orgId, existing, types, canSetType,
         });
         const c = {
           firstName: get("firstName"), lastName: get("lastName"), email, phone: get("phone"), whatsapp: "",
-          company: get("company"), role: get("role"), dni: get("dni"), address: get("address"), city: get("city"),
+          company: get("company"), role: get("role"), website: get("website"), dni: get("dni"), address: get("address"), city: get("city"),
           province: get("province"), notes: get("notes"), tags: get("tags").split(/[,;]/).map(norm).filter(Boolean),
           ...(canSetType && typeIds.length ? { clientTypes: typeIds } : {}),
         };
@@ -125,6 +115,8 @@ export default function ContactImportModal({ orgId, existing, types, canSetType,
         ok.push(c);
       });
       setPreview({ file: file.name, total: rows.length, map, ok, dupes, invalid, how, unknownTypes: [...unknownTypes] });
+      // Archivo exportado desde Contactos (trae la columna ID) → lo normal es guardar lo editado.
+      setMode(map.id && dupes.some((d) => d.prev) ? "overwrite" : "none");
     } catch (err) {
       setError("No se pudo leer el archivo: " + (err.message || err));
     } finally {
@@ -207,7 +199,7 @@ export default function ContactImportModal({ orgId, existing, types, canSetType,
     >
       <p style={{ marginTop: 0 }}>
         Sube un <b>CSV</b> o <b>Excel</b> con una fila de cabeceras. Columnas reconocidas: ID, Nombre, Apellidos, Email, Teléfono,
-        Empresa, Cargo, DNI/NIF, Dirección, Ciudad, Provincia, Tipo de cliente, Etiquetas y Notas. Para cambiar datos de
+        Empresa, Cargo, Página web, DNI/NIF, Dirección, Ciudad, Provincia, Tipo de cliente, Etiquetas y Notas. Para cambiar datos de
         contactos que ya existen, exporta desde Contactos, edita el archivo sin tocar la columna <b>ID</b> e impórtalo.
       </p>
       <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={onFile} />
@@ -241,7 +233,8 @@ export default function ContactImportModal({ orgId, existing, types, canSetType,
                   <input type="radio" name="import-mode" checked={mode === v} onChange={() => setMode(v)} style={{ width: "auto" }} /> {l}
                 </label>
               ))}
-              {mode !== "none" && <p style={{ margin: "6px 0 0", color: "var(--crm-muted)" }}>{changes.length ? `Se cambiarán datos en ${changes.length} contacto(s).` : "No hay nada que cambiar en los que ya existen."}</p>}
+              {mode !== "none" && <p style={{ margin: "6px 0 0", color: "var(--crm-muted)" }}>{changes.length ? `Se cambiarán datos en ${changes.length} contacto(s).` : "No hay nada que cambiar en los que ya existen: el archivo trae los mismos datos que ya tienen."}</p>}
+              {mode === "none" && <p style={{ margin: "6px 0 0", color: "#b26b00" }}>⚠ Con «No tocarlos» no se guarda ningún cambio en estos contactos. Si has editado el archivo, elige «Actualizarlos».</p>}
             </div>
           )}
         </div>

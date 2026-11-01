@@ -16,7 +16,7 @@ import { submissionLabel, submissionEntries } from "../../forms/public/builtinFo
 const EDIT_FIELDS = [
   ["firstName", "Nombre"], ["lastName", "Apellidos"], ["email", "Email", "email"], ["phone", "Teléfono", "tel"],
   ["whatsapp", "WhatsApp", "tel"], ["dni", "DNI / NIF"], ["company", "Empresa"], ["role", "Cargo"], ["area", "Área / departamento"],
-  ["address", "Dirección"], ["city", "Ciudad"], ["province", "Provincia"], ["notes", "Notas"],
+  ["website", "Página web", "url"], ["address", "Dirección"], ["city", "Ciudad"], ["province", "Provincia"], ["notes", "Notas"],
 ];
 
 export default function ContactDetail() {
@@ -203,6 +203,7 @@ export default function ContactDetail() {
               <div className="row"><dt>DNI/NIF</dt><dd>{contact.dni || "—"}</dd></div>
               <div className="row"><dt>Empresa</dt><dd>{contact.companyId ? <span className="crm-link" onClick={() => navigate(`/dashboard/crm/companies/${contact.companyId}`)}>{contact.company || "Ver empresa"}</span> : contact.company || "—"}</dd></div>
               {(contact.role || contact.area) && <div className="row"><dt>Cargo / área</dt><dd>{[contact.role, contact.area].filter(Boolean).join(" · ")}</dd></div>}
+              <div className="row"><dt>Página web</dt><dd>{contact.website ? <a href={/^https?:\/\//i.test(contact.website) ? contact.website : `https://${contact.website}`} target="_blank" rel="noopener noreferrer">{contact.website}</a> : "—"}</dd></div>
               <div className="row"><dt>Dirección</dt><dd>{contact.address || "—"}</dd></div>
               <div className="row"><dt>Ciudad</dt><dd>{contact.city || "—"}{contact.province ? ` · ${contact.province}` : ""}</dd></div>
               <ClientAssignRows collection="contacts" item={contact} onChange={(patch) => setContact((c) => ({ ...c, ...patch }))} />
