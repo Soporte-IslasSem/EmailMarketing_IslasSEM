@@ -172,6 +172,10 @@ function signatureOk(raw, sig, secret) {
   return sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
 
+// Últimos avisos del webhook (en memoria, sin contenido de mensajes) para el diagnóstico.
+const RECENT = [];
+function noteHook(e) { RECENT.unshift({ at: Date.now(), ...e }); RECENT.length = Math.min(RECENT.length, 30); }
+
 async function receiveWebhook(req, res) {
   const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
   let payload;
@@ -195,6 +199,8 @@ async function receiveWebhook(req, res) {
     allowed.set(orgId, platformOk || signatureOk(raw, sig, (await settings(orgId)).appSecret));
   }
   const ok = jobs.filter((j) => allowed.get(j.orgId));
+  const ids = (payload?.entry || []).flatMap((en) => (en.changes || []).map((c) => ({ field: c.field, waba: en.id, phone: c.value?.metadata?.phone_number_id || "" })));
+  noteHook({ orgs: [...allowed.keys()], ids: ids.slice(0, 5), signed: !!sig, result: !jobs.length ? "sin empresa (número/cuenta no conectados)" : ok.length ? "aceptado" : "firma no válida (clave secreta)" });
   if (jobs.length && !ok.length) return res.sendStatus(401);
   // Meta reintenta si no respondemos rápido: se contesta ya y se procesa después.
   res.sendStatus(200);
@@ -632,6 +638,24 @@ async function saveConfig(req, res) {
 
 /* ------------------------------------------------------------------ conexión (ajustes) */
 
+// Diagnóstico (solo lectura): qué apps tiene suscritas la cuenta en Meta y qué avisos han llegado.
+async function diag(req, res) {
+  const user = await staff(req, res);
+  if (!user) return;
+  if (!user.isAdmin) return fail(res, "Solo un administrador", 403);
+  const s = await settings(user.orgId, true);
+  const out = { ok: true, phoneNumberId: s.phoneNumberId || "", wabaId: s.wabaId || "", appId: s.appId || "", hasToken: !!s.token, hasAppSecret: !!s.appSecret };
+  if (s.wabaId && s.token) {
+    out.subscribedApps = await graph(user.orgId, `${s.wabaId}/subscribed_apps`, { token: s.token })
+      .then((r) => (r.data || []).map((a) => ({ id: a.whatsapp_business_api_data?.id || a.id || "", name: a.whatsapp_business_api_data?.name || a.name || "", override: a.override_callback_uri || "" })))
+      .catch((e) => ({ error: String(e.message || e) }));
+  }
+  const mine = new Set([s.phoneNumberId, s.wabaId].filter(Boolean).map(String));
+  out.recent = RECENT.filter((e) => e.orgs.includes(user.orgId) || e.ids.some((i) => mine.has(String(i.phone)) || mine.has(String(i.waba))) || !e.orgs.length).slice(0, 20)
+    .map((e) => ({ ...e, orgs: undefined, mine: e.orgs.includes(user.orgId) }));
+  res.json(out);
+}
+
 async function getSettings(req, res) {
   const user = await staff(req, res);
   if (!user) return;
@@ -883,7 +907,7 @@ module.exports = {
   verifyWebhook, receiveWebhook: route(receiveWebhook), send: route(send), sendMedia: route(sendMedia),
   fileUrl: route(fileUrl), updateChat: route(updateChat), bulk: route(bulk), block: route(block),
   getConfig: route(getConfig), saveConfig: route(saveConfig),
-  getSettings: route(getSettings), saveSettings: route(saveSettings), embeddedSignup: route(embeddedSignup), disconnect: route(disconnect),
+  getSettings: route(getSettings), diag: route(diag), saveSettings: route(saveSettings), embeddedSignup: route(embeddedSignup), disconnect: route(disconnect),
   getProfile: route(getProfile), saveProfile: route(saveProfile), health: route(health),
   // para waAuto / waTemplates
   route, staff, settings, graph, deliver, storeOutbound, logEvent, stageText, sendAuto, sendAutoText, openChat, findContact,

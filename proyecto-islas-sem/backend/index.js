@@ -202,6 +202,7 @@ api.post("/whatsapp/send", whatsapp.send);
 api.post("/whatsapp/file-url", whatsapp.fileUrl);
 api.post("/whatsapp/chat", whatsapp.updateChat);
 api.get("/whatsapp/settings", whatsapp.getSettings);
+api.get("/whatsapp/diag", whatsapp.diag);
 api.post("/whatsapp/settings", whatsapp.saveSettings);
 api.post("/whatsapp/embedded-signup", whatsapp.embeddedSignup);
 api.post("/whatsapp/disconnect", whatsapp.disconnect);
