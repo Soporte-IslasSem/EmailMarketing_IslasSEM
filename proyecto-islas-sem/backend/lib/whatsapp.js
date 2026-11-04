@@ -709,15 +709,22 @@ async function saveSettings(req, res) {
   } catch (e) {
     return fail(res, `Meta no acepta estos datos: ${e.message}`, 400);
   }
-  // La cuenta (WABA) tiene que suscribir esta app para que lleguen los mensajes al webhook.
-  let subscribed = false;
-  if (next.wabaId) {
-    subscribed = await graph(user.orgId, `${next.wabaId}/subscribed_apps`, { method: "POST", token: next.token }).then(() => true).catch(() => false);
-  }
   await storeConnection(user, next, info);
+  // La cuenta (WABA) tiene que suscribir esta app para que lleguen los mensajes al webhook. Se pide
+  // a Meta que los mensajes de ESTA cuenta vayan a nuestro webhook (override_callback_uri): así la
+  // app puede ser una que ya se usa para otro producto sin tocar su webhook. Sin plan B sin
+  // override: eso mandaría los mensajes de esta cuenta al webhook de la otra app. Va después de
+  // guardar porque Meta comprueba el webhook con el token de verificación en ese momento.
+  let subscribed = false;
+  let subscribeError = "";
+  if (next.wabaId) {
+    const body = { override_callback_uri: `${PUBLIC_URL}/api/whatsapp/webhook`, verify_token: next.verifyToken };
+    subscribed = await graph(user.orgId, `${next.wabaId}/subscribed_apps`, { method: "POST", token: next.token, body })
+      .then(() => true).catch((e) => { subscribeError = String(e.message || e).slice(0, 300); return false; });
+  }
   // Primera sincronización de plantillas (si falla no impide guardar).
   if (next.wabaId) await require("./waTemplates").syncTemplates(user.orgId).catch(() => {});
-  res.json({ ok: true, subscribed });
+  res.json({ ok: true, subscribed, subscribeError });
 }
 
 // Conexión con un botón (Embedded Signup): la app manda el código de Facebook y los

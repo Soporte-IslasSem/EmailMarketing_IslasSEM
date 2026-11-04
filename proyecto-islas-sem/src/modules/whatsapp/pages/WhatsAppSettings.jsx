@@ -129,7 +129,7 @@ function Connection({ admin }) {
     setSaving(true); setMsg(null);
     try {
       const r = await waApi("settings", f);
-      setMsg({ text: `Conectado y guardado. Meta ha confirmado los datos.${f.wabaId ? (r.subscribed ? " La app está suscrita a la cuenta (los mensajes llegarán al webhook)." : " Aviso: no se pudo suscribir la app a la cuenta de WhatsApp; revisa los permisos del token.") : ""}` });
+      setMsg({ text: `Conectado y guardado. Meta ha confirmado los datos.${f.wabaId ? (r.subscribed ? " La app está suscrita a la cuenta (los mensajes llegarán al webhook)." : ` Aviso: no se pudo suscribir la app a la cuenta de WhatsApp (los mensajes no llegarán)${r.subscribeError ? `: ${r.subscribeError}` : "; revisa los permisos del token."}`) : ""}` });
       await load();
     } catch (e) { setMsg({ err: true, text: e.message }); }
     setSaving(false);
