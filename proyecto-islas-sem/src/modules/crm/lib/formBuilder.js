@@ -5,7 +5,7 @@
 //     fields: [{ k, type, ph, req, options?, maps? }] }
 // - type: text | email | tel | textarea | select | check (casilla de consentimiento RGPD)
 // - maps: dónde se copia el valor en la ficha del cliente (email, firstName, lastName,
-//   phone, company). Se pone solo al añadir campos de la biblioteca.
+//   phone, company, dni, website, address, city). Se pone solo al añadir campos de la biblioteca.
 // SEPA y Datos Jurídicos se pueden editar: se guarda una versión en crmForms con su
 // mismo id ("sepa" / "juridicos"); si no existe, se usa la original.
 import { BUILTIN_FORMS, BUILTIN_LIST } from "../../forms/public/builtinForms";
@@ -16,6 +16,11 @@ export const FIELD_LIB = {
   email: { k: "Email", type: "email", ph: "correo@ejemplo.com", req: true, maps: "email" },
   telefono: { k: "Teléfono", type: "tel", ph: "+34 …", req: false, maps: "phone" },
   empresa: { k: "Empresa", type: "text", ph: "Nombre de tu empresa", req: false, maps: "company" },
+  // Datos necesarios para hacer el contrato: obligatorios y comprobados (DNI/NIF con su letra).
+  dni: { k: "DNI/NIF", type: "text", ph: "12345678Z o B12345678", req: true, maps: "dni" },
+  web: { k: "Página web", type: "text", ph: "www.tuempresa.com", req: true, maps: "website" },
+  direccion: { k: "Dirección", type: "text", ph: "Calle, número, piso", req: true, maps: "address" },
+  ciudad: { k: "Ciudad", type: "text", ph: "Ciudad o municipio", req: true, maps: "city" },
   servicio: { k: "Servicio de interés", type: "select", ph: "", req: false, options: ["SEO", "SEM / Google Ads", "Redes sociales", "Email marketing"] },
   mensaje: { k: "Mensaje", type: "textarea", ph: "¿En qué podemos ayudarte?", req: false },
   rgpd: { k: "Acepto la política de privacidad", type: "check", ph: "", req: true },
@@ -60,6 +65,10 @@ function guessMap(f) {
   if (/^apellidos/.test(k)) return "lastName";
   if (f.type === "tel" && /directo|^tel[eé]fono$/.test(k)) return "phone";
   if (/denominaci[oó]n|^empresa/.test(k)) return "company";
+  if (/\b(dni|nif|nie|cif)\b/.test(k)) return "dni";
+  if (/p[aá]gina web|^web/.test(k)) return "website";
+  if (/^direcci[oó]n$/.test(k)) return "address";
+  if (/^(ciudad|localidad|municipio)$/.test(k)) return "city";
   return "";
 }
 

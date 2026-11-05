@@ -30,7 +30,30 @@ const { respond } = require("./stageflow");
 const FORM_LABEL = { sepa: "Orden de Domiciliación SEPA", juridicos: "Datos Jurídicos del Representante" };
 const MIN_SCORE = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
 const FIELD_TYPES = new Set(["text", "email", "tel", "number", "date", "textarea", "select", "check"]);
-const MAPS = new Set(["email", "firstName", "lastName", "phone", "company"]);
+const MAPS = new Set(["email", "firstName", "lastName", "phone", "company", "dni", "website", "address", "city"]);
+// Campos de la ficha que se completan con el formulario (si en la ficha están vacíos).
+const FICHA = ["firstName", "lastName", "phone", "company", "dni", "website", "address", "city"];
+
+// DNI, NIE o CIF español con su letra/dígito de control: así no vale cualquier texto.
+function documentoValido(valor) {
+  const v = String(valor || "").toUpperCase().replace(/[\s.-]/g, "");
+  const LETRAS = "TRWAGMYFPDXBNJZSQVHLCKE";
+  if (/^\d{8}[A-Z]$/.test(v)) return LETRAS[Number(v.slice(0, 8)) % 23] === v[8];
+  if (/^[XYZ]\d{7}[A-Z]$/.test(v)) return LETRAS[Number("XYZ".indexOf(v[0]) + v.slice(1, 8)) % 23] === v[8];
+  if (/^[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]$/.test(v)) {
+    let suma = 0;
+    for (let i = 0; i < 7; i++) {
+      const n = Number(v[i + 1]);
+      if (i % 2 === 0) { const d = n * 2; suma += Math.floor(d / 10) + (d % 10); } else suma += n;
+    }
+    const control = (10 - (suma % 10)) % 10;
+    return v[8] === String(control) || v[8] === "JABCDEFGHI"[control];
+  }
+  return false;
+}
+const webValida = (v) => /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/\S*)?$/i.test(String(v).trim());
+const telefonoValido = (v) => String(v).replace(/\D/g, "").length >= 9;
+const esCampoDocumento = (f) => f.maps === "dni" || /\b(dni|nif|nie|cif)\b/i.test(f.k);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const HEX = /^#[0-9a-f]{6}$/i;
 const TYPE_ID = /^[a-z0-9-]{1,64}$/;
@@ -153,6 +176,10 @@ async function submitForm(req, res) {
         if (f.req && !v) return res.status(400).json({ ok: false, error: `Falta rellenar: ${f.k}` });
         if (v && f.type === "email" && !EMAIL_RE.test(v)) return res.status(400).json({ ok: false, error: `Email no válido: ${f.k}` });
         if (v && f.type === "select" && !f.options.includes(v)) return res.status(400).json({ ok: false, error: `Opción no válida: ${f.k}` });
+        // Datos para contratos: que no se pueda poner cualquier cosa.
+        if (v && esCampoDocumento(f) && !documentoValido(v)) return res.status(400).json({ ok: false, error: `${f.k} no válido: revisa el número y la letra` });
+        if (v && f.maps === "website" && !webValida(v)) return res.status(400).json({ ok: false, error: `${f.k} no válida` });
+        if (v && (f.type === "tel" || f.maps === "phone") && !telefonoValido(v)) return res.status(400).json({ ok: false, error: `${f.k} no válido` });
         clean[f.k] = v;
         if (f.maps && v && !person[f.maps]) person[f.maps] = f.maps === "email" ? norm(v) : v;
       }
@@ -235,6 +262,10 @@ function pickPerson(data) {
     lastName: find(/^apellidos/i),
     phone: find(/tel[eé]fono directo|tel[eé]fono/i),
     company: find(/denominaci[oó]n|empresa/i),
+    dni: find(/\b(dni|nif|nie|cif)\b/i),
+    website: find(/p[aá]gina web|^web|sitio web/i),
+    address: find(/direcci[oó]n/i),
+    city: find(/ciudad|localidad|poblaci[oó]n|municipio/i),
   };
 }
 
@@ -350,7 +381,7 @@ async function fillEmptyFields(col, id, person) {
   const d = (await ref.get()).data();
   if (!d || norm(d.email) !== email) return;
   const patch = {};
-  for (const k of ["firstName", "lastName", "phone", "company"]) {
+  for (const k of FICHA) {
     const cur = String(d[k] || "").trim();
     // Prospecto creado sin nombre: se le puso la parte del email antes de la @.
     const blank = !cur || (k === "firstName" && cur === email.split("@")[0]);
@@ -395,8 +426,13 @@ async function processFormSubmissions() {
       else dealId = "";
     }
     // Formularios creados con campos "guardar en la ficha como": solo esos. Si no, por el nombre del campo.
-    const person = s.mapped ? { email: "", firstName: "", lastName: "", phone: "", company: "" } : pickPerson(s.data);
+    const person = s.mapped ? { email: "", firstName: "", lastName: "", phone: "", company: "", dni: "", website: "", address: "", city: "" } : pickPerson(s.data);
     for (const [k, v] of Object.entries(s.person || {})) if (MAPS.has(k) && v) person[k] = k === "email" ? norm(v) : String(v);
+    // Datos de contrato de campos creados a mano (sin "guardar en la ficha"): se reconocen por el nombre.
+    if (s.mapped) {
+      const porNombre = pickPerson(s.data);
+      for (const k of ["dni", "website", "address", "city"]) if (!person[k] && porNombre[k]) person[k] = porNombre[k];
+    }
     if (!contactId) {
       const r = await resolvePerson(orgId, { ...person, source: "Formulario web", notes: `Creado por el formulario "${label}"` });
       contactId = r.contactId; leadId = r.leadId;
@@ -439,4 +475,4 @@ async function processFormSubmissions() {
   return { linked };
 }
 
-module.exports = { leadForContact, ensureDeal, submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };
+module.exports = { documentoValido, leadForContact, ensureDeal, submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { BUILTIN_FORMS } from "./builtinForms";
+import { documentoValido, esCampoDocumento, telefonoValido, webValida } from "./validarDatos";
 
 const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 const API_BASE = import.meta.env.VITE_API_BASE || "https://email-marketing.islassem.com/api";
@@ -120,6 +121,14 @@ export default function PublicForm() {
     setError("");
     const missing = cfg.fields.filter((f) => f.req && !String(values[f.k] || "").trim());
     if (missing.length) { setError(`Falta rellenar: ${missing.map((m) => m.k).join(", ")}`); return; }
+    // Datos de contrato: el DNI/NIF tiene que ser real (letra de control), la web y el teléfono válidos.
+    const val = (f) => String(values[f.k] || "").trim();
+    const malDoc = cfg.fields.find((f) => val(f) && esCampoDocumento(f) && !documentoValido(val(f)));
+    if (malDoc) { setError(`${malDoc.k} no válido: revisa el número y la letra.`); return; }
+    const malWeb = cfg.fields.find((f) => val(f) && f.maps === "website" && !webValida(val(f)));
+    if (malWeb) { setError(`${malWeb.k} no válida.`); return; }
+    const malTel = cfg.fields.find((f) => val(f) && (f.type === "tel" || f.maps === "phone") && !telefonoValido(val(f)));
+    if (malTel) { setError(`${malTel.k} no válido.`); return; }
     if (cfg.checks.some((c) => c.req && !accepted[c.k])) { setError("Debes aceptar el consentimiento."); return; }
     // Las casillas viajan como "Sí" (los formularios fijos originales no las guardan como campo).
     const data = { ...values };
