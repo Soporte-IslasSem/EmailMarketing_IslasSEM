@@ -53,7 +53,8 @@ function documentoValido(valor) {
 }
 const webValida = (v) => /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/\S*)?$/i.test(String(v).trim());
 const telefonoValido = (v) => String(v).replace(/\D/g, "").length >= 9;
-const esCampoDocumento = (f) => f.maps === "dni" || /\b(dni|nif|nie|cif)\b/i.test(f.k);
+// Solo campos de texto: un desplegable o una casilla tipo "¿Tienes DNI?" no es el número.
+const esCampoDocumento = (f) => f.maps === "dni" || (f.type === "text" && /\b(dni|nif|nie|cif)\b/i.test(f.k));
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const HEX = /^#[0-9a-f]{6}$/i;
 const TYPE_ID = /^[a-z0-9-]{1,64}$/;
@@ -255,7 +256,7 @@ async function markRgpdSigned(orgId, data, contactId, submissionId) {
 // Extrae email/nombre/teléfono/empresa de los campos (los nombres vienen del formulario).
 function pickPerson(data) {
   const entries = Object.entries(data || {});
-  const find = (re) => (entries.find(([k, v]) => re.test(k) && String(v).trim()) || [])[1] || "";
+  const find = (re, no) => (entries.find(([k, v]) => re.test(k) && !(no && no.test(k)) && String(v).trim()) || [])[1] || "";
   return {
     email: norm(find(/e-?mail directo|correo electr[oó]nico de facturaci|e-?mail|correo/i)),
     firstName: find(/^nombre/i),
@@ -264,7 +265,8 @@ function pickPerson(data) {
     company: find(/denominaci[oó]n|empresa/i),
     dni: find(/\b(dni|nif|nie|cif)\b/i),
     website: find(/p[aá]gina web|^web|sitio web/i),
-    address: find(/direcci[oó]n/i),
+    // "Dirección de correo" o "Dirección web" no son la dirección postal.
+    address: find(/direcci[oó]n/i, /correo|e-?mail|web|url/i),
     city: find(/ciudad|localidad|poblaci[oó]n|municipio/i),
     province: find(/provincia/i),
   };

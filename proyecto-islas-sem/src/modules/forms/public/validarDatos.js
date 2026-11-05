@@ -18,4 +18,5 @@ export function documentoValido(valor) {
 }
 export const webValida = (v) => /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/\S*)?$/i.test(String(v).trim());
 export const telefonoValido = (v) => String(v).replace(/\D/g, "").length >= 9;
-export const esCampoDocumento = (f) => f.maps === "dni" || /\b(dni|nif|nie|cif)\b/i.test(f.k);
+// Solo campos de texto: un desplegable o una casilla tipo "¿Tienes DNI?" no es el número.
+export const esCampoDocumento = (f) => f.maps === "dni" || (f.type === "text" && /\b(dni|nif|nie|cif)\b/i.test(f.k));
