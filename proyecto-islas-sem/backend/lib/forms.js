@@ -32,7 +32,7 @@ const MIN_SCORE = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
 const FIELD_TYPES = new Set(["text", "email", "tel", "number", "date", "textarea", "select", "check"]);
 const MAPS = new Set(["email", "firstName", "lastName", "phone", "company", "dni", "website", "address", "city"]);
 // Campos de la ficha que se completan con el formulario (si en la ficha están vacíos).
-const FICHA = ["firstName", "lastName", "phone", "company", "dni", "website", "address", "city"];
+const FICHA = ["firstName", "lastName", "phone", "company", "dni", "website", "address", "city", "province"];
 
 // DNI, NIE o CIF español con su letra/dígito de control: así no vale cualquier texto.
 function documentoValido(valor) {
@@ -266,6 +266,7 @@ function pickPerson(data) {
     website: find(/p[aá]gina web|^web|sitio web/i),
     address: find(/direcci[oó]n/i),
     city: find(/ciudad|localidad|poblaci[oó]n|municipio/i),
+    province: find(/provincia/i),
   };
 }
 
@@ -426,12 +427,12 @@ async function processFormSubmissions() {
       else dealId = "";
     }
     // Formularios creados con campos "guardar en la ficha como": solo esos. Si no, por el nombre del campo.
-    const person = s.mapped ? { email: "", firstName: "", lastName: "", phone: "", company: "", dni: "", website: "", address: "", city: "" } : pickPerson(s.data);
+    const person = s.mapped ? { email: "", firstName: "", lastName: "", phone: "", company: "", dni: "", website: "", address: "", city: "", province: "" } : pickPerson(s.data);
     for (const [k, v] of Object.entries(s.person || {})) if (MAPS.has(k) && v) person[k] = k === "email" ? norm(v) : String(v);
     // Datos de contrato de campos creados a mano (sin "guardar en la ficha"): se reconocen por el nombre.
     if (s.mapped) {
       const porNombre = pickPerson(s.data);
-      for (const k of ["dni", "website", "address", "city"]) if (!person[k] && porNombre[k]) person[k] = porNombre[k];
+      for (const k of ["dni", "website", "address", "city", "province"]) if (!person[k] && porNombre[k]) person[k] = porNombre[k];
     }
     if (!contactId) {
       const r = await resolvePerson(orgId, { ...person, source: "Formulario web", notes: `Creado por el formulario "${label}"` });
@@ -475,4 +476,4 @@ async function processFormSubmissions() {
   return { linked };
 }
 
-module.exports = { documentoValido, leadForContact, ensureDeal, submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };
+module.exports = { fillEmptyFields, FICHA, MAPS, documentoValido, leadForContact, ensureDeal, submitForm, formDefinition, publicForms, processFormSubmissions, verifyRecaptcha, pickPerson, loadCustomForm, markRgpdSigned };
